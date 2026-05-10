@@ -1,0 +1,36 @@
+{
+  "materials": [
+    {
+      "id": "alu_profile_40x40",
+      "name": "Alu profiel 40x40",
+      "kind": "profile",
+      "widthMm": 40,
+      "heightMm": 40,
+      "stockLengthMm": 6000
+    },
+    {
+      "id": "osb_18",
+      "name": "OSB 18mm",
+      "kind": "sheet",
+      "thicknessMm": 18,
+      "sheetLengthMm": 2440,
+      "sheetWidthMm": 1220
+    },
+    {
+      "id": "betonplex_12",
+      "name": "Betonplex 12mm",
+      "kind": "sheet",
+      "thicknessMm": 12,
+      "sheetLengthMm": 2500,
+      "sheetWidthMm": 1250
+    },
+    {
+      "id": "betonplex_18",
+      "name": "Betonplex 18mm",
+      "kind": "sheet",
+      "thicknessMm": 18,
+      "sheetLengthMm": 2500,
+      "sheetWidthMm": 1250
+    }
+  ]
+}

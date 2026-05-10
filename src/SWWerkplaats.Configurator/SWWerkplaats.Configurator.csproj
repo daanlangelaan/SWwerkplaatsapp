@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>SWWerkplaats.Configurator</RootNamespace>
+    <AssemblyName>SWWerkplaats.Configurator</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Domain\CutListItem.cs" />
+    <Compile Include="Domain\AssemblyPlacement.cs" />
+    <Compile Include="Domain\CabinetConfig.cs" />
+    <Compile Include="Domain\DrillOperation.cs" />
+    <Compile Include="Domain\FastenerDefinition.cs" />
+    <Compile Include="Domain\HardwareItem.cs" />
+    <Compile Include="Domain\LibraryCatalog.cs" />
+    <Compile Include="Domain\MachineProfile.cs" />
+    <Compile Include="Domain\Material.cs" />
+    <Compile Include="Domain\NestingModels.cs" />
+    <Compile Include="Domain\PartModels.cs" />
+    <Compile Include="Domain\ProfileOperation.cs" />
+    <Compile Include="Domain\RailTemplate.cs" />
+    <Compile Include="Domain\ToolDefinition.cs" />
+    <Compile Include="Domain\WorkbenchConfig.cs" />
+    <Compile Include="Domain\WorkbenchModel.cs" />
+    <Compile Include="Engine\WorkbenchEngine.cs" />
+    <Compile Include="Engine\CabinetEngine.cs" />
+    <Compile Include="Manufacturing\CsvExporter.cs" />
+    <Compile Include="Manufacturing\Mach3GCodeGenerator.cs" />
+    <Compile Include="Manufacturing\NestedMach3GCodeGenerator.cs" />
+    <Compile Include="Manufacturing\NestingExporter.cs" />
+    <Compile Include="Manufacturing\ProfileOperationsXlsxExporter.cs" />
+    <Compile Include="Manufacturing\SheetNestingEngine.cs" />
+    <Compile Include="SolidWorks\ISolidWorksExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksComPartExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksExportPlan.cs" />
+    <Compile Include="SolidWorks\SolidWorksMacroExporter.cs" />
+    <Compile Include="UI\MainForm.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

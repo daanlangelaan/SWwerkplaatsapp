@@ -1,0 +1,13 @@
+{
+  "machines": [
+    {
+      "id": "mach3_portaal_3020x1520",
+      "name": "Mach3 portaalfrees 3020x1520",
+      "maxXmm": 3020,
+      "maxYmm": 1520,
+      "fileExtension": ".tap",
+      "safeZmm": 15,
+      "origin": "links onder"
+    }
+  ]
+}

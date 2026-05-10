@@ -1,0 +1,34 @@
+{
+  "tools": [
+    {
+      "id": "endmill_6mm",
+      "name": "Frees 6mm",
+      "kind": "endMill",
+      "diameterMm": 6,
+      "feedRateMmMin": 1800,
+      "plungeRateMmMin": 400,
+      "spindleRpm": 18000,
+      "passDepthMm": 4
+    },
+    {
+      "id": "endmill_8mm",
+      "name": "Frees 8mm",
+      "kind": "endMill",
+      "diameterMm": 8,
+      "feedRateMmMin": 2200,
+      "plungeRateMmMin": 450,
+      "spindleRpm": 18000,
+      "passDepthMm": 5
+    },
+    {
+      "id": "drill_5mm",
+      "name": "Boor 5mm",
+      "kind": "drill",
+      "diameterMm": 5,
+      "feedRateMmMin": 300,
+      "plungeRateMmMin": 300,
+      "spindleRpm": 6000,
+      "passDepthMm": 3
+    }
+  ]
+}

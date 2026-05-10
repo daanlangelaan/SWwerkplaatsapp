@@ -1,0 +1,20 @@
+{
+  "projectName": "Werktafel_1500x750x900",
+  "widthMm": 1500,
+  "depthMm": 750,
+  "heightMm": 900,
+  "frameProfileId": "alu_profile_40x40",
+  "topSheetId": "betonplex_18",
+  "includeLowerFrame": false,
+  "topOverhangFrontMm": 0,
+  "topOverhangBackMm": 0,
+  "topOverhangLeftMm": 0,
+  "topOverhangRightMm": 0,
+  "connectorHoleDiameterMm": 8,
+  "machineId": "mach3_portaal_3020x1520",
+  "toolId": "endmill_6mm",
+  "autoTabs": true,
+  "smallPartAreaThresholdMm2": 90000,
+  "tabWidthMm": 8,
+  "tabHeightMm": 1.5
+}
