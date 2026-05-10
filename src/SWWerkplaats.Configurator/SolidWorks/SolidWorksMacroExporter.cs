@@ -35,7 +35,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
         {
             var sb = new StringBuilder();
             sb.AppendLine("Option Explicit");
-            sb.AppendLine("' GeneratorVersion: SWWerkplaats_CabinetFacePlaneCuts_2026_05_10");
+            sb.AppendLine("' GeneratorVersion: SWWerkplaats_CabinetFaceOneSideCuts_2026_05_10");
             sb.AppendLine();
             sb.AppendLine("Dim swApp As Object");
             sb.AppendLine();
@@ -245,10 +245,16 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    ok = SelectVerticalZFacePlane(swModel, thickness, \"PlintuitsparingVlak\")");
             sb.AppendLine("    If Not ok Then Exit Sub");
             sb.AppendLine("    swModel.SketchManager.InsertSketch True");
-            sb.AppendLine("    swModel.SketchManager.CreateLine faceX, y0, z0, faceX, y1, z0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine faceX, y1, z0, faceX, y1, z1");
-            sb.AppendLine("    swModel.SketchManager.CreateLine faceX, y1, z1, faceX, y0, z1");
-            sb.AppendLine("    swModel.SketchManager.CreateLine faceX, y0, z1, faceX, y0, z0");
+            sb.AppendLine("    On Error Resume Next");
+            sb.AppendLine("    swModel.SketchManager.CreateCornerRectangle faceX, y0, z0, faceX, y1, z1");
+            sb.AppendLine("    If Err.Number <> 0 Then");
+            sb.AppendLine("        Err.Clear");
+            sb.AppendLine("        swModel.SketchManager.CreateLine faceX, y0, z0, faceX, y1, z0");
+            sb.AppendLine("        swModel.SketchManager.CreateLine faceX, y1, z0, faceX, y1, z1");
+            sb.AppendLine("        swModel.SketchManager.CreateLine faceX, y1, z1, faceX, y0, z1");
+            sb.AppendLine("        swModel.SketchManager.CreateLine faceX, y0, z1, faceX, y0, z0");
+            sb.AppendLine("    End If");
+            sb.AppendLine("    On Error GoTo 0");
             sb.AppendLine("    On Error Resume Next");
             sb.AppendLine("    Set cutFeat = CutSelectedSketchThroughThickness(swModel, thickness + 0.002)");
             sb.AppendLine("    If Err.Number <> 0 Or cutFeat Is Nothing Then");
@@ -318,14 +324,15 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("Function CutSelectedSketchThroughThickness(swModel As Object, depth As Double) As Object");
             sb.AppendLine("    Dim cutFeat As Object");
             sb.AppendLine("    On Error Resume Next");
-            sb.AppendLine("    Set cutFeat = swModel.FeatureManager.FeatureCut3(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, False, True, True, False, True, False, 0, 0, False)");
+            sb.AppendLine("    ' Face-plane sketches liggen op het oppervlak; cut dus eenzijdig het materiaal in.");
+            sb.AppendLine("    Set cutFeat = swModel.FeatureManager.FeatureCut3(True, False, True, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, False, True, True, False, True, False, 0, 0, False)");
             sb.AppendLine("    If Err.Number <> 0 Or cutFeat Is Nothing Then");
             sb.AppendLine("        Err.Clear");
             sb.AppendLine("        Set cutFeat = swModel.FeatureManager.FeatureCut3(False, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, False, True, True, False, True, False, 0, 0, False)");
             sb.AppendLine("    End If");
             sb.AppendLine("    If Err.Number <> 0 Or cutFeat Is Nothing Then");
             sb.AppendLine("        Err.Clear");
-            sb.AppendLine("        Set cutFeat = swModel.FeatureManager.FeatureCut3(False, False, False, 0, 0, depth / 2, depth / 2, False, False, False, False, 0, 0, False, False, False, False, False, True, True, False, True, False, 0, 0, False)");
+            sb.AppendLine("        Set cutFeat = swModel.FeatureManager.FeatureCut3(True, False, False, 0, 0, depth, 0, False, False, False, False, 0, 0, False, False, False, False, False, True, True, False, True, False, 0, 0, False)");
             sb.AppendLine("    End If");
             sb.AppendLine("    On Error GoTo 0");
             sb.AppendLine("    Set CutSelectedSketchThroughThickness = cutFeat");
