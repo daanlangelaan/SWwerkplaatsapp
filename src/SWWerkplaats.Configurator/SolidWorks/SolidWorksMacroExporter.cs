@@ -745,7 +745,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    Else");
             sb.AppendLine("        If orientation = \"SHEET_XY_TO_XZ\" Then SetSheetComponentTransform swComp, x, y, z");
             sb.AppendLine("        If orientation = \"SHEET_VERTICAL_X\" Then SetComponentTransform swComp, x, y, z, 1#, 0#, 0#, 0#, 0#, 1#, 0#, 1#, 0#");
-            sb.AppendLine("        If orientation = \"SHEET_VERTICAL_Z\" Then SetComponentTransform swComp, x, y, z, 0#, 0#, 1#, 0#, 1#, 0#, 1#, 0#, 0#");
+            sb.AppendLine("        If orientation = \"SHEET_VERTICAL_Z\" Then SetComponentTransform swComp, x, y, z, 0#, 0#, 1#, 1#, 0#, 0#, 0#, 1#, 0#");
             sb.AppendLine("        On Error Resume Next");
             sb.AppendLine("        swComp.Select4 False, Nothing, False");
             sb.AppendLine("        swAsm.FixComponent");
