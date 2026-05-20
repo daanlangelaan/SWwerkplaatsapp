@@ -35,7 +35,10 @@ namespace SWWerkplaats.Configurator.UI
         private readonly NumericUpDown cabinetPlinthDepth;
         private readonly NumericUpDown cabinetShelfClearance;
         private readonly NumericUpDown cabinetDrawerClearance;
+        private readonly NumericUpDown cabinetDrawerBackClearance;
         private readonly NumericUpDown cabinetDoorGap;
+        private readonly NumericUpDown cabinetTopDrawerHeight;
+        private readonly NumericUpDown cabinetShelfHoleEndMargin;
         private readonly ComboBox productMode;
         private readonly ComboBox frameProfile;
         private readonly ComboBox topSheet;
@@ -47,6 +50,7 @@ namespace SWWerkplaats.Configurator.UI
         private readonly ComboBox cabinetFrontMaterial;
         private readonly ComboBox cabinetBackMaterial;
         private readonly ComboBox cabinetRailTemplate;
+        private readonly ComboBox cabinetShelfSupportTemplate;
         private readonly CheckBox lowerFrame;
         private readonly CheckBox lowerShelf;
         private readonly CheckBox middleLayer;
@@ -54,8 +58,12 @@ namespace SWWerkplaats.Configurator.UI
         private readonly CheckBox autoTabs;
         private readonly CheckBox countersinkHoles;
         private readonly CheckBox cabinetBackPanel;
+        private readonly CheckBox cabinetTopDrawer;
+        private readonly CheckBox cabinetAdjustableShelfHoles;
         private readonly CheckBox exportSolidWorks;
         private readonly DataGridView cabinetUnits;
+        private readonly DataGridView railLibrary;
+        private readonly DataGridView shelfSupportLibrary;
         private readonly TextBox outputFolder;
         private readonly TextBox log;
 
@@ -69,10 +77,12 @@ namespace SWWerkplaats.Configurator.UI
             var tabs = new TabControl { Dock = DockStyle.Fill };
             var projectPage = BuildProjectPage();
             var cabinetPage = BuildCabinetPage();
+            var libraryPage = BuildLibraryPage();
             var camPage = BuildCamPage();
             var outputPage = BuildOutputPage();
             tabs.TabPages.Add(projectPage);
             tabs.TabPages.Add(cabinetPage);
+            tabs.TabPages.Add(libraryPage);
             tabs.TabPages.Add(camPage);
             tabs.TabPages.Add(outputPage);
             Controls.Add(tabs);
@@ -100,11 +110,15 @@ namespace SWWerkplaats.Configurator.UI
             cabinetDepth = Number(600, 250, 1520);
             cabinetWorktopHeight = Number(900, 300, 2400);
             cabinetUnitCount = Number(4, 1, 12);
+            cabinetUnitCount.ValueChanged += delegate { SyncCabinetUnitRows(); };
             cabinetPlinthHeight = Number(100, 0, 300);
             cabinetPlinthDepth = Number(60, 0, 300);
             cabinetShelfClearance = Number(2, 0, 20);
             cabinetDrawerClearance = Number(13, 0, 40);
+            cabinetDrawerBackClearance = Number(30, 0, 120);
             cabinetDoorGap = Number(2, 0, 10);
+            cabinetTopDrawerHeight = Number(160, 80, 400);
+            cabinetShelfHoleEndMargin = Number(80, 20, 400);
             frameProfile = MaterialCombo(LibraryCatalog.Profiles());
             topSheet = MaterialCombo(LibraryCatalog.Sheets(), 2);
             shelfSheet = MaterialCombo(LibraryCatalog.Sheets(), 2);
@@ -114,13 +128,20 @@ namespace SWWerkplaats.Configurator.UI
             cabinetDrawerMaterial = MaterialCombo(LibraryCatalog.Sheets(), 3);
             cabinetFrontMaterial = MaterialCombo(LibraryCatalog.Sheets(), 2);
             cabinetBackMaterial = MaterialCombo(LibraryCatalog.Sheets(), 3);
-            cabinetRailTemplate = RailCombo(LibraryCatalog.DrawerRails(), 1);
+            var railPresets = LibraryCatalog.DrawerRails();
+            var shelfSupportPresets = LibraryCatalog.ShelfSupports();
+            railLibrary = BuildRailLibraryGrid(railPresets);
+            shelfSupportLibrary = BuildShelfSupportLibraryGrid(shelfSupportPresets);
+            cabinetRailTemplate = RailCombo(railPresets, 1);
+            cabinetShelfSupportTemplate = ShelfSupportCombo(shelfSupportPresets, 0);
             lowerFrame = new CheckBox { Text = "Onderframe", Checked = false, AutoSize = true };
             lowerShelf = new CheckBox { Text = "Blad op onderframe met hoekuitsparingen", Checked = false, AutoSize = true };
             middleLayer = new CheckBox { Text = "Extra frame-laag", Checked = false, AutoSize = true };
             middleShelf = new CheckBox { Text = "Blad op extra laag met hoekuitsparingen", Checked = false, AutoSize = true };
             countersinkHoles = new CheckBox { Text = "Kopkamers frezen voor cilinderkop/inbusbout", Checked = true, AutoSize = true };
             cabinetBackPanel = new CheckBox { Text = "Achterwand toevoegen", Checked = false, AutoSize = true };
+            cabinetTopDrawer = new CheckBox { Text = "Bovenaan 1 lade per unit", Checked = false, AutoSize = true };
+            cabinetAdjustableShelfHoles = new CheckBox { Text = "Legplankgaten onder bovenlade", Checked = false, AutoSize = true };
             autoTabs = new CheckBox { Text = "Tabs automatisch voor kleine delen", Checked = true, AutoSize = true };
             exportSolidWorks = new CheckBox { Text = "SolidWorks parts genereren", Checked = false, AutoSize = true };
             cabinetUnits = BuildCabinetUnitsGrid();
@@ -129,6 +150,7 @@ namespace SWWerkplaats.Configurator.UI
 
             FillProjectPage(projectPage);
             FillCabinetPage(cabinetPage);
+            FillLibraryPage(libraryPage);
             FillCamPage(camPage);
             FillOutputPage(outputPage);
         }
@@ -146,6 +168,11 @@ namespace SWWerkplaats.Configurator.UI
         private TabPage BuildCabinetPage()
         {
             return new TabPage("Cabinet");
+        }
+
+        private TabPage BuildLibraryPage()
+        {
+            return new TabPage("Library");
         }
 
         private TabPage BuildOutputPage()
@@ -202,7 +229,11 @@ namespace SWWerkplaats.Configurator.UI
             AddRow4(panel, "Romp materiaal", cabinetCarcassMaterial, "Blad materiaal", cabinetWorktopMaterial);
             AddRow4(panel, "Lade materiaal", cabinetDrawerMaterial, "Front materiaal", cabinetFrontMaterial);
             AddRow4(panel, "Achterwand materiaal", cabinetBackMaterial, "Rail-template", cabinetRailTemplate);
+            AddRow4(panel, "Legplankdrager", cabinetShelfSupportTemplate, "Bovenlade", cabinetTopDrawer);
+            AddRow4(panel, "Hoogte bovenlade mm", cabinetTopDrawerHeight, "Legplankgaten", cabinetAdjustableShelfHoles);
+            AddRow4(panel, "Gaten eindmarge boven mm", cabinetShelfHoleEndMargin, "", new Label());
             AddRow4(panel, "Legplank speling mm", cabinetShelfClearance, "Lade zijdelingse speling mm", cabinetDrawerClearance);
+            AddRow4(panel, "Lade achterspeling mm", cabinetDrawerBackClearance, "", new Label());
             AddRow4(panel, "Deur/ front voeg mm", cabinetDoorGap, "Achterwand", cabinetBackPanel);
 
             var hint = new Label
@@ -215,6 +246,43 @@ namespace SWWerkplaats.Configurator.UI
             layout.Controls.Add(panel);
             layout.Controls.Add(hint);
             layout.Controls.Add(cabinetUnits);
+            page.Controls.Add(layout);
+        }
+
+        private void FillLibraryPage(Control page)
+        {
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1 };
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
+            var applyRails = new Button { Text = "Rails toepassen op cabinet-keuze", Width = 240, Height = 30 };
+            var addRail = new Button { Text = "Nieuwe rail", Width = 120, Height = 30 };
+            var applySupports = new Button { Text = "Dragers toepassen op cabinet-keuze", Width = 250, Height = 30 };
+            var addSupport = new Button { Text = "Nieuwe drager", Width = 130, Height = 30 };
+            applyRails.Click += delegate { ReloadRailTemplateCombo(); };
+            addRail.Click += delegate
+            {
+                var index = railLibrary.Rows.Count + 1;
+                railLibrary.Rows.Add("custom_" + index, "Nieuwe ladegeleider " + index, "450", "12.7", "5", "37", "96", "", "32", "6.5", "5", "37", "96", "", "32", "4.5", "4x16 bolkopschroef");
+                ReloadRailTemplateCombo();
+            };
+            applySupports.Click += delegate { ReloadShelfSupportCombo(); };
+            addSupport.Click += delegate
+            {
+                var index = shelfSupportLibrary.Rows.Count + 1;
+                shelfSupportLibrary.Rows.Add("support_" + index, "Nieuwe legplankdrager " + index, "5", "12", "5", "32", "50", "50", "160");
+                ReloadShelfSupportCombo();
+            };
+            buttons.Controls.Add(applyRails);
+            buttons.Controls.Add(addRail);
+            buttons.Controls.Add(applySupports);
+            buttons.Controls.Add(addSupport);
+
+            layout.Controls.Add(buttons);
+            layout.Controls.Add(railLibrary);
+            layout.Controls.Add(shelfSupportLibrary);
             page.Controls.Add(layout);
         }
 
@@ -373,12 +441,18 @@ namespace SWWerkplaats.Configurator.UI
                 BackMaterial = CloneMaterial((Material)cabinetBackMaterial.SelectedItem),
                 SheetFastener = CloneFastener((FastenerDefinition)fastener.SelectedItem),
                 DrawerRail = CloneRail((RailTemplate)cabinetRailTemplate.SelectedItem),
+                ShelfSupport = CloneShelfSupport((ShelfSupportTemplate)cabinetShelfSupportTemplate.SelectedItem),
+                IncludeFullWidthTopDrawer = cabinetTopDrawer.Checked,
+                FullWidthTopDrawerHeightMm = (double)cabinetTopDrawerHeight.Value,
+                IncludeAdjustableShelfHoles = cabinetAdjustableShelfHoles.Checked,
+                AdjustableShelfHoleEndMarginMm = (double)cabinetShelfHoleEndMargin.Value,
                 AutoTabs = autoTabs.Checked,
                 SmallPartAreaThresholdMm2 = 300 * 300,
                 TabWidthMm = 8,
                 TabHeightMm = 1.5,
                 ShelfClearanceMm = (double)cabinetShelfClearance.Value,
-                DrawerSideClearanceMm = (double)cabinetDrawerClearance.Value,
+                DrawerSideClearanceMm = Math.Max((double)cabinetDrawerClearance.Value, ((RailTemplate)cabinetRailTemplate.SelectedItem).ThicknessMm),
+                DrawerBackClearanceMm = (double)cabinetDrawerBackClearance.Value,
                 DoorGapMm = (double)cabinetDoorGap.Value
             };
 
@@ -529,6 +603,19 @@ namespace SWWerkplaats.Configurator.UI
             return combo;
         }
 
+        private static ComboBox ShelfSupportCombo(ShelfSupportTemplate[] supports, int selectedIndex)
+        {
+            var combo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 320,
+                DisplayMember = "Name"
+            };
+            combo.Items.AddRange(supports);
+            combo.SelectedIndex = selectedIndex;
+            return combo;
+        }
+
         private static DataGridView BuildCabinetUnitsGrid()
         {
             var grid = new DataGridView
@@ -555,6 +642,266 @@ namespace SWWerkplaats.Configurator.UI
             return grid;
         }
 
+        private void SyncCabinetUnitRows()
+        {
+            if (cabinetUnits == null) return;
+
+            var target = (int)cabinetUnitCount.Value;
+            while (CountCabinetUnitRows() < target)
+            {
+                var nextUnit = CountCabinetUnitRows() + 1;
+                var defaults = LastCabinetUnitValues();
+                defaults[0] = nextUnit.ToString();
+                cabinetUnits.Rows.Add(defaults);
+            }
+
+            for (var i = cabinetUnits.Rows.Count - 1; i >= 0; i--)
+            {
+                var row = cabinetUnits.Rows[i];
+                if (row.IsNewRow) continue;
+                var unitNumber = CellInt(row, 0, 0);
+                if (unitNumber > target)
+                {
+                    cabinetUnits.Rows.RemoveAt(i);
+                }
+            }
+        }
+
+        private int CountCabinetUnitRows()
+        {
+            var count = 0;
+            foreach (DataGridViewRow row in cabinetUnits.Rows)
+            {
+                if (!row.IsNewRow) count++;
+            }
+
+            return count;
+        }
+
+        private string[] LastCabinetUnitValues()
+        {
+            DataGridViewRow last = null;
+            foreach (DataGridViewRow row in cabinetUnits.Rows)
+            {
+                if (!row.IsNewRow) last = row;
+            }
+
+            if (last == null)
+            {
+                return new[] { "1", "4", "", "0", "160", "Geen", "nee", "600" };
+            }
+
+            return new[]
+            {
+                CellText(last, 0),
+                CellText(last, 1),
+                CellText(last, 2),
+                CellText(last, 3),
+                CellText(last, 4),
+                CellText(last, 5),
+                CellText(last, 6),
+                CellText(last, 7)
+            };
+        }
+
+        private static DataGridView BuildRailLibraryGrid(RailTemplate[] rails)
+        {
+            var grid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = true,
+                AllowUserToDeleteRows = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+                RowHeadersWidth = 28
+            };
+            grid.Columns.Add("Id", "Id");
+            grid.Columns.Add("Name", "Naam");
+            grid.Columns.Add("Length", "Lengte");
+            grid.Columns.Add("Thickness", "Dikte");
+            grid.Columns.Add("CabinetHoleCount", "Kast gaten");
+            grid.Columns.Add("CabinetFirstHole", "Kast 1e gat");
+            grid.Columns.Add("CabinetSpacing", "Kast gatpas");
+            grid.Columns.Add("CabinetPositions", "Kast posities ;");
+            grid.Columns.Add("CabinetVerticalOffset", "Kast hoogte offset");
+            grid.Columns.Add("CabinetDiameter", "Kast gatdiam.");
+            grid.Columns.Add("DrawerHoleCount", "Lade gaten");
+            grid.Columns.Add("DrawerFirstHole", "Lade 1e gat");
+            grid.Columns.Add("DrawerSpacing", "Lade gatpas");
+            grid.Columns.Add("DrawerPositions", "Lade posities ;");
+            grid.Columns.Add("DrawerVerticalOffset", "Lade hoogte offset");
+            grid.Columns.Add("DrawerDiameter", "Lade gatdiam.");
+            grid.Columns.Add("Fastener", "Bevestiging");
+
+            foreach (var rail in rails)
+            {
+                grid.Rows.Add(
+                    rail.Id,
+                    rail.Name,
+                    rail.LengthMm.ToString("0.##"),
+                    rail.ThicknessMm.ToString("0.##"),
+                    rail.CabinetHoleCount.ToString(),
+                    rail.CabinetFirstHoleOffsetMm.ToString("0.##"),
+                    rail.CabinetHoleSpacingMm.ToString("0.##"),
+                    rail.CabinetHolePositionsMm,
+                    rail.CabinetVerticalOffsetMm.ToString("0.##"),
+                    rail.CabinetHoleDiameterMm.ToString("0.##"),
+                    rail.DrawerHoleCount.ToString(),
+                    rail.DrawerFirstHoleOffsetMm.ToString("0.##"),
+                    rail.DrawerHoleSpacingMm.ToString("0.##"),
+                    rail.DrawerHolePositionsMm,
+                    rail.DrawerVerticalOffsetMm.ToString("0.##"),
+                    rail.DrawerHoleDiameterMm.ToString("0.##"),
+                    rail.FastenerName);
+            }
+
+            return grid;
+        }
+
+        private static DataGridView BuildShelfSupportLibraryGrid(ShelfSupportTemplate[] supports)
+        {
+            var grid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = true,
+                AllowUserToDeleteRows = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+                RowHeadersWidth = 28
+            };
+            grid.Columns.Add("Id", "Id");
+            grid.Columns.Add("Name", "Naam");
+            grid.Columns.Add("Thickness", "Dikte");
+            grid.Columns.Add("Height", "Hoogte");
+            grid.Columns.Add("HoleDiameter", "Gatdiam.");
+            grid.Columns.Add("HoleSpacing", "Gatafstand");
+            grid.Columns.Add("FrontInset", "Voor-inzet");
+            grid.Columns.Add("BackInset", "Achter-inzet");
+            grid.Columns.Add("FirstHoleHeight", "Eerste hoogte");
+
+            foreach (var support in supports)
+            {
+                grid.Rows.Add(
+                    support.Id,
+                    support.Name,
+                    support.ThicknessMm.ToString("0.##"),
+                    support.HeightMm.ToString("0.##"),
+                    support.HoleDiameterMm.ToString("0.##"),
+                    support.HoleSpacingMm.ToString("0.##"),
+                    support.FrontInsetMm.ToString("0.##"),
+                    support.BackInsetMm.ToString("0.##"),
+                    support.FirstHoleHeightMm.ToString("0.##"));
+            }
+
+            return grid;
+        }
+
+        private void ReloadRailTemplateCombo()
+        {
+            var selectedRail = cabinetRailTemplate.SelectedItem as RailTemplate;
+            var selectedId = selectedRail == null ? "" : selectedRail.Id;
+            var rails = RailsFromLibraryGrid();
+            cabinetRailTemplate.Items.Clear();
+            cabinetRailTemplate.Items.AddRange(rails);
+            if (cabinetRailTemplate.Items.Count == 0) return;
+
+            var selectedIndex = 0;
+            for (var i = 0; i < cabinetRailTemplate.Items.Count; i++)
+            {
+                var rail = (RailTemplate)cabinetRailTemplate.Items[i];
+                if (rail.Id == selectedId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+
+            cabinetRailTemplate.SelectedIndex = selectedIndex;
+        }
+
+        private RailTemplate[] RailsFromLibraryGrid()
+        {
+            var rails = new System.Collections.Generic.List<RailTemplate>();
+            foreach (DataGridViewRow row in railLibrary.Rows)
+            {
+                if (row.IsNewRow) continue;
+                var id = CellText(row, 0).Trim();
+                var name = CellText(row, 1).Trim();
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+
+                rails.Add(new RailTemplate
+                {
+                    Id = id,
+                    Name = name,
+                    LengthMm = CellDouble(row, 2, 450),
+                    ThicknessMm = CellDouble(row, 3, 12.7),
+                    CabinetHoleCount = CellInt(row, 4, 0),
+                    CabinetFirstHoleOffsetMm = CellDouble(row, 5, 37),
+                    CabinetHoleSpacingMm = CellDouble(row, 6, 96),
+                    CabinetHolePositionsMm = CellText(row, 7),
+                    CabinetVerticalOffsetMm = CellDouble(row, 8, 32),
+                    CabinetHoleDiameterMm = CellDouble(row, 9, 6.5),
+                    DrawerHoleCount = CellInt(row, 10, 0),
+                    DrawerFirstHoleOffsetMm = CellDouble(row, 11, 37),
+                    DrawerHoleSpacingMm = CellDouble(row, 12, 96),
+                    DrawerHolePositionsMm = CellText(row, 13),
+                    DrawerVerticalOffsetMm = CellDouble(row, 14, 32),
+                    DrawerHoleDiameterMm = CellDouble(row, 15, 4.5),
+                    FastenerName = CellText(row, 16)
+                });
+            }
+
+            return rails.ToArray();
+        }
+
+        private void ReloadShelfSupportCombo()
+        {
+            var selectedSupport = cabinetShelfSupportTemplate.SelectedItem as ShelfSupportTemplate;
+            var selectedId = selectedSupport == null ? "" : selectedSupport.Id;
+            var supports = ShelfSupportsFromLibraryGrid();
+            cabinetShelfSupportTemplate.Items.Clear();
+            cabinetShelfSupportTemplate.Items.AddRange(supports);
+            if (cabinetShelfSupportTemplate.Items.Count == 0) return;
+
+            var selectedIndex = 0;
+            for (var i = 0; i < cabinetShelfSupportTemplate.Items.Count; i++)
+            {
+                var support = (ShelfSupportTemplate)cabinetShelfSupportTemplate.Items[i];
+                if (support.Id == selectedId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+
+            cabinetShelfSupportTemplate.SelectedIndex = selectedIndex;
+        }
+
+        private ShelfSupportTemplate[] ShelfSupportsFromLibraryGrid()
+        {
+            var supports = new System.Collections.Generic.List<ShelfSupportTemplate>();
+            foreach (DataGridViewRow row in shelfSupportLibrary.Rows)
+            {
+                if (row.IsNewRow) continue;
+                var id = CellText(row, 0).Trim();
+                var name = CellText(row, 1).Trim();
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+
+                supports.Add(new ShelfSupportTemplate
+                {
+                    Id = id,
+                    Name = name,
+                    ThicknessMm = CellDouble(row, 2, 5),
+                    HeightMm = CellDouble(row, 3, 12),
+                    HoleDiameterMm = CellDouble(row, 4, 5),
+                    HoleSpacingMm = CellDouble(row, 5, 32),
+                    FrontInsetMm = CellDouble(row, 6, 50),
+                    BackInsetMm = CellDouble(row, 7, 50),
+                    FirstHoleHeightMm = CellDouble(row, 8, 160)
+                });
+            }
+
+            return supports.ToArray();
+        }
+
         private static FastenerDefinition CloneFastener(FastenerDefinition fastener)
         {
             return new FastenerDefinition
@@ -578,12 +925,36 @@ namespace SWWerkplaats.Configurator.UI
                 Id = rail.Id,
                 Name = rail.Name,
                 LengthMm = rail.LengthMm,
-                HoleCount = rail.HoleCount,
-                FirstHoleOffsetMm = rail.FirstHoleOffsetMm,
-                HoleSpacingMm = rail.HoleSpacingMm,
-                VerticalOffsetMm = rail.VerticalOffsetMm,
-                HoleDiameterMm = rail.HoleDiameterMm,
+                ThicknessMm = rail.ThicknessMm,
+                CabinetHoleCount = rail.CabinetHoleCount,
+                CabinetFirstHoleOffsetMm = rail.CabinetFirstHoleOffsetMm,
+                CabinetHoleSpacingMm = rail.CabinetHoleSpacingMm,
+                CabinetHolePositionsMm = rail.CabinetHolePositionsMm,
+                CabinetVerticalOffsetMm = rail.CabinetVerticalOffsetMm,
+                CabinetHoleDiameterMm = rail.CabinetHoleDiameterMm,
+                DrawerHoleCount = rail.DrawerHoleCount,
+                DrawerFirstHoleOffsetMm = rail.DrawerFirstHoleOffsetMm,
+                DrawerHoleSpacingMm = rail.DrawerHoleSpacingMm,
+                DrawerHolePositionsMm = rail.DrawerHolePositionsMm,
+                DrawerVerticalOffsetMm = rail.DrawerVerticalOffsetMm,
+                DrawerHoleDiameterMm = rail.DrawerHoleDiameterMm,
                 FastenerName = rail.FastenerName
+            };
+        }
+
+        private static ShelfSupportTemplate CloneShelfSupport(ShelfSupportTemplate support)
+        {
+            return new ShelfSupportTemplate
+            {
+                Id = support.Id,
+                Name = support.Name,
+                ThicknessMm = support.ThicknessMm,
+                HeightMm = support.HeightMm,
+                HoleDiameterMm = support.HoleDiameterMm,
+                HoleSpacingMm = support.HoleSpacingMm,
+                FrontInsetMm = support.FrontInsetMm,
+                BackInsetMm = support.BackInsetMm,
+                FirstHoleHeightMm = support.FirstHoleHeightMm
             };
         }
 

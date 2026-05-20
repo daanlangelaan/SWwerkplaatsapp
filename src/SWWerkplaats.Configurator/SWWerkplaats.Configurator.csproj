@@ -33,6 +33,7 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
   </ItemGroup>
@@ -51,6 +52,7 @@
     <Compile Include="Domain\PartModels.cs" />
     <Compile Include="Domain\ProfileOperation.cs" />
     <Compile Include="Domain\RailTemplate.cs" />
+    <Compile Include="Domain\ShelfSupportTemplate.cs" />
     <Compile Include="Domain\ToolDefinition.cs" />
     <Compile Include="Domain\WorkbenchConfig.cs" />
     <Compile Include="Domain\WorkbenchModel.cs" />
@@ -62,11 +64,31 @@
     <Compile Include="Manufacturing\NestingExporter.cs" />
     <Compile Include="Manufacturing\ProfileOperationsXlsxExporter.cs" />
     <Compile Include="Manufacturing\SheetNestingEngine.cs" />
+    <Compile Include="Portal\PortalAssembly3DService.cs" />
+    <Compile Include="Portal\PriceOverviewXlsxExporter.cs" />
+    <Compile Include="Portal\PortalConfigurationFactory.cs" />
+    <Compile Include="Portal\PortalHtml.cs" />
+    <Compile Include="Portal\PortalModels.cs" />
+    <Compile Include="Portal\PortalOrderService.cs" />
+    <Compile Include="Portal\PortalPricingService.cs" />
+    <Compile Include="Portal\PortalVisualizationService.cs" />
+    <Compile Include="Portal\PortalWebServer.cs" />
+    <Compile Include="Portal\ProductionOutputService.cs" />
     <Compile Include="SolidWorks\ISolidWorksExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksComPartExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksExportPlan.cs" />
     <Compile Include="SolidWorks\SolidWorksMacroExporter.cs" />
     <Compile Include="UI\MainForm.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Portal\vendor\three\three.module.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\vendor\three\three.module.js</Link>
+    </Content>
+    <Content Include="Portal\vendor\three\OrbitControls.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\vendor\three\OrbitControls.js</Link>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

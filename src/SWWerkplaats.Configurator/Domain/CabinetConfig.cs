@@ -26,12 +26,18 @@ namespace SWWerkplaats.Configurator.Domain
         public Material BackMaterial { get; set; }
         public FastenerDefinition SheetFastener { get; set; }
         public RailTemplate DrawerRail { get; set; }
+        public ShelfSupportTemplate ShelfSupport { get; set; }
+        public bool IncludeFullWidthTopDrawer { get; set; }
+        public double FullWidthTopDrawerHeightMm { get; set; }
+        public bool IncludeAdjustableShelfHoles { get; set; }
+        public double AdjustableShelfHoleEndMarginMm { get; set; }
         public bool AutoTabs { get; set; }
         public double SmallPartAreaThresholdMm2 { get; set; }
         public double TabWidthMm { get; set; }
         public double TabHeightMm { get; set; }
         public double ShelfClearanceMm { get; set; }
         public double DrawerSideClearanceMm { get; set; }
+        public double DrawerBackClearanceMm { get; set; }
         public double DoorGapMm { get; set; }
         public List<CabinetUnitConfig> Units { get; private set; }
 

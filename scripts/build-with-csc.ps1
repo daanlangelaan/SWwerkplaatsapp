@@ -29,8 +29,16 @@ $sources = Get-ChildItem -Path $project -Recurse -Filter *.cs | Select-Object -E
     /reference:System.IO.Compression.dll `
     /reference:System.IO.Compression.FileSystem.dll `
     /reference:Microsoft.CSharp.dll `
+    /reference:System.Web.Extensions.dll `
     /reference:System.Windows.Forms.dll `
     /reference:System.Xml.dll `
     $sources
+
+$portalVendor = Join-Path $project "Portal\vendor"
+$portalAssets = Join-Path $outDir "PortalAssets\vendor"
+if (Test-Path $portalVendor) {
+    New-Item -ItemType Directory -Force -Path $portalAssets | Out-Null
+    Copy-Item -Path (Join-Path $portalVendor "*") -Destination $portalAssets -Recurse -Force
+}
 
 Write-Host "Build klaar: $exe"

@@ -1,0 +1,14 @@
+Categorie;Sleutel;Omschrijving;Eenheid;Geschatte_inkoop_eenheidsprijs;Opslag_pct;Notitie
+Materiaal;osb_18;OSB 18mm;m2;18.00;35;Invulwaarde, vervangen door actuele leverancierprijs
+Materiaal;betonplex_12;Betonplex 12mm;m2;34.00;35;Invulwaarde, vervangen door actuele leverancierprijs
+Materiaal;betonplex_18;Betonplex 18mm;m2;42.00;35;Invulwaarde, vervangen door actuele leverancierprijs
+Materiaal;multiplex_15;Multiplex 15mm;m2;38.00;35;Invulwaarde, vervangen door actuele leverancierprijs
+Profiel;alu_profile_30x30;Alu profiel 30x30;m;9.00;30;Invulwaarde per meter
+Profiel;alu_profile_40x40;Alu profiel 40x40;m;12.00;30;Invulwaarde per meter
+Profiel;alu_profile_45x45;Alu profiel 45x45;m;15.00;30;Invulwaarde per meter
+Profiel;steel_tube_40x40;Stalen koker 40x40;m;9.00;30;Invulwaarde per meter
+Beslag;drawer_rail;Ladegeleider / rail;st;7.50;45;Algemene invulwaarde
+Beslag;hinge;Scharnier;st;3.50;45;Algemene invulwaarde
+Beslag;fastener;Schroef/bout/ring;st;0.18;45;Algemene invulwaarde
+Machine;cnc_hour;CNC frezen / boren;uur;38.00;40;Geschatte interne machinekost
+Arbeid;labour_hour;Voorbereiding, controle en handling;uur;42.00;35;Geschat intern uurtarief
