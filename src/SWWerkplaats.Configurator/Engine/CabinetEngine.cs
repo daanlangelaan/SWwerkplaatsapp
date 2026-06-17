@@ -118,7 +118,8 @@ namespace SWWerkplaats.Configurator.Engine
             Material carcassMaterial)
         {
             var t = carcassMaterial.ThicknessMm;
-            foreach (var shelfHeight in ShelfHeights(unit, config, config.PlinthHeightMm + 80, shelfZoneTop - 60))
+            var shelfZone = ShelfZoneForUnit(unit, config, shelfZoneTop);
+            foreach (var shelfHeight in ShelfHeights(unit, config, shelfZone.MinMm, shelfZone.MaxMm, unit.DrawerCount > 0))
             {
                 var shelf = Sheet("Legplank U" + unitNumber + " H" + shelfHeight.ToString("0", CultureInfo.InvariantCulture), carcassMaterial, clearWidth, innerDepth);
                 AddSheet(model, shelf, centerX, shelfHeight, 0, AssemblyOrientation.SheetHorizontal);
@@ -281,6 +282,31 @@ namespace SWWerkplaats.Configurator.Engine
             }
 
             return config.PlinthHeightMm + config.DoorGapMm + drawerIndex * (drawerHeight + config.DoorGapMm);
+        }
+
+        private static VerticalZone ShelfZoneForUnit(CabinetUnitConfig unit, CabinetConfig config, double shelfZoneTop)
+        {
+            var min = config.PlinthHeightMm + 80;
+            var max = shelfZoneTop - 60;
+            if (unit == null || unit.DrawerCount <= 0)
+            {
+                return new VerticalZone(min, max);
+            }
+
+            var drawerHeight = Math.Max(80, unit.DrawerHeightMm);
+            var drawerCount = Math.Max(0, unit.DrawerCount);
+            if (IsTopStart(config.ShelfStartMode))
+            {
+                var lowestDrawerBottom = DrawerBottomY(config, drawerCount - 1, drawerHeight, shelfZoneTop);
+                max = Math.Min(max, lowestDrawerBottom - 60);
+            }
+            else
+            {
+                var highestDrawerBottom = DrawerBottomY(config, drawerCount - 1, drawerHeight, shelfZoneTop);
+                min = Math.Max(min, highestDrawerBottom + drawerHeight + 60);
+            }
+
+            return new VerticalZone(min, max);
         }
 
         private static SheetPart SidePanel(string name, Material material, double length, double width, double notchDepth, double notchHeight)
@@ -607,7 +633,7 @@ namespace SWWerkplaats.Configurator.Engine
             return new CabinetUnitConfig { UnitNumber = unitNumber };
         }
 
-        private static IEnumerable<double> ShelfHeights(CabinetUnitConfig unit, CabinetConfig config, double min, double max)
+        private static IEnumerable<double> ShelfHeights(CabinetUnitConfig unit, CabinetConfig config, double min, double max, bool forceEvenDistribution)
         {
             var explicitHeights = new List<double>();
             if (!string.IsNullOrWhiteSpace(unit.ShelfHeightsMm))
@@ -629,7 +655,7 @@ namespace SWWerkplaats.Configurator.Engine
             }
 
             var count = Math.Max(0, unit.ShelfCount);
-            if (IsAnchoredShelfStart(config.ShelfStartMode))
+            if (!forceEvenDistribution && IsAnchoredShelfStart(config.ShelfStartMode))
             {
                 return AnchoredShelfHeights(count, config, min, max);
             }
@@ -707,6 +733,18 @@ namespace SWWerkplaats.Configurator.Engine
             if (snapped < min) snapped = min;
             if (snapped > max) snapped = max;
             return Math.Round(snapped, 3);
+        }
+
+        private sealed class VerticalZone
+        {
+            public VerticalZone(double minMm, double maxMm)
+            {
+                MinMm = minMm;
+                MaxMm = maxMm;
+            }
+
+            public double MinMm { get; private set; }
+            public double MaxMm { get; private set; }
         }
 
         private static void AddRailHardware(WorkbenchModel model, CabinetConfig config, int unitNumber, int drawerNumber)
