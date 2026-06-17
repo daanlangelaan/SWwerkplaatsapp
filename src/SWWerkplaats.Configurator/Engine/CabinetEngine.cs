@@ -30,6 +30,7 @@ namespace SWWerkplaats.Configurator.Engine
             var innerDepth = config.DepthMm - t;
             var bayFitClearance = Math.Min(Math.Max(0, config.ShelfClearanceMm), 1.0);
             var bayWidth = Math.Max(20, unitWidth - t - 2.0 * bayFitClearance);
+            var clearBottomBayWidth = Math.Max(20, (config.WidthMm - (config.UnitCount + 1.0) * t) / config.UnitCount);
             var frontZ = -config.DepthMm / 2.0;
             var backZ = config.DepthMm / 2.0;
             var backThickness = config.IncludeBackPanel ? back.ThicknessMm : 0;
@@ -80,8 +81,12 @@ namespace SWWerkplaats.Configurator.Engine
             for (var i = 0; i < config.UnitCount; i++)
             {
                 var unitCenterX = -config.WidthMm / 2.0 + unitWidth * (i + 0.5);
-                var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bayWidth, config.DepthMm);
-                AddSheet(model, bottom, unitCenterX, config.PlinthHeightMm + t / 2.0, 0, AssemblyOrientation.SheetHorizontal);
+                var bottomInsertDepth = AlignmentGrooveDepthMmForMaterial(carcass);
+                var bottomWidth = clearBottomBayWidth + 2.0 * bottomInsertDepth;
+                var bottomDepth = config.DepthMm + (config.IncludeBackPanel ? bottomInsertDepth : 0);
+                var bottomCenterZ = config.IncludeBackPanel ? bottomInsertDepth / 2.0 : 0;
+                var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bottomWidth, bottomDepth);
+                AddSheet(model, bottom, unitCenterX, config.PlinthHeightMm + t / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
             }
 
             if (config.IncludeBackPanel)
@@ -654,8 +659,13 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double AlignmentGrooveDepthMm(SheetPart sheet)
         {
-            if (sheet == null || sheet.Material == null) return 3.0;
-            return Math.Min(3.0, Math.Max(0.1, sheet.Material.ThicknessMm - 0.1));
+            return AlignmentGrooveDepthMmForMaterial(sheet == null ? null : sheet.Material);
+        }
+
+        private static double AlignmentGrooveDepthMmForMaterial(Material material)
+        {
+            if (material == null) return 3.0;
+            return Math.Min(3.0, Math.Max(0.1, material.ThicknessMm - 0.1));
         }
 
         private static double AlignmentGrooveClearanceMm()
