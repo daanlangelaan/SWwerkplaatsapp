@@ -1,4 +1,5 @@
 using System;
+using SWWerkplaats.Configurator.Drawing.Products.CubbyCabinet;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Engine;
 using SWWerkplaats.Configurator.Portal;
@@ -21,12 +22,12 @@ namespace SWWerkplaats.Configurator.Application
                     Product = ProductId,
                     Name = "Vakjeskast",
                     Category = "kast",
-                    DefaultWidthMm = OuterWidth(
+                    DefaultWidthMm = CubbyCabinetDrawingRules.OuterWidth(
                         ProductDefaults.CubbyCabinetColumnCount,
                         ProductDefaults.CubbyCabinetCellWidthMm,
                         ProductDefaults.DefaultSheetThicknessMm),
                     DefaultDepthMm = ProductDefaults.CubbyCabinetCellDepthMm,
-                    DefaultHeightMm = OuterHeight(
+                    DefaultHeightMm = CubbyCabinetDrawingRules.OuterHeight(
                         ProductDefaults.CubbyCabinetRowCount,
                         ProductDefaults.CubbyCabinetCellHeightMm,
                         ProductDefaults.DefaultSheetThicknessMm),
@@ -58,8 +59,8 @@ namespace SWWerkplaats.Configurator.Application
             var cellDepth = Dimension(request.CubbyCellDepthMm, ProductDefaults.CubbyCabinetCellDepthMm);
             var cellHeight = Dimension(request.CubbyCellHeightMm, ProductDefaults.CubbyCabinetCellHeightMm);
             var materialThickness = ProductDefaults.DefaultSheetThicknessMm;
-            var width = OuterWidth(columnCount, cellWidth, materialThickness);
-            var height = OuterHeight(rowCount, cellHeight, materialThickness);
+            var width = CubbyCabinetDrawingRules.OuterWidth(columnCount, cellWidth, materialThickness);
+            var height = CubbyCabinetDrawingRules.OuterHeight(rowCount, cellHeight, materialThickness);
             var depth = cellDepth;
 
             return new CubbyCabinetConfig
@@ -102,14 +103,5 @@ namespace SWWerkplaats.Configurator.Application
             return value > 0 ? value : fallback;
         }
 
-        private static double OuterWidth(int columns, double cellWidth, double materialThickness)
-        {
-            return columns * cellWidth + (columns + 1) * materialThickness;
-        }
-
-        private static double OuterHeight(int rows, double cellHeight, double materialThickness)
-        {
-            return rows * cellHeight + (rows + 1) * materialThickness;
-        }
     }
 }

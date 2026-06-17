@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using SWWerkplaats.Configurator.Drawing;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Engine
@@ -253,15 +254,7 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static SheetPart Sheet(string name, Material material, double length, double width)
         {
-            return new SheetPart
-            {
-                Name = name,
-                Material = material,
-                LengthMm = Math.Round(length, 2),
-                WidthMm = Math.Round(width, 2),
-                Quantity = 1,
-                UseTabs = false
-            };
+            return SheetDrawing.CreateSheet(name, material, length, width);
         }
 
         private static double DrawerBoxDepth(CabinetConfig config, double innerDepth)
@@ -540,24 +533,7 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, string note)
         {
-            if (sheet == null || length <= 0 || width <= 0 || depth <= 0) return;
-            var safeX = Math.Max(0, Math.Min(sheet.LengthMm, x));
-            var safeY = Math.Max(0, Math.Min(sheet.WidthMm, y));
-            var safeLength = Math.Max(0, Math.Min(length, sheet.LengthMm - safeX));
-            var safeWidth = Math.Max(0, Math.Min(width, sheet.WidthMm - safeY));
-            if (safeLength <= 0 || safeWidth <= 0) return;
-            sheet.Pockets.Add(new SheetPocket
-            {
-                Name = name,
-                Xmm = Math.Round(safeX, 3),
-                Ymm = Math.Round(safeY, 3),
-                LengthMm = Math.Round(safeLength, 3),
-                WidthMm = Math.Round(safeWidth, 3),
-                DepthMm = Math.Round(Math.Min(depth, Math.Max(0.1, sheet.Material.ThicknessMm - 0.1)), 3),
-                Face = OperationFace.CenterPlane,
-                DepthMode = OperationDepthMode.PocketFromFace,
-                Note = note
-            });
+            SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, note);
         }
 
         private static double AlignmentGrooveDepthMm(SheetPart sheet)
@@ -598,36 +574,12 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static List<double> PatternPositions(double length, double edgeInset, double maxSpacing, int minimumCount)
         {
-            var positions = new List<double>();
-            if (length <= 0) return positions;
-            var start = Math.Min(Math.Max(8, edgeInset), length / 2.0);
-            var end = Math.Max(start, length - start);
-            var usable = Math.Max(0, end - start);
-            var count = Math.Max(minimumCount, (int)System.Math.Ceiling(usable / Math.Max(1, maxSpacing)) + 1);
-            if (count <= 1)
-            {
-                positions.Add(System.Math.Round(length / 2.0, 3));
-                return positions;
-            }
-
-            for (var i = 0; i < count; i++)
-            {
-                var t = (double)i / (count - 1);
-                positions.Add(System.Math.Round(start + usable * t, 3));
-            }
-
-            return positions;
+            return SheetPatterns.EdgeDistributedPositions(length, edgeInset, maxSpacing, minimumCount);
         }
 
         private static void AddMountingLine(SheetPart sheet, double x1, double y1, double x2, double y2, double diameter, double maxSpacing, string note)
         {
-            var length = System.Math.Sqrt(System.Math.Pow(x2 - x1, 2) + System.Math.Pow(y2 - y1, 2));
-            var segments = System.Math.Max(1, (int)System.Math.Ceiling(length / System.Math.Max(1, maxSpacing)));
-            for (var i = 0; i <= segments; i++)
-            {
-                var t = (double)i / segments;
-                AddUniqueCabinetHole(sheet, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, diameter, note);
-            }
+            SheetOperations.AddMountingLine(sheet, x1, y1, x2, y2, diameter, maxSpacing, "Montagegat " + note, SheetHoleSupportKind.PanelScrew);
         }
 
         private static void AddUniqueCabinetHole(SheetPart sheet, double x, double y, double diameter, string note)
@@ -637,40 +589,12 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static void AddUniqueCabinetHole(SheetPart sheet, double x, double y, double diameter, string note, SheetHoleSupportKind supportKind)
         {
-            if (sheet == null) return;
-            x = System.Math.Round(System.Math.Max(6, System.Math.Min(sheet.LengthMm - 6, x)), 3);
-            y = System.Math.Round(System.Math.Max(6, System.Math.Min(sheet.WidthMm - 6, y)), 3);
-            if (HasHoleAt(sheet, x, y, diameter)) return;
-            sheet.Holes.Add(new SheetHole
-            {
-                Name = "Montagegat " + note + " " + (sheet.Holes.Count + 1),
-                Xmm = x,
-                Ymm = y,
-                DiameterMm = diameter,
-                DepthMm = 0,
-                Face = OperationFace.CenterPlane,
-                DepthMode = OperationDepthMode.Through,
-                Countersunk = false,
-                SupportKind = supportKind
-            });
+            SheetOperations.AddUniqueThroughHole(sheet, x, y, diameter, "Montagegat " + note + " " + (sheet == null ? 1 : sheet.Holes.Count + 1), supportKind, 6);
         }
 
         private static void AddSheet(WorkbenchModel model, SheetPart sheet, double x, double y, double z, AssemblyOrientation orientation)
         {
-            sheet.CenterHeightMm = y;
-            sheet.UseTabs = sheet.LengthMm * sheet.WidthMm < 300 * 300;
-            model.Sheets.Add(sheet);
-            model.AssemblyPlacements.Add(new AssemblyPlacement
-            {
-                Kind = AssemblyComponentKind.Sheet,
-                PartName = sheet.Name,
-                LengthMm = sheet.LengthMm,
-                WidthMm = sheet.WidthMm,
-                Xmm = x,
-                Ymm = y,
-                Zmm = z,
-                Orientation = orientation
-            });
+            SheetDrawing.AddSheetToModel(model, sheet, x, y, z, orientation);
         }
 
         private static CabinetUnitConfig GetUnit(CabinetConfig config, int unitNumber)
@@ -918,15 +842,7 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static bool HasHoleAt(SheetPart panel, double x, double y, double diameter)
         {
-            foreach (var hole in panel.Holes)
-            {
-                if (Math.Abs(hole.Xmm - x) < 0.01 && Math.Abs(hole.Ymm - y) < 0.01 && Math.Abs(hole.DiameterMm - diameter) < 0.01)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return SheetOperations.HasHoleAt(panel, x, y, diameter);
         }
 
         private static void AddAdjustableShelfHoles(SheetPart panel, CabinetConfig config, double usableHeight)
