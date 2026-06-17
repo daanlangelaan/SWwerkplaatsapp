@@ -172,10 +172,18 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "POST" && path.StartsWith("/api/orders/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/status", StringComparison.OrdinalIgnoreCase))
+            {
+                var orderId = ExtractOrderId(path, "/status");
+                var statusRequest = serializer.Deserialize<PortalOrderStatusRequest>(request.Body);
+                var record = orders.ChangeStatus(Uri.UnescapeDataString(orderId), statusRequest.Status, statusRequest.Role);
+                WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Orderstatus bijgewerkt.", Order = record });
+                return;
+            }
+
             if (request.Method == "POST" && path.StartsWith("/api/orders/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/release", StringComparison.OrdinalIgnoreCase))
             {
-                var orderId = path.Substring("/api/orders/".Length);
-                orderId = orderId.Substring(0, orderId.Length - "/release".Length);
+                var orderId = ExtractOrderId(path, "/release");
                 WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Order naar freeswachtrij gezet.", Order = orders.ReleaseToQueue(Uri.UnescapeDataString(orderId)) });
                 return;
             }
@@ -220,6 +228,12 @@ namespace SWWerkplaats.Configurator.Portal
 
             var body = contentLength > 0 ? Encoding.UTF8.GetString(buffer, bodyStart, Math.Min(contentLength, total - bodyStart)) : "";
             return new HttpRequest { Method = first[0], Path = first.Length > 1 ? first[1].Split('?')[0] : "/", Body = body };
+        }
+
+        private static string ExtractOrderId(string path, string suffix)
+        {
+            var orderId = path.Substring("/api/orders/".Length);
+            return orderId.Substring(0, orderId.Length - suffix.Length);
         }
 
         private static int FindHeaderEnd(byte[] buffer, int length)

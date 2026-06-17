@@ -87,6 +87,11 @@ namespace SWWerkplaats.Configurator.Application
             return record;
         }
 
+        public PortalOrderRecord ChangeStatus(string orderId, string nextStatus, string role)
+        {
+            return ChangeStatus(orderId, nextStatus, OrderWorkflowPolicy.ParseRole(role));
+        }
+
         private static string ProductName(PortalQuoteRequest request)
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";

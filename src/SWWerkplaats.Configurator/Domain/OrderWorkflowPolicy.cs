@@ -45,6 +45,15 @@ namespace SWWerkplaats.Configurator.Domain
             throw new InvalidOperationException("Statusovergang niet toegestaan voor " + role + ": " + Normalize(fromStatus) + " -> " + Normalize(toStatus));
         }
 
+        public static OrderWorkflowRole ParseRole(string role)
+        {
+            role = (role ?? "").Trim().ToLowerInvariant();
+            if (role == "system" || role == "systeem") return OrderWorkflowRole.System;
+            if (role == "werkvoorbereider" || role == "controleur" || role == "controller") return OrderWorkflowRole.Werkvoorbereider;
+            if (role == "uitvoerder" || role == "operator" || role == "cnc") return OrderWorkflowRole.Uitvoerder;
+            throw new InvalidOperationException("Onbekende workflowrol: " + role);
+        }
+
         public static bool IsKnownStatus(string status)
         {
             status = Normalize(status);

@@ -128,6 +128,12 @@ namespace SWWerkplaats.Configurator.Portal
         public PortalOrderRecord Order { get; set; }
     }
 
+    public sealed class PortalOrderStatusRequest
+    {
+        public string Status { get; set; }
+        public string Role { get; set; }
+    }
+
     public static class PortalOrderStatus
     {
         public const string Nieuw = Domain.OrderWorkflowStatus.Nieuw;
