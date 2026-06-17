@@ -31,6 +31,12 @@ namespace SWWerkplaats.Configurator.Portal
         public double MiddleShelfHeightMm { get; set; }
         public int CubbyColumnCount { get; set; }
         public int CubbyRowCount { get; set; }
+        public double CubbyCellWidthMm { get; set; }
+        public double CubbyCellDepthMm { get; set; }
+        public double CubbyCellHeightMm { get; set; }
+        public double CubbyGridInsetMm { get; set; }
+        public double CubbyBackGrooveDepthMm { get; set; }
+        public double CubbyCombSlotClearanceMm { get; set; }
     }
 
     public sealed class PortalQuoteResponse

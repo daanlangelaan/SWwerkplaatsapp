@@ -21,9 +21,15 @@ namespace SWWerkplaats.Configurator.Application
                     Product = ProductId,
                     Name = "Vakjeskast",
                     Category = "kast",
-                    DefaultWidthMm = ProductDefaults.CubbyCabinetWidthMm,
-                    DefaultDepthMm = ProductDefaults.CubbyCabinetDepthMm,
-                    DefaultHeightMm = ProductDefaults.CubbyCabinetHeightMm,
+                    DefaultWidthMm = OuterWidth(
+                        ProductDefaults.CubbyCabinetColumnCount,
+                        ProductDefaults.CubbyCabinetCellWidthMm,
+                        ProductDefaults.DefaultSheetThicknessMm),
+                    DefaultDepthMm = ProductDefaults.CubbyCabinetCellDepthMm,
+                    DefaultHeightMm = OuterHeight(
+                        ProductDefaults.CubbyCabinetRowCount,
+                        ProductDefaults.CubbyCabinetCellHeightMm,
+                        ProductDefaults.DefaultSheetThicknessMm),
                     DefaultUnitCount = ProductDefaults.CubbyCabinetColumnCount,
                     DefaultShelfCount = ProductDefaults.CubbyCabinetRowCount,
                     DefaultDrawerCount = 0,
@@ -46,15 +52,33 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (factory == null) throw new ArgumentNullException("factory");
             request = request ?? new PortalQuoteRequest();
+            var columnCount = Count(request.CubbyColumnCount, ProductDefaults.CubbyCabinetColumnCount);
+            var rowCount = Count(request.CubbyRowCount, ProductDefaults.CubbyCabinetRowCount);
+            var cellWidth = Dimension(request.CubbyCellWidthMm, ProductDefaults.CubbyCabinetCellWidthMm);
+            var cellDepth = Dimension(request.CubbyCellDepthMm, ProductDefaults.CubbyCabinetCellDepthMm);
+            var cellHeight = Dimension(request.CubbyCellHeightMm, ProductDefaults.CubbyCabinetCellHeightMm);
+            var materialThickness = ProductDefaults.DefaultSheetThicknessMm;
+            var width = OuterWidth(columnCount, cellWidth, materialThickness);
+            var height = OuterHeight(rowCount, cellHeight, materialThickness);
+            var depth = cellDepth;
 
             return new CubbyCabinetConfig
             {
-                ProjectName = "Vakjeskast_" + Dimension(request.WidthMm, ProductDefaults.CubbyCabinetWidthMm).ToString("0") + "x" + Dimension(request.DepthMm, ProductDefaults.CubbyCabinetDepthMm).ToString("0") + "x" + Dimension(request.HeightMm, ProductDefaults.CubbyCabinetHeightMm).ToString("0"),
-                WidthMm = Dimension(request.WidthMm, ProductDefaults.CubbyCabinetWidthMm),
-                DepthMm = Dimension(request.DepthMm, ProductDefaults.CubbyCabinetDepthMm),
-                HeightMm = Dimension(request.HeightMm, ProductDefaults.CubbyCabinetHeightMm),
-                ColumnCount = Count(request.CubbyColumnCount, ProductDefaults.CubbyCabinetColumnCount),
-                RowCount = Count(request.CubbyRowCount, ProductDefaults.CubbyCabinetRowCount),
+                ProjectName = "Vakjeskast_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                HeightMm = height,
+                CellWidthMm = cellWidth,
+                CellDepthMm = cellDepth,
+                CellHeightMm = cellHeight,
+                ColumnCount = columnCount,
+                RowCount = rowCount,
+                GridInsetMm = Dimension(request.CubbyGridInsetMm, ProductDefaults.CubbyCabinetGridInsetMm),
+                CombSlotClearanceMm = Dimension(request.CubbyCombSlotClearanceMm, ProductDefaults.CubbyCabinetCombSlotClearanceMm),
+                BackGrooveDepthMm = Dimension(request.CubbyBackGrooveDepthMm, ProductDefaults.CubbyCabinetBackGrooveDepthMm),
+                BackGrooveClearanceMm = ProductDefaults.CubbyCabinetBackGrooveClearanceMm,
+                BackFastenerMaxSpacingMm = ProductDefaults.CubbyCabinetBackFastenerMaxSpacingMm,
+                DividerBackFastenerMaxSpacingMm = ProductDefaults.CubbyCabinetDividerBackFastenerMaxSpacingMm,
                 PlinthHeightMm = ProductDefaults.CubbyCabinetPlinthHeightMm,
                 PlinthDepthMm = ProductDefaults.CubbyCabinetPlinthDepthMm,
                 IncludeBackPanel = request.IncludeBackPanel,
@@ -76,6 +100,16 @@ namespace SWWerkplaats.Configurator.Application
         private static int Count(int value, int fallback)
         {
             return value > 0 ? value : fallback;
+        }
+
+        private static double OuterWidth(int columns, double cellWidth, double materialThickness)
+        {
+            return columns * cellWidth + (columns + 1) * materialThickness;
+        }
+
+        private static double OuterHeight(int rows, double cellHeight, double materialThickness)
+        {
+            return rows * cellHeight + (rows + 1) * materialThickness;
         }
     }
 }

@@ -19,19 +19,26 @@ namespace SWWerkplaats.Configurator.Application
         public const int CabinetDefaultDrawerCount = 1;
         public const string CabinetDefaultShelfStartMode = "top";
 
-        public const double CubbyCabinetWidthMm = 1800;
-        public const double CubbyCabinetDepthMm = 350;
-        public const double CubbyCabinetHeightMm = 1800;
-        public const int CubbyCabinetColumnCount = 4;
+        public const double CubbyCabinetCellWidthMm = 400;
+        public const double CubbyCabinetCellDepthMm = 350;
+        public const double CubbyCabinetCellHeightMm = 350;
+        public const int CubbyCabinetColumnCount = 3;
         public const int CubbyCabinetRowCount = 4;
         public const double CubbyCabinetPlinthHeightMm = 80;
         public const double CubbyCabinetPlinthDepthMm = 40;
+        public const double CubbyCabinetGridInsetMm = 20;
+        public const double CubbyCabinetCombSlotClearanceMm = 0.3;
+        public const double CubbyCabinetBackGrooveDepthMm = 6;
+        public const double CubbyCabinetBackGrooveClearanceMm = 0.5;
+        public const double CubbyCabinetBackFastenerMaxSpacingMm = 220;
+        public const double CubbyCabinetDividerBackFastenerMaxSpacingMm = 260;
 
         public const int DefaultSheetIndex = 2;
         public const int DefaultProfileIndex = 1;
         public const int DefaultFastenerIndex = 0;
         public const int DefaultDrawerRailIndex = 1;
         public const int DefaultShelfSupportIndex = 0;
+        public const double DefaultSheetThicknessMm = 18;
 
         public const string DefaultDrawerMaterialId = "multiplex_15";
         public const string DefaultBackMaterialId = "multiplex_15";

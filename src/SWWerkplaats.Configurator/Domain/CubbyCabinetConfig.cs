@@ -6,8 +6,17 @@ namespace SWWerkplaats.Configurator.Domain
         public double WidthMm { get; set; }
         public double DepthMm { get; set; }
         public double HeightMm { get; set; }
+        public double CellWidthMm { get; set; }
+        public double CellDepthMm { get; set; }
+        public double CellHeightMm { get; set; }
         public int ColumnCount { get; set; }
         public int RowCount { get; set; }
+        public double GridInsetMm { get; set; }
+        public double CombSlotClearanceMm { get; set; }
+        public double BackGrooveDepthMm { get; set; }
+        public double BackGrooveClearanceMm { get; set; }
+        public double BackFastenerMaxSpacingMm { get; set; }
+        public double DividerBackFastenerMaxSpacingMm { get; set; }
         public double PlinthHeightMm { get; set; }
         public double PlinthDepthMm { get; set; }
         public bool IncludeBackPanel { get; set; }
