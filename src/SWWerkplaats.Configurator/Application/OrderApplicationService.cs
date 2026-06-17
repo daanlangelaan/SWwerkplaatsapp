@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Portal;
 
 namespace SWWerkplaats.Configurator.Application
@@ -31,10 +32,11 @@ namespace SWWerkplaats.Configurator.Application
             var orderFolder = repository.CreateOrderFolder(orderId);
             var output = production.GenerateOrderFiles(request, orderFolder);
             var price = pricing.Calculate(output.Model, output.NestingPlan);
+            OrderWorkflowPolicy.EnsureCanTransition(OrderWorkflowStatus.Nieuw, OrderWorkflowStatus.TeControleren, OrderWorkflowRole.System);
             var record = new PortalOrderRecord
             {
                 OrderId = orderId,
-                Status = PortalOrderStatus.TeControleren,
+                Status = OrderWorkflowStatus.TeControleren,
                 CreatedAt = DateTime.Now.ToString("s"),
                 ProductName = ProductName(request),
                 CustomerName = request.CustomerName,
@@ -66,8 +68,21 @@ namespace SWWerkplaats.Configurator.Application
             var record = repository.LoadOrder(orderId);
             if (record == null) throw new InvalidOperationException("Order niet gevonden: " + orderId);
 
-            record.Status = PortalOrderStatus.InFreeswachtrij;
+            OrderWorkflowPolicy.EnsureCanTransition(record.Status, OrderWorkflowStatus.InFreeswachtrij, OrderWorkflowRole.Werkvoorbereider);
+            record.Status = OrderWorkflowStatus.InFreeswachtrij;
             record.QueueFolder = repository.CopyOrderToQueue(record);
+            repository.SaveRecord(record);
+            return record;
+        }
+
+        public PortalOrderRecord ChangeStatus(string orderId, string nextStatus, OrderWorkflowRole role)
+        {
+            if (!OrderWorkflowPolicy.IsKnownStatus(nextStatus)) throw new InvalidOperationException("Onbekende orderstatus: " + nextStatus);
+            var record = repository.LoadOrder(orderId);
+            if (record == null) throw new InvalidOperationException("Order niet gevonden: " + orderId);
+
+            OrderWorkflowPolicy.EnsureCanTransition(record.Status, nextStatus, role);
+            record.Status = nextStatus;
             repository.SaveRecord(record);
             return record;
         }
