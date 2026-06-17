@@ -46,6 +46,7 @@
     <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />
+    <Compile Include="Application\WorkflowApplicationService.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Domain\CutListItem.cs" />
     <Compile Include="Domain\AssemblyPlacement.cs" />

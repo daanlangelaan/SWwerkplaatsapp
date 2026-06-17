@@ -140,6 +140,12 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "GET" && path == "/api/workflow")
+            {
+                WriteJson(stream, 200, new WorkflowApplicationService().GetWorkflow());
+                return;
+            }
+
             if (request.Method == "POST" && path == "/api/shutdown")
             {
                 WriteJson(stream, 200, new { ok = true, message = "Portal stopt. Start de configurator opnieuw om verse code te laden." });

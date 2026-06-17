@@ -11,6 +11,19 @@ namespace SWWerkplaats.Configurator.Domain
 
     public static class OrderWorkflowPolicy
     {
+        public static OrderWorkflowTransition[] AllTransitions()
+        {
+            return new[]
+            {
+                new OrderWorkflowTransition(OrderWorkflowStatus.Nieuw, OrderWorkflowStatus.TeControleren, OrderWorkflowRole.System),
+                new OrderWorkflowTransition(OrderWorkflowStatus.TeControleren, OrderWorkflowStatus.Goedgekeurd, OrderWorkflowRole.Werkvoorbereider),
+                new OrderWorkflowTransition(OrderWorkflowStatus.TeControleren, OrderWorkflowStatus.InFreeswachtrij, OrderWorkflowRole.Werkvoorbereider),
+                new OrderWorkflowTransition(OrderWorkflowStatus.Goedgekeurd, OrderWorkflowStatus.InFreeswachtrij, OrderWorkflowRole.Werkvoorbereider),
+                new OrderWorkflowTransition(OrderWorkflowStatus.InFreeswachtrij, OrderWorkflowStatus.InProductie, OrderWorkflowRole.Uitvoerder),
+                new OrderWorkflowTransition(OrderWorkflowStatus.InProductie, OrderWorkflowStatus.Gereed, OrderWorkflowRole.Uitvoerder)
+            };
+        }
+
         public static bool CanTransition(string fromStatus, string toStatus, OrderWorkflowRole role)
         {
             fromStatus = Normalize(fromStatus);
@@ -74,6 +87,20 @@ namespace SWWerkplaats.Configurator.Domain
         private static string Normalize(string status)
         {
             return string.IsNullOrWhiteSpace(status) ? OrderWorkflowStatus.Nieuw : status.Trim();
+        }
+    }
+
+    public sealed class OrderWorkflowTransition
+    {
+        public string FromStatus { get; private set; }
+        public string ToStatus { get; private set; }
+        public OrderWorkflowRole Role { get; private set; }
+
+        public OrderWorkflowTransition(string fromStatus, string toStatus, OrderWorkflowRole role)
+        {
+            FromStatus = fromStatus;
+            ToStatus = toStatus;
+            Role = role;
         }
     }
 }
