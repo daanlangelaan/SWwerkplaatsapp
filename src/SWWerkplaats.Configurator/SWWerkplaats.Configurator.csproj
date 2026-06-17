@@ -41,6 +41,8 @@
     <Compile Include="Application\CatalogApplicationService.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
+    <Compile Include="Application\IOrderRepository.cs" />
+    <Compile Include="Application\OrderApplicationService.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />
@@ -82,7 +84,6 @@
     <Compile Include="Portal\PortalConfigurationFactory.cs" />
     <Compile Include="Portal\PortalHtml.cs" />
     <Compile Include="Portal\PortalModels.cs" />
-    <Compile Include="Portal\PortalOrderService.cs" />
     <Compile Include="Portal\PortalPricingService.cs" />
     <Compile Include="Portal\PortalVisualizationService.cs" />
     <Compile Include="Portal\PortalWebServer.cs" />

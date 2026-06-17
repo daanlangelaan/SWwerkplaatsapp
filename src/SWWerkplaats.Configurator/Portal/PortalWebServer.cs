@@ -12,7 +12,7 @@ namespace SWWerkplaats.Configurator.Portal
     public sealed class PortalWebServer : IDisposable
     {
         private readonly JavaScriptSerializer serializer;
-        private readonly PortalOrderService orders;
+        private readonly OrderApplicationService orders;
         private TcpListener listener;
         private Thread worker;
         private bool disposed;
@@ -22,7 +22,7 @@ namespace SWWerkplaats.Configurator.Portal
             Prefix = prefix;
             RootFolder = rootFolder;
             serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-            orders = new PortalOrderService(rootFolder);
+            orders = new OrderApplicationService(new FileOrderRepository(rootFolder));
         }
 
         public string Prefix { get; private set; }

@@ -2,15 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
+using SWWerkplaats.Configurator.Portal;
 
-namespace SWWerkplaats.Configurator.Portal
+namespace SWWerkplaats.Configurator.Application
 {
-    public sealed class PortalOrderService
+    public interface IOrderRepository
+    {
+        string CreateOrderFolder(string orderId);
+        List<PortalOrderRecord> ListOrders();
+        PortalOrderRecord LoadOrder(string orderId);
+        void SaveRequest(string orderFolder, PortalQuoteRequest request);
+        void SaveRecord(PortalOrderRecord record);
+        void SaveOfferText(string orderFolder, string contents);
+        void WriteNotifications(PortalOrderRecord record, PortalQuoteRequest request);
+        string CopyOrderToQueue(PortalOrderRecord record);
+    }
+
+    public sealed class FileOrderRepository : IOrderRepository
     {
         private readonly string rootFolder;
         private readonly JavaScriptSerializer serializer;
 
-        public PortalOrderService(string rootFolder)
+        public FileOrderRepository(string rootFolder)
         {
             this.rootFolder = rootFolder;
             serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
@@ -31,40 +44,13 @@ namespace SWWerkplaats.Configurator.Portal
             get { return Path.Combine(rootFolder, "Notifications"); }
         }
 
-        public PortalOrderRecord CreateOrder(PortalQuoteRequest request)
+        public string CreateOrderFolder(string orderId)
         {
             Directory.CreateDirectory(OrdersFolder);
             Directory.CreateDirectory(NotificationsFolder);
-            var orderId = "SW-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            var orderFolder = Path.Combine(OrdersFolder, orderId);
+            var orderFolder = Path.Combine(OrdersFolder, ProductionOutputService.SafeFileName(orderId));
             Directory.CreateDirectory(orderFolder);
-
-            var output = new ProductionOutputService().GenerateOrderFiles(request, orderFolder);
-            var price = new PortalPricingService().Calculate(output.Model, output.NestingPlan);
-            var record = new PortalOrderRecord
-            {
-                OrderId = orderId,
-                Status = PortalOrderStatus.TeControleren,
-                CreatedAt = DateTime.Now.ToString("s"),
-                ProductName = ProductName(request),
-                CustomerName = request.CustomerName,
-                CustomerEmail = request.CustomerEmail,
-                PriceExVat = price.ExVat,
-                PriceIncVat = price.IncVat,
-                OutputFolder = orderFolder
-            };
-
-            foreach (var file in output.Files)
-            {
-                record.Files.Add(file);
-            }
-
-            var pricing = new PortalPricingService();
-            File.WriteAllText(Path.Combine(orderFolder, "Offerte.txt"), pricing.ExportOfferText(request, price, orderId));
-            SaveRequest(orderFolder, request);
-            SaveRecord(record);
-            WriteNotifications(record, request);
-            return record;
+            return orderFolder;
         }
 
         public List<PortalOrderRecord> ListOrders()
@@ -93,27 +79,7 @@ namespace SWWerkplaats.Configurator.Portal
             return orders;
         }
 
-        public PortalOrderRecord ReleaseToQueue(string orderId)
-        {
-            var record = LoadOrder(orderId);
-            if (record == null) throw new InvalidOperationException("Order niet gevonden: " + orderId);
-
-            Directory.CreateDirectory(QueueFolder);
-            var target = Path.Combine(QueueFolder, orderId);
-            Directory.CreateDirectory(target);
-            CopyTapFiles(Path.Combine(record.OutputFolder, "Nesting"), target);
-            CopyIfExists(Path.Combine(record.OutputFolder, "BOM.csv"), Path.Combine(target, "BOM.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "CAM-operaties.csv"), Path.Combine(target, "CAM-operaties.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestPlan.csv"), Path.Combine(target, "NestPlan.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestVisualisatie.svg"), Path.Combine(target, "NestVisualisatie.svg"));
-
-            record.Status = PortalOrderStatus.InFreeswachtrij;
-            record.QueueFolder = target;
-            SaveRecord(record);
-            return record;
-        }
-
-        private PortalOrderRecord LoadOrder(string orderId)
+        public PortalOrderRecord LoadOrder(string orderId)
         {
             if (string.IsNullOrWhiteSpace(orderId)) return null;
             var statusFile = Path.Combine(OrdersFolder, ProductionOutputService.SafeFileName(orderId), "order-status.json");
@@ -121,19 +87,25 @@ namespace SWWerkplaats.Configurator.Portal
             return serializer.Deserialize<PortalOrderRecord>(File.ReadAllText(statusFile));
         }
 
-        private void SaveRequest(string orderFolder, PortalQuoteRequest request)
+        public void SaveRequest(string orderFolder, PortalQuoteRequest request)
         {
             File.WriteAllText(Path.Combine(orderFolder, "klant-configuratie.json"), serializer.Serialize(request));
         }
 
-        private void SaveRecord(PortalOrderRecord record)
+        public void SaveRecord(PortalOrderRecord record)
         {
             Directory.CreateDirectory(record.OutputFolder);
             File.WriteAllText(Path.Combine(record.OutputFolder, "order-status.json"), serializer.Serialize(record));
         }
 
-        private void WriteNotifications(PortalOrderRecord record, PortalQuoteRequest request)
+        public void SaveOfferText(string orderFolder, string contents)
         {
+            File.WriteAllText(Path.Combine(orderFolder, "Offerte.txt"), contents);
+        }
+
+        public void WriteNotifications(PortalOrderRecord record, PortalQuoteRequest request)
+        {
+            Directory.CreateDirectory(NotificationsFolder);
             var text = "Nieuwe order " + record.OrderId + Environment.NewLine
                 + "Status: " + record.Status + Environment.NewLine
                 + "Klant: " + request.CustomerName + Environment.NewLine
@@ -155,6 +127,21 @@ namespace SWWerkplaats.Configurator.Portal
                 + "SW Werkplaats" + Environment.NewLine);
         }
 
+        public string CopyOrderToQueue(PortalOrderRecord record)
+        {
+            if (record == null) throw new ArgumentNullException("record");
+
+            Directory.CreateDirectory(QueueFolder);
+            var target = Path.Combine(QueueFolder, ProductionOutputService.SafeFileName(record.OrderId));
+            Directory.CreateDirectory(target);
+            CopyTapFiles(Path.Combine(record.OutputFolder, "Nesting"), target);
+            CopyIfExists(Path.Combine(record.OutputFolder, "BOM.csv"), Path.Combine(target, "BOM.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "CAM-operaties.csv"), Path.Combine(target, "CAM-operaties.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestPlan.csv"), Path.Combine(target, "NestPlan.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestVisualisatie.svg"), Path.Combine(target, "NestVisualisatie.svg"));
+            return target;
+        }
+
         private static void CopyTapFiles(string sourceFolder, string targetFolder)
         {
             if (!Directory.Exists(sourceFolder)) return;
@@ -167,12 +154,6 @@ namespace SWWerkplaats.Configurator.Portal
         private static void CopyIfExists(string source, string target)
         {
             if (File.Exists(source)) File.Copy(source, target, true);
-        }
-
-        private static string ProductName(PortalQuoteRequest request)
-        {
-            if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
-            return "Cabinet";
         }
     }
 }
