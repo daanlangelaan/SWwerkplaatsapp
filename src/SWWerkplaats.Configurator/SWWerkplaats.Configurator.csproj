@@ -39,6 +39,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
+    <Compile Include="Application\ICatalogRepository.cs" />
+    <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Domain\CutListItem.cs" />

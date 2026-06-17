@@ -11,12 +11,24 @@ namespace SWWerkplaats.Configurator.Application
 
     public sealed class CatalogApplicationService
     {
+        private readonly ICatalogRepository catalog;
+
+        public CatalogApplicationService()
+            : this(new LibraryCatalogRepository())
+        {
+        }
+
+        public CatalogApplicationService(ICatalogRepository catalog)
+        {
+            this.catalog = catalog ?? new LibraryCatalogRepository();
+        }
+
         public CatalogData GetCatalog()
         {
             return new CatalogData
             {
-                Sheets = LibraryCatalog.Sheets(),
-                Profiles = LibraryCatalog.Profiles(),
+                Sheets = catalog.Sheets(),
+                Profiles = catalog.Profiles(),
                 Statuses = OrderWorkflowStatus.All()
             };
         }

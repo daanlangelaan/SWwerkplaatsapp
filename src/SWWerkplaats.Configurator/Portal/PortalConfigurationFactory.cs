@@ -1,19 +1,32 @@
 using System;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
 {
     public sealed class PortalConfigurationFactory
     {
+        private readonly ICatalogRepository catalog;
+
+        public PortalConfigurationFactory()
+            : this(new LibraryCatalogRepository())
+        {
+        }
+
+        public PortalConfigurationFactory(ICatalogRepository catalog)
+        {
+            this.catalog = catalog ?? new LibraryCatalogRepository();
+        }
+
         public WorkbenchConfig BuildWorkbench(PortalQuoteRequest request)
         {
-            var width = Clamp(request.WidthMm, 300, 3020, 1500);
-            var depth = Clamp(request.DepthMm, 300, 1520, 750);
-            var height = Clamp(request.HeightMm, 300, 2400, 900);
+            var width = Clamp(request.WidthMm, 300, 3020, ProductDefaults.WorkbenchWidthMm);
+            var depth = Clamp(request.DepthMm, 300, 1520, ProductDefaults.WorkbenchDepthMm);
+            var height = Clamp(request.HeightMm, 300, 2400, ProductDefaults.WorkbenchHeightMm);
             var topSheet = CloneMaterial(FindSheet(request.SheetMaterialId));
             topSheet.ThicknessMm = topSheet.ThicknessMm <= 0 ? 18 : topSheet.ThicknessMm;
 
-            var fastener = CloneFastener(LibraryCatalog.SheetFasteners()[0]);
+            var fastener = CloneFastener(catalog.SheetFasteners()[ProductDefaults.DefaultFastenerIndex]);
             return new WorkbenchConfig
             {
                 ProjectName = "Werktafel_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
@@ -49,14 +62,14 @@ namespace SWWerkplaats.Configurator.Portal
 
         public CabinetConfig BuildCabinet(PortalQuoteRequest request)
         {
-            var width = Clamp(request.WidthMm, 300, 3020, 2400);
-            var depth = Clamp(request.DepthMm, 250, 1520, 600);
-            var height = Clamp(request.HeightMm, 300, 2400, 900);
-            var units = (int)Clamp(request.UnitCount, 1, 12, 4);
+            var width = Clamp(request.WidthMm, 300, 3020, ProductDefaults.CabinetWidthMm);
+            var depth = Clamp(request.DepthMm, 250, 1520, ProductDefaults.CabinetDepthMm);
+            var height = Clamp(request.HeightMm, 300, 2400, ProductDefaults.CabinetHeightMm);
+            var units = (int)Clamp(request.UnitCount, 1, 12, ProductDefaults.CabinetUnitCount);
             var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
-            var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? "multiplex_15" : request.DrawerMaterialId));
-            var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? "multiplex_15" : request.BackMaterialId));
-            var rail = CloneRail(LibraryCatalog.DrawerRails()[1]);
+            var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId));
+            var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
+            var rail = CloneRail(catalog.DrawerRails()[ProductDefaults.DefaultDrawerRailIndex]);
 
             var config = new CabinetConfig
             {
@@ -65,30 +78,30 @@ namespace SWWerkplaats.Configurator.Portal
                 DepthMm = depth,
                 WorktopHeightMm = height,
                 UnitCount = units,
-                PlinthHeightMm = 100,
-                PlinthDepthMm = 60,
+                PlinthHeightMm = ProductDefaults.CabinetPlinthHeightMm,
+                PlinthDepthMm = ProductDefaults.CabinetPlinthDepthMm,
                 IncludeBackPanel = request.IncludeBackPanel,
                 CarcassMaterial = carcass,
                 WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
                 DrawerMaterial = drawer,
                 FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
                 BackMaterial = back,
-                SheetFastener = CloneFastener(LibraryCatalog.SheetFasteners()[0]),
+                SheetFastener = CloneFastener(catalog.SheetFasteners()[ProductDefaults.DefaultFastenerIndex]),
                 DrawerRail = rail,
-                ShelfSupport = CloneShelfSupport(LibraryCatalog.ShelfSupports()[0]),
+                ShelfSupport = CloneShelfSupport(catalog.ShelfSupports()[ProductDefaults.DefaultShelfSupportIndex]),
                 IncludeFullWidthTopDrawer = request.IncludeTopDrawer,
-                FullWidthTopDrawerHeightMm = 160,
+                FullWidthTopDrawerHeightMm = ProductDefaults.FullWidthTopDrawerHeightMm,
                 ShelfStartMode = NormalizeShelfStartMode(request.ShelfStartMode),
                 IncludeAdjustableShelfHoles = request.IncludeAdjustableShelfHoles,
-                AdjustableShelfHoleEndMarginMm = 80,
+                AdjustableShelfHoleEndMarginMm = ProductDefaults.AdjustableShelfHoleEndMarginMm,
                 AutoTabs = true,
                 SmallPartAreaThresholdMm2 = 300 * 300,
                 TabWidthMm = 8,
                 TabHeightMm = 1.5,
-                ShelfClearanceMm = 2,
+                ShelfClearanceMm = ProductDefaults.ShelfClearanceMm,
                 DrawerSideClearanceMm = Math.Max(13, rail.ThicknessMm),
-                DrawerBackClearanceMm = 30,
-                DoorGapMm = 2
+                DrawerBackClearanceMm = ProductDefaults.DrawerBackClearanceMm,
+                DoorGapMm = ProductDefaults.DoorGapMm
             };
 
             for (var i = 1; i <= units; i++)
@@ -111,21 +124,12 @@ namespace SWWerkplaats.Configurator.Portal
 
         public ToolDefinition DefaultTool()
         {
-            return LibraryCatalog.DefaultEndMill(4, 3);
+            return catalog.DefaultEndMill(ProductDefaults.DefaultToolDiameterMm, ProductDefaults.DefaultToolPassDepthMm);
         }
 
         public MachineProfile DefaultMachine()
         {
-            return new MachineProfile
-            {
-                Id = "mach3_portaal_3020x1520",
-                Name = "Mach3 portaalfrees 3020x1520",
-                MaxXmm = 3020,
-                MaxYmm = 1520,
-                FileExtension = ".tap",
-                SafeZmm = 15,
-                Origin = "links onder"
-            };
+            return ProductDefaults.DefaultMachine();
         }
 
         private static CabinetDoorHand ParseDoor(string value)
@@ -151,14 +155,16 @@ namespace SWWerkplaats.Configurator.Portal
             return value;
         }
 
-        private static Material FindSheet(string id)
+        private Material FindSheet(string id)
         {
-            return FindMaterial(LibraryCatalog.Sheets(), id, LibraryCatalog.Sheets()[2]);
+            var sheets = catalog.Sheets();
+            return FindMaterial(sheets, id, sheets[ProductDefaults.DefaultSheetIndex]);
         }
 
-        private static Material FindProfile(string id)
+        private Material FindProfile(string id)
         {
-            return FindMaterial(LibraryCatalog.Profiles(), id, LibraryCatalog.Profiles()[1]);
+            var profiles = catalog.Profiles();
+            return FindMaterial(profiles, id, profiles[ProductDefaults.DefaultProfileIndex]);
         }
 
         private static Material FindMaterial(Material[] materials, string id, Material fallback)
