@@ -75,10 +75,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             AddOutsideRectangle(sb, part, contourTool, machine, materialThicknessMm, tabWidthMm, tabHeightMm);
 
-            sb.AppendLine("M5");
-            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
-            sb.AppendLine("G0 X0 Y0");
-            sb.AppendLine("M30");
+            EndProgram(sb);
             return sb.ToString();
         }
 
@@ -88,21 +85,45 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Machine: " + machine.Name + ")");
             sb.AppendLine("(Tool: " + tool.Name + ", diameter " + F(tool.DiameterMm) + " mm)");
             sb.AppendLine("(Origin: links onder, Z0 op bovenzijde materiaal)");
+            sb.AppendLine("(Initialisatie volgens veilige Mach3/Fusion stijl)");
+            sb.AppendLine("G90 G94 G91.1 G40 G49 G17");
             sb.AppendLine("G21");
+            sb.AppendLine("(Z-as naar machine-home voor veilige start)");
+            sb.AppendLine("G28 G91 Z0.");
             sb.AppendLine("G90");
-            sb.AppendLine("G17");
-            sb.AppendLine("G40");
-            sb.AppendLine("G49");
-            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
         }
 
         private static void BeginTool(StringBuilder sb, int toolNumber, string description, ToolDefinition tool)
         {
             sb.AppendLine();
             sb.AppendLine("(Laad tool T" + toolNumber + ": " + description + ")");
+            sb.AppendLine("(TOOLCHANGE: machine gaat eerst naar home/wisselpositie)");
+            sb.AppendLine("M9");
             sb.AppendLine("M5");
+            sb.AppendLine("(1/2 Z-as naar machine-home)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
+            sb.AppendLine("(2/2 X/Y naar machine-home voor toolwissel)");
+            sb.AppendLine("G28 G91 X0. Y0.");
+            sb.AppendLine("G90");
             sb.AppendLine("T" + toolNumber + " M6");
+            sb.AppendLine("G17 G90 G94");
+            sb.AppendLine("G54");
+            sb.AppendLine("(Controleer tool, spanmoer en Z0 op bovenzijde materiaal voordat je start)");
             sb.AppendLine("M3 S" + F(tool.SpindleRpm));
+        }
+
+        private static void EndProgram(StringBuilder sb)
+        {
+            sb.AppendLine("M9");
+            sb.AppendLine("M5");
+            sb.AppendLine("(Einde programma: eerst Z naar machine-home)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
+            sb.AppendLine("(Daarna X/Y naar machine-home)");
+            sb.AppendLine("G28 G91 X0. Y0.");
+            sb.AppendLine("G90");
+            sb.AppendLine("M30");
         }
 
         private static void AddHole(StringBuilder sb, SheetHole hole, ToolDefinition tool, MachineProfile machine, double materialThicknessMm)
