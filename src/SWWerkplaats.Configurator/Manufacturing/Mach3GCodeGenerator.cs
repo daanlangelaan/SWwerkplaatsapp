@@ -96,6 +96,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(2/2 X/Y naar machine-home voor toolwissel)");
             sb.AppendLine("G28 G91 X0. Y0.");
             sb.AppendLine("G90");
+            sb.AppendLine("(STOP: wissel nu naar T" + toolNumber + " - " + description + ")");
+            sb.AppendLine("(Druk pas op Cycle Start als frees, spanmoer en Z0 gecontroleerd zijn.)");
+            sb.AppendLine("M0");
             sb.AppendLine("T" + toolNumber + " M6");
             sb.AppendLine("G17 G90 G94");
             sb.AppendLine("G54");

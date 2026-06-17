@@ -91,6 +91,16 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Plaats " + options.ToolName + " in de freeshouder. Zet Z0 op de potloodpunt.)");
             sb.AppendLine("(Schrijfdiepte " + F(options.WriteDepthMm) + " mm vanaf potlood-Z0; hou rekening met veerweg.)");
             sb.AppendLine("M5");
+            sb.AppendLine("(TOOLCHANGE: machine gaat eerst naar home/wisselpositie)");
+            sb.AppendLine("(1/2 Z-as naar machine-home)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
+            sb.AppendLine("(2/2 X/Y naar machine-home voor toolwissel)");
+            sb.AppendLine("G28 G91 X0. Y0.");
+            sb.AppendLine("G90");
+            sb.AppendLine("(STOP: plaats T" + options.ToolNumber + " - " + options.ToolName + ")");
+            sb.AppendLine("(Druk pas op Cycle Start als potlood, houder en Z0 gecontroleerd zijn.)");
+            sb.AppendLine("M0");
             sb.AppendLine("T" + options.ToolNumber + " M6");
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
 
