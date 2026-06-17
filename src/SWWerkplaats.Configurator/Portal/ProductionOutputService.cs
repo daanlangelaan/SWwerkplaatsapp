@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Web.Script.Serialization;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
-using SWWerkplaats.Configurator.Engine;
 using SWWerkplaats.Configurator.Manufacturing;
 using SWWerkplaats.Configurator.SolidWorks;
 
@@ -29,7 +29,7 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var factory = new PortalConfigurationFactory();
             var machine = factory.DefaultMachine();
-            var model = BuildModel(factory, request);
+            var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
             var nestingPlan = new SheetNestingEngine().Build(model, machine, settings.NestSpacingMm, settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
             var nestingSvg = new NestingExporter().ExportSvg(nestingPlan);
@@ -42,7 +42,7 @@ namespace SWWerkplaats.Configurator.Portal
             var tool = factory.DefaultTool();
             var camJob = CamJobOptions.FromPrimaryTool(tool);
             var machine = factory.DefaultMachine();
-            var model = BuildModel(factory, request);
+            var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
             var nestingPlan = new SheetNestingEngine().Build(model, machine, settings.NestSpacingMm, settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
 
@@ -210,54 +210,6 @@ namespace SWWerkplaats.Configurator.Portal
             sb.AppendLine(json);
             sb.AppendLine(";const c=document.getElementById('c'),ctx=c.getContext('2d'),rot=document.getElementById('rot'),zoom=document.getElementById('zoom');function resize(){c.width=innerWidth*devicePixelRatio;c.height=(innerHeight-58)*devicePixelRatio;draw()}addEventListener('resize',resize);rot.oninput=draw;zoom.oninput=draw;function p3(x,y,z,a,s){const ca=Math.cos(a),sa=Math.sin(a);const xr=x*ca-z*sa,zr=x*sa+z*ca;return [c.width/2+xr*s,(c.height*0.58)-y*s+zr*s*.35]}function box(part,a,s){const x=part.Xmm,y=part.Ymm,z=part.Zmm,sx=part.SizeXmm/2,sy=part.SizeYmm/2,sz=part.SizeZmm/2;const pts=[p3(x-sx,y-sy,z-sz,a,s),p3(x+sx,y-sy,z-sz,a,s),p3(x+sx,y+sy,z-sz,a,s),p3(x-sx,y+sy,z-sz,a,s),p3(x-sx,y-sy,z+sz,a,s),p3(x+sx,y-sy,z+sz,a,s),p3(x+sx,y+sy,z+sz,a,s),p3(x-sx,y+sy,z+sz,a,s)];const faces=[[0,1,2,3],[4,5,6,7],[0,4,7,3],[1,5,6,2],[3,2,6,7],[0,1,5,4]];ctx.strokeStyle='#64748b';ctx.lineWidth=1.2*devicePixelRatio;ctx.fillStyle=part.Kind==='profile'?'rgba(174,184,196,.72)':'rgba(228,205,170,.72)';for(const f of faces){ctx.beginPath();ctx.moveTo(...pts[f[0]]);for(let i=1;i<f.length;i++)ctx.lineTo(...pts[f[i]]);ctx.closePath();ctx.fill();ctx.stroke()}}function draw(){ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,c.width,c.height);const a=Number(rot.value)*Math.PI/180,s=Number(zoom.value)/100*devicePixelRatio*.55;[...parts].sort((a,b)=>(a.Zmm+a.Xmm)-(b.Zmm+b.Xmm)).forEach(part=>box(part,a,s));}resize();</script></body></html>");
             return sb.ToString();
-        }
-
-        private static WorkbenchModel BuildModel(PortalConfigurationFactory factory, PortalQuoteRequest request)
-        {
-            WorkbenchModel model;
-            if (IsCabinet(request))
-            {
-                model = new CabinetEngine().Build(factory.BuildCabinet(request));
-            }
-            else
-            {
-                model = new WorkbenchEngine().Build(factory.BuildWorkbench(request));
-            }
-
-            ApplyOrderQuantity(model, request);
-            return model;
-        }
-
-        private static void ApplyOrderQuantity(WorkbenchModel model, PortalQuoteRequest request)
-        {
-            if (model == null || request == null) return;
-            var quantity = Math.Max(1, request.Quantity);
-            if (quantity <= 1) return;
-
-            foreach (var sheet in model.Sheets)
-            {
-                sheet.Quantity = Math.Max(1, sheet.Quantity) * quantity;
-            }
-
-            foreach (var profile in model.Profiles)
-            {
-                profile.Quantity = Math.Max(1, profile.Quantity) * quantity;
-            }
-
-            foreach (var operation in model.ProfileOperations)
-            {
-                operation.Quantity = Math.Max(1, operation.Quantity) * quantity;
-            }
-
-            foreach (var hardware in model.Hardware)
-            {
-                hardware.Quantity = Math.Max(0, hardware.Quantity) * quantity;
-            }
-        }
-
-        private static bool IsCabinet(PortalQuoteRequest request)
-        {
-            return request == null || string.IsNullOrWhiteSpace(request.Product) || request.Product.ToLowerInvariant() != "werktafel";
         }
 
         private static void Write(ProductionOutput output, string folder, string relativeName, string contents)

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Windows.Forms;
 using SWWerkplaats.Configurator.Portal;
 using SWWerkplaats.Configurator.UI;
+using WinFormsApplication = System.Windows.Forms.Application;
 
 namespace SWWerkplaats.Configurator
 {
@@ -14,7 +15,7 @@ namespace SWWerkplaats.Configurator
         {
             PortalWebServer portal = null;
             var portalOnly = args != null && Array.IndexOf(args, "--portal-only") >= 0;
-            Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
+            WinFormsApplication.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
             {
                 MessageBox.Show(e.Exception.ToString(), "SWWerkplaats.Configurator fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
@@ -53,9 +54,9 @@ namespace SWWerkplaats.Configurator
                     }
                 }
 
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm());
+                WinFormsApplication.EnableVisualStyles();
+                WinFormsApplication.SetCompatibleTextRenderingDefault(false);
+                WinFormsApplication.Run(new MainForm());
             }
             catch (Exception ex)
             {
