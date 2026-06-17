@@ -71,6 +71,7 @@
     <Compile Include="Domain\OrderWorkflowStatus.cs" />
     <Compile Include="Domain\PartModels.cs" />
     <Compile Include="Domain\ProfileOperation.cs" />
+    <Compile Include="Domain\ProductDrawingStrategy.cs" />
     <Compile Include="Domain\RailTemplate.cs" />
     <Compile Include="Domain\ShelfSupportTemplate.cs" />
     <Compile Include="Domain\ToolDefinition.cs" />

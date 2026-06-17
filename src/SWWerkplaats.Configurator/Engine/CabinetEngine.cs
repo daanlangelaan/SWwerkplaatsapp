@@ -36,7 +36,7 @@ namespace SWWerkplaats.Configurator.Engine
             var backThickness = config.IncludeBackPanel ? back.ThicknessMm : 0;
             var topDepth = config.DepthMm + backThickness;
             var topCenterZ = backThickness / 2.0;
-            var backAlignmentDepth = config.IncludeBackPanel ? AlignmentGrooveDepthMmForMaterial(back) : 0;
+            var backAlignmentDepth = config.IncludeBackPanel ? ProductDrawingStrategy.GrooveDepthForMaterial(back) : 0;
             var plinthNotchDepth = Math.Min(config.DepthMm - 1, config.PlinthDepthMm + t + 2.0);
             var topDrawerHeight = TopDrawerHeight(config, bodyHeight);
             var shelfZoneTop = topDrawerHeight > 0 ? bodyHeight - topDrawerHeight : bodyHeight;
@@ -83,10 +83,12 @@ namespace SWWerkplaats.Configurator.Engine
             for (var i = 0; i < config.UnitCount; i++)
             {
                 var unitCenterX = -config.WidthMm / 2.0 + unitWidth * (i + 0.5);
-                var bottomInsertDepth = AlignmentGrooveDepthMmForMaterial(carcass);
-                var bottomWidth = clearBottomBayWidth + 2.0 * bottomInsertDepth;
-                var bottomDepth = config.DepthMm + (config.IncludeBackPanel ? bottomInsertDepth : 0);
-                var bottomCenterZ = config.IncludeBackPanel ? bottomInsertDepth / 2.0 : 0;
+                var bottomInsertDepth = ProductDrawingStrategy.GrooveDepthForMaterial(carcass);
+                var bottomWidth = ProductDrawingStrategy.PlateSizeWithOppositeGrooveInsertion(clearBottomBayWidth, bottomInsertDepth);
+                var bottomDepth = config.IncludeBackPanel
+                    ? ProductDrawingStrategy.PlateSizeWithSingleGrooveInsertion(config.DepthMm, bottomInsertDepth)
+                    : config.DepthMm;
+                var bottomCenterZ = config.IncludeBackPanel ? ProductDrawingStrategy.CenterOffsetForSingleGrooveInsertion(bottomInsertDepth) : 0;
                 var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bottomWidth, bottomDepth);
                 AddSheet(model, bottom, unitCenterX, config.PlinthHeightMm + t / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
             }
@@ -666,23 +668,22 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double AlignmentGrooveDepthMmForMaterial(Material material)
         {
-            if (material == null) return 3.0;
-            return Math.Min(3.0, Math.Max(0.1, material.ThicknessMm - 0.1));
+            return ProductDrawingStrategy.GrooveDepthForMaterial(material);
         }
 
         private static double AlignmentGrooveClearanceMm()
         {
-            return 1.0;
+            return ProductDrawingStrategy.DefaultAlignmentGrooveClearanceMm;
         }
 
         private static double DrawerGrooveDepthMm()
         {
-            return 3.0;
+            return ProductDrawingStrategy.DefaultDrawerGrooveDepthMm;
         }
 
         private static double DrawerGrooveClearanceMm()
         {
-            return 0.8;
+            return ProductDrawingStrategy.DefaultDrawerGrooveClearanceMm;
         }
 
         private static double DrawerGrooveBottomOffsetMm()

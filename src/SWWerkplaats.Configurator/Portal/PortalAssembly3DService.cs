@@ -378,6 +378,19 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static double VerticalZFaceOffset(string partName, string holeName, double thickness, double lift)
         {
+            if (IsBottomAssemblyHole(holeName))
+            {
+                if (StartsWith(partName, "Zijwand links"))
+                {
+                    return -thickness / 2.0 - lift;
+                }
+
+                if (StartsWith(partName, "Zijwand rechts"))
+                {
+                    return thickness / 2.0 + lift;
+                }
+            }
+
             if (StartsWith(partName, "Zijwand links") || StartsWith(partName, "Ladezijde links"))
             {
                 return thickness / 2.0 + lift;
@@ -396,6 +409,11 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             return thickness / 2.0 + lift;
+        }
+
+        private static bool IsBottomAssemblyHole(string value)
+        {
+            return StartsWith(value, "Montagegat bodem");
         }
 
         private static double VerticalXHoleFaceOffset(string partName, double thickness, double lift)

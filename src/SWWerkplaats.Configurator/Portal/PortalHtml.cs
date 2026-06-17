@@ -288,9 +288,12 @@ namespace SWWerkplaats.Configurator.Portal
         const geo=realPocketSheet?buildPocketedSheetGeometry(THREE,p):new THREE.BoxGeometry(p.SizeXmm,p.SizeYmm,p.SizeZmm);
         const mesh=new THREE.Mesh(geo,material);mesh.position.set(p.Xmm,p.Ymm,p.Zmm);group.add(mesh);
         const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:p.Kind==='pocket'?0x3f3a33:0x667085,transparent:true,opacity:p.Kind==='pocket'?.62:.48}));edges.position.copy(mesh.position);group.add(edges);
-        (p.Holes||[]).forEach(h=>{const hg=new THREE.CircleGeometry(Math.max(3,h.DiameterMm/2),18),hm=new THREE.MeshBasicMaterial({color:0x344054,transparent:true,opacity:.72,side:THREE.DoubleSide}),hole=new THREE.Mesh(hg,hm);hole.position.set(h.Xmm,h.Ymm,h.Zmm);if(h.Plane==='x')hole.rotation.y=Math.PI/2;else if(h.Plane==='y')hole.rotation.x=-Math.PI/2;group.add(hole);});
+        addThreeHoles(THREE,group,p);
       });
       const floorGeo=new THREE.CircleGeometry(900,64),floorMat=new THREE.MeshBasicMaterial({color:0xdfe4eb,transparent:true,opacity:.42});const floor=new THREE.Mesh(floorGeo,floorMat);floor.rotation.x=-Math.PI/2;floor.scale.set(1.55,.55,1);floor.position.y=-8;group.add(floor);
+    }
+    function addThreeHoles(THREE,group,p){
+      (p.Holes||[]).forEach(h=>{const hg=new THREE.CircleGeometry(Math.max(3,h.DiameterMm/2),18),hm=new THREE.MeshBasicMaterial({color:0x344054,transparent:true,opacity:.72,side:THREE.DoubleSide}),hole=new THREE.Mesh(hg,hm);hole.position.set(h.Xmm,h.Ymm,h.Zmm);if(h.Plane==='x')hole.rotation.y=Math.PI/2;else if(h.Plane==='y')hole.rotation.x=-Math.PI/2;group.add(hole);});
     }
     function rectCells(THREE,p,pockets,uSize,vSize,uName,vName,uSizeName,vSizeName){
       const us=[-uSize/2,uSize/2],vs=[-vSize/2,vSize/2];
@@ -305,6 +308,7 @@ namespace SWWerkplaats.Configurator.Portal
       const geo=buildRecessedBoxGeometry(THREE,p,'z',insidePlus?1:-1,mapped);
       const mesh=new THREE.Mesh(geo,material);mesh.position.set(p.Xmm,p.Ymm,p.Zmm);group.add(mesh);
       const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x667085,transparent:true,opacity:.48}));edges.position.copy(mesh.position);group.add(edges);
+      addThreeHoles(THREE,group,p);
     }
     function addPocketedVerticalZPart(THREE,group,p,material){
       const pockets=(p.Pockets||[]).filter(g=>g.Plane==='x'&&g.SizeXmm>0),depth=Math.min(p.SizeXmm*.8,Math.max(...pockets.map(g=>g.SizeXmm))),insidePlus=pockets.reduce((n,g)=>n+(g.Xmm>p.Xmm?1:-1),0)>=0;
@@ -312,6 +316,7 @@ namespace SWWerkplaats.Configurator.Portal
       const geo=buildRecessedBoxGeometry(THREE,p,'x',insidePlus?1:-1,mapped);
       const mesh=new THREE.Mesh(geo,material);mesh.position.set(p.Xmm,p.Ymm,p.Zmm);group.add(mesh);
       const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x667085,transparent:true,opacity:.48}));edges.position.copy(mesh.position);group.add(edges);
+      addThreeHoles(THREE,group,p);
     }
     function isDrawerPart(p){const n=p&&p.Name?p.Name:'';return n.startsWith('Lade')||n.startsWith('Bovenlade');}
     function buildRecessedBoxGeometry(THREE,p,axis,sign,pockets){
