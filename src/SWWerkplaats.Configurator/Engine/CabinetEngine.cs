@@ -141,7 +141,7 @@ namespace SWWerkplaats.Configurator.Engine
                     var bottomDepth = Math.Max(80, boxDepth - drawerT);
                     var frontWidth = Math.Max(80, clearWidth - config.DoorGapMm);
                     var frontHeight = usableHeight - config.DoorGapMm;
-                    var boxFrontZ = frontZ;
+                    var boxFrontZ = InnerFrontZ(frontZ, frontMaterial);
                     var boxCenterZ = boxFrontZ - frontPocketDepth + sideLength / 2.0;
                     bottomWidth = Math.Max(80, bottomWidth + 2.0 * DrawerGrooveDepthMm());
                     bottomDepth = Math.Max(80, bottomDepth + 2.0 * DrawerGrooveDepthMm());
@@ -224,7 +224,7 @@ namespace SWWerkplaats.Configurator.Engine
             var sideLength = boxDepth + frontPocketDepth;
             var frontWidth = Math.Max(80, clearWidth - config.DoorGapMm);
             var frontHeight = usableHeight - config.DoorGapMm;
-            var boxFrontZ = frontZ;
+            var boxFrontZ = InnerFrontZ(frontZ, frontMaterial);
             var boxCenterZ = boxFrontZ - frontPocketDepth + sideLength / 2.0;
             bottomWidth = Math.Max(80, bottomWidth + 2.0 * DrawerGrooveDepthMm());
             bottomDepth = Math.Max(80, bottomDepth + 2.0 * DrawerGrooveDepthMm());
@@ -267,6 +267,12 @@ namespace SWWerkplaats.Configurator.Engine
         {
             var thickness = frontMaterial == null ? 18.0 : frontMaterial.ThicknessMm;
             return frontZ + thickness / 2.0;
+        }
+
+        private static double InnerFrontZ(double frontZ, Material frontMaterial)
+        {
+            var thickness = frontMaterial == null ? 18.0 : frontMaterial.ThicknessMm;
+            return frontZ + thickness;
         }
 
         private static double TopDrawerHeight(CabinetConfig config, double bodyHeight)
@@ -796,7 +802,7 @@ namespace SWWerkplaats.Configurator.Engine
             var drawerHeight = Math.Max(80, config.FullWidthTopDrawerHeightMm);
             var bottomY = bodyHeight - drawerHeight + config.DoorGapMm;
             var railY = bottomY + rail.VerticalOffsetMm;
-            AddRailHoleLine(panel, rail.CabinetHolePositionsMm, rail.HoleCount, rail.FirstHoleOffsetMm, rail.HoleSpacingMm, rail.HoleDiameterMm, railY, "Bovenlade railgat U" + unitNumber, BlindDepthForOutsidePanel(panel));
+            AddRailHoleLine(panel, rail.CabinetHolePositionsMm, rail.HoleCount, rail.FirstHoleOffsetMm, rail.HoleSpacingMm, rail.HoleDiameterMm, railY, "Bovenlade railgat U" + unitNumber, BlindDepthForOutsidePanel(panel), DrawerBoxFrontInset(config));
         }
 
         private static void AddRailHolesForAdjacentUnit(SheetPart panel, CabinetConfig config, int unitNumber, double bodyHeight)
@@ -808,6 +814,7 @@ namespace SWWerkplaats.Configurator.Engine
             var rail = config.DrawerRail;
             var drawerHeight = Math.Max(80, unit.DrawerHeightMm);
             var shelfZoneTop = DrawerShelfZoneTop(config, bodyHeight);
+            var railXOffset = DrawerBoxFrontInset(config);
             for (var drawerIndex = 0; drawerIndex < unit.DrawerCount; drawerIndex++)
             {
                 var bottomY = DrawerBottomY(config, drawerIndex, drawerHeight, shelfZoneTop);
@@ -817,7 +824,7 @@ namespace SWWerkplaats.Configurator.Engine
                 var positions = RailHolePositions(rail.CabinetHolePositionsMm, rail.HoleCount, rail.FirstHoleOffsetMm, rail.HoleSpacingMm);
                 for (var holeIndex = 0; holeIndex < positions.Count; holeIndex++)
                 {
-                    var x = positions[holeIndex];
+                    var x = positions[holeIndex] + railXOffset;
                     if (x <= 5 || x >= panel.LengthMm - 5) continue;
                     panel.Holes.Add(new SheetHole
                     {
@@ -843,10 +850,10 @@ namespace SWWerkplaats.Configurator.Engine
             var y = Math.Round(rail.DrawerVerticalOffsetMm, 3);
             if (y <= 5 || y >= panel.WidthMm - 5) return;
 
-            AddRailHoleLine(panel, rail.DrawerHolePositionsMm, rail.DrawerHoleCount, rail.DrawerFirstHoleOffsetMm, rail.DrawerHoleSpacingMm, rail.DrawerHoleDiameterMm, y, "Laderailgat", 0);
+            AddRailHoleLine(panel, rail.DrawerHolePositionsMm, rail.DrawerHoleCount, rail.DrawerFirstHoleOffsetMm, rail.DrawerHoleSpacingMm, rail.DrawerHoleDiameterMm, y, "Laderailgat", 0, 0);
         }
 
-        private static void AddRailHoleLine(SheetPart panel, string explicitPositions, int count, double firstOffset, double spacing, double diameter, double y, string name, double depthMm)
+        private static void AddRailHoleLine(SheetPart panel, string explicitPositions, int count, double firstOffset, double spacing, double diameter, double y, string name, double depthMm, double xOffset)
         {
             y = Math.Round(y, 3);
             if (y <= 5 || y >= panel.WidthMm - 5) return;
@@ -854,7 +861,7 @@ namespace SWWerkplaats.Configurator.Engine
             var positions = RailHolePositions(explicitPositions, count, firstOffset, spacing);
             for (var holeIndex = 0; holeIndex < positions.Count; holeIndex++)
             {
-                var x = positions[holeIndex];
+                var x = positions[holeIndex] + xOffset;
                 if (x <= 5 || x >= panel.LengthMm - 5) continue;
                 if (HasHoleAt(panel, x, y, diameter)) continue;
                 panel.Holes.Add(new SheetHole
@@ -882,6 +889,12 @@ namespace SWWerkplaats.Configurator.Engine
             }
 
             return 0;
+        }
+
+        private static double DrawerBoxFrontInset(CabinetConfig config)
+        {
+            var frontThickness = config == null || config.FrontMaterial == null ? 18.0 : config.FrontMaterial.ThicknessMm;
+            return Math.Max(0, frontThickness - DrawerGrooveDepthMm());
         }
 
         private static bool HasHoleAt(SheetPart panel, double x, double y, double diameter)
