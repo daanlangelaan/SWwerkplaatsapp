@@ -1,3 +1,9 @@
+param(
+    [ValidateSet("Start", "Stop", "Rebuild")]
+    [string]$Action = "Start",
+    [switch]$NoOpen
+)
+
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -27,18 +33,13 @@ function Stop-ExistingPortal {
     if (-not $portalPid) { return }
 
     try {
-        Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://localhost:8088/api/shutdown" -TimeoutSec 2 | Out-Null
+        Stop-Process -Id $portalPid -Force -ErrorAction Stop
     } catch {
     }
 
     for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Milliseconds 150
         if (-not (Get-PortalProcessId)) { return }
-    }
-
-    try {
-        Stop-Process -Id $portalPid -Force -ErrorAction Stop
-    } catch {
     }
 }
 
@@ -91,6 +92,11 @@ function Build-CurrentPortal {
 }
 
 function Start-Portal {
+    if (Get-PortalProcessId) { return }
+    if (-not (Test-Path $exe)) {
+        throw "De portal is nog niet gebouwd. Gebruik eerst Web configurator rebuild.cmd."
+    }
+
     Start-Process -FilePath $exe -ArgumentList "--portal-only" -WorkingDirectory $outDir -WindowStyle Hidden | Out-Null
 
     for ($i = 0; $i -lt 40; $i++) {
@@ -101,11 +107,55 @@ function Start-Portal {
     throw "Portal startte niet op poort 8088."
 }
 
+function Wait-PortalReady {
+    for ($i = 0; $i -lt 30; $i++) {
+        if (Test-PortalHealth) { return }
+
+        Start-Sleep -Milliseconds 200
+    }
+
+    throw "Portal luistert op poort 8088, maar de health-check geeft nog geen antwoord."
+}
+
+function Test-PortalHealth {
+    $client = $null
+    try {
+        $client = New-Object Net.Sockets.TcpClient
+        $client.ReceiveTimeout = 1000
+        $client.SendTimeout = 1000
+        $client.Connect("127.0.0.1", 8088)
+        $stream = $client.GetStream()
+        $request = [Text.Encoding]::ASCII.GetBytes("GET /api/health HTTP/1.1`r`nHost: localhost`r`nConnection: close`r`n`r`n")
+        $stream.Write($request, 0, $request.Length)
+        $buffer = New-Object byte[] 256
+        $read = $stream.Read($buffer, 0, $buffer.Length)
+        if ($read -le 0) { return $false }
+
+        $response = [Text.Encoding]::ASCII.GetString($buffer, 0, $read)
+        return $response.StartsWith("HTTP/1.1 200", [StringComparison]::OrdinalIgnoreCase)
+    } catch {
+        return $false
+    } finally {
+        if ($client) { $client.Close() }
+    }
+}
+
 try {
-    Stop-ExistingPortal
-    Build-CurrentPortal
+    if ($Action -eq "Stop") {
+        Stop-ExistingPortal
+        exit 0
+    }
+
+    if ($Action -eq "Rebuild") {
+        Stop-ExistingPortal
+        Build-CurrentPortal
+    }
+
     Start-Portal
-    Start-Process $url
+    Wait-PortalReady
+    if (-not $NoOpen) {
+        Start-Process $url
+    }
 } catch {
     Show-PortalError $_.Exception.Message
     exit 1

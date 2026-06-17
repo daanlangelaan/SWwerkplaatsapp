@@ -9,6 +9,16 @@ Zonder extra configuratie:
 - URL: `http://localhost:8088/`
 - Datafolder: `bin/PortalData`
 
+## Klikbare startbestanden
+
+Voor lokaal ontwikkelen staan in de projectmap drie klikbare bestanden:
+
+- `Web configurator starten.cmd`: start de laatst gebouwde portal en opent de browser.
+- `Web configurator stoppen.cmd`: stopt de portal op poort `8088`.
+- `Web configurator rebuild.cmd`: stopt de portal, bouwt de actuele code opnieuw, start de portal en opent de browser.
+
+Gebruik `rebuild` na codewijzigingen. Gebruik `stop` als je twijfelt of er nog een oude portal draait.
+
 ## Tijdelijk starten via argumenten
 
 ```powershell
