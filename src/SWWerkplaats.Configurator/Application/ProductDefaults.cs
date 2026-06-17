@@ -19,6 +19,14 @@ namespace SWWerkplaats.Configurator.Application
         public const int CabinetDefaultDrawerCount = 1;
         public const string CabinetDefaultShelfStartMode = "top";
 
+        public const double CubbyCabinetWidthMm = 1800;
+        public const double CubbyCabinetDepthMm = 350;
+        public const double CubbyCabinetHeightMm = 1800;
+        public const int CubbyCabinetColumnCount = 4;
+        public const int CubbyCabinetRowCount = 4;
+        public const double CubbyCabinetPlinthHeightMm = 80;
+        public const double CubbyCabinetPlinthDepthMm = 40;
+
         public const int DefaultSheetIndex = 2;
         public const int DefaultProfileIndex = 1;
         public const int DefaultFastenerIndex = 0;

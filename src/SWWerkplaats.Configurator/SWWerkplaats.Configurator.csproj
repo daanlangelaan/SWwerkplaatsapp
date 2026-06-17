@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
+    <Compile Include="Application\CubbyCabinetProductBuilder.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\HealthApplicationService.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
@@ -57,6 +58,7 @@
     <Compile Include="Domain\AssemblyPlacement.cs" />
     <Compile Include="Domain\AppSettings.cs" />
     <Compile Include="Domain\CabinetConfig.cs" />
+    <Compile Include="Domain\CubbyCabinetConfig.cs" />
     <Compile Include="Domain\DrawingContracts.cs" />
     <Compile Include="Domain\DrillOperation.cs" />
     <Compile Include="Domain\FastenerDefinition.cs" />

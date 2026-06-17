@@ -29,6 +29,8 @@ namespace SWWerkplaats.Configurator.Portal
         public bool IncludeMiddleShelf { get; set; }
         public double LowerShelfHeightMm { get; set; }
         public double MiddleShelfHeightMm { get; set; }
+        public int CubbyColumnCount { get; set; }
+        public int CubbyRowCount { get; set; }
     }
 
     public sealed class PortalQuoteResponse
