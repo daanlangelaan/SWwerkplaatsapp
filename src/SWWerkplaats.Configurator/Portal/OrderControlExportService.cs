@@ -115,6 +115,31 @@ namespace SWWerkplaats.Configurator.Portal
             return sb.ToString();
         }
 
+        public string ExportDrawingContractControl(WorkbenchModel model)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Onderdeel;Orientatie;Basisvlak;Lengte_as;Breedte_as;Dikte_as;SheetX_sign;SheetY_sign;Default_bewerkingsvlak;Notitie");
+            if (model == null) return sb.ToString();
+
+            foreach (var placement in model.AssemblyPlacements)
+            {
+                if (placement.Kind != AssemblyComponentKind.Sheet) continue;
+                var contract = DrawingContracts.ForOrientation(placement.Orientation);
+                sb.Append(E(placement.PartName)).Append(';');
+                sb.Append(E(placement.Orientation.ToString())).Append(';');
+                sb.Append(E(contract.BasePlane.ToString())).Append(';');
+                sb.Append(E(contract.LengthAxis.ToString())).Append(';');
+                sb.Append(E(contract.WidthAxis.ToString())).Append(';');
+                sb.Append(E(contract.ThicknessAxis.ToString())).Append(';');
+                sb.Append(contract.SheetXSign).Append(';');
+                sb.Append(contract.SheetYSign).Append(';');
+                sb.Append(E(contract.DefaultOperationFace.ToString())).Append(';');
+                sb.AppendLine(E(contract.Notes));
+            }
+
+            return sb.ToString();
+        }
+
         private static List<AssemblyFinding> Validate(WorkbenchModel model, PortalQuoteRequest request)
         {
             var findings = new List<AssemblyFinding>();

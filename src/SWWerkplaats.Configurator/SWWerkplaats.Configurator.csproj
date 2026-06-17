@@ -43,6 +43,7 @@
     <Compile Include="Domain\AssemblyPlacement.cs" />
     <Compile Include="Domain\AppSettings.cs" />
     <Compile Include="Domain\CabinetConfig.cs" />
+    <Compile Include="Domain\DrawingContracts.cs" />
     <Compile Include="Domain\DrillOperation.cs" />
     <Compile Include="Domain\FastenerDefinition.cs" />
     <Compile Include="Domain\HardwareItem.cs" />
