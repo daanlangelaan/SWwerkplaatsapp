@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
@@ -135,12 +136,8 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (request.Method == "GET" && path == "/api/catalog")
             {
-                WriteJson(stream, 200, new
-                {
-                    sheets = LibraryCatalog.Sheets(),
-                    profiles = LibraryCatalog.Profiles(),
-                    statuses = new[] { PortalOrderStatus.Nieuw, PortalOrderStatus.TeControleren, PortalOrderStatus.Goedgekeurd, PortalOrderStatus.InFreeswachtrij, PortalOrderStatus.InProductie, PortalOrderStatus.Gereed }
-                });
+                var catalog = new CatalogApplicationService().GetCatalog();
+                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, statuses = catalog.Statuses });
                 return;
             }
 

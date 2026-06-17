@@ -38,6 +38,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Application\CatalogApplicationService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Domain\CutListItem.cs" />
@@ -52,6 +53,7 @@
     <Compile Include="Domain\MachineProfile.cs" />
     <Compile Include="Domain\Material.cs" />
     <Compile Include="Domain\NestingModels.cs" />
+    <Compile Include="Domain\OrderWorkflowStatus.cs" />
     <Compile Include="Domain\PartModels.cs" />
     <Compile Include="Domain\ProfileOperation.cs" />
     <Compile Include="Domain\RailTemplate.cs" />

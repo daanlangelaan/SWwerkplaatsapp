@@ -130,11 +130,11 @@ namespace SWWerkplaats.Configurator.Portal
 
     public static class PortalOrderStatus
     {
-        public const string Nieuw = "Nieuw";
-        public const string TeControleren = "Te controleren";
-        public const string Goedgekeurd = "Goedgekeurd";
-        public const string InFreeswachtrij = "In freeswachtrij";
-        public const string InProductie = "In productie";
-        public const string Gereed = "Gereed";
+        public const string Nieuw = Domain.OrderWorkflowStatus.Nieuw;
+        public const string TeControleren = Domain.OrderWorkflowStatus.TeControleren;
+        public const string Goedgekeurd = Domain.OrderWorkflowStatus.Goedgekeurd;
+        public const string InFreeswachtrij = Domain.OrderWorkflowStatus.InFreeswachtrij;
+        public const string InProductie = Domain.OrderWorkflowStatus.InProductie;
+        public const string Gereed = Domain.OrderWorkflowStatus.Gereed;
     }
 }
