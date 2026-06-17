@@ -51,12 +51,14 @@ namespace SWWerkplaats.Configurator.Engine
             AddRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddTopDrawerRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddAdjustableShelfHoles(leftSide, config, shelfZoneTop);
+            AddBottomToUprightHoles(leftSide, config, 1);
             AddSheet(model, leftSide, -config.WidthMm / 2.0 + t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
 
             var rightSide = SidePanel("Zijwand rechts", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
             AddRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddTopDrawerRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddAdjustableShelfHoles(rightSide, config, shelfZoneTop);
+            AddBottomToUprightHoles(rightSide, config, config.UnitCount);
             AddSheet(model, rightSide, config.WidthMm / 2.0 - t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
 
             for (var i = 1; i < config.UnitCount; i++)
@@ -67,6 +69,8 @@ namespace SWWerkplaats.Configurator.Engine
                 AddRailHolesForPanel(divider, config, i, bodyHeight);
                 AddTopDrawerRailHolesForPanel(divider, config, i, bodyHeight);
                 AddAdjustableShelfHoles(divider, config, shelfZoneTop);
+                AddBottomToUprightHoles(divider, config, i);
+                AddBottomToUprightHoles(divider, config, i + 1);
                 AddSheet(model, divider, x, dividerHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
             }
 
@@ -261,6 +265,11 @@ namespace SWWerkplaats.Configurator.Engine
         private static double DrawerBoxDepth(CabinetConfig config, double innerDepth)
         {
             return Math.Max(120, innerDepth - config.DrawerBackClearanceMm);
+        }
+
+        private static double MaterialThickness(Material material)
+        {
+            return material == null ? 18.0 : material.ThicknessMm;
         }
 
         private static double FlushFrontCenterZ(double frontZ, Material frontMaterial)
@@ -474,6 +483,25 @@ namespace SWWerkplaats.Configurator.Engine
             }
         }
 
+        private static void AddBottomToUprightHoles(SheetPart panel, CabinetConfig config, int unitNumber)
+        {
+            if (panel == null || config == null || unitNumber < 1 || unitNumber > config.UnitCount) return;
+
+            var diameter = AssemblyHoleDiameter(config);
+            var y = config.PlinthHeightMm + MaterialThickness(config.CarcassMaterial) / 2.0;
+            var positions = PatternPositions(panel.LengthMm, 45, 180, 3);
+            for (var i = 0; i < positions.Count; i++)
+            {
+                AddCabinetHole(
+                    panel,
+                    positions[i],
+                    y,
+                    diameter,
+                    "Montagegat bodem U" + unitNumber.ToString(CultureInfo.InvariantCulture) + " naar zijpaneel " + (i + 1).ToString(CultureInfo.InvariantCulture),
+                    SheetHoleSupportKind.PanelScrew);
+            }
+        }
+
         private static void AddDrawerAssemblyHoles(
             CabinetConfig config,
             SheetPart drawerFront,
@@ -628,6 +656,25 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddUniqueCabinetHole(SheetPart sheet, double x, double y, double diameter, string note, SheetHoleSupportKind supportKind)
         {
             SheetOperations.AddUniqueThroughHole(sheet, x, y, diameter, "Montagegat " + note + " " + (sheet == null ? 1 : sheet.Holes.Count + 1), supportKind, 6);
+        }
+
+        private static void AddCabinetHole(SheetPart sheet, double x, double y, double diameter, string name, SheetHoleSupportKind supportKind)
+        {
+            if (sheet == null) return;
+            x = Math.Round(Math.Max(6, Math.Min(sheet.LengthMm - 6, x)), 3);
+            y = Math.Round(Math.Max(6, Math.Min(sheet.WidthMm - 6, y)), 3);
+            sheet.Holes.Add(new SheetHole
+            {
+                Name = name,
+                Xmm = x,
+                Ymm = y,
+                DiameterMm = diameter,
+                DepthMm = 0,
+                Face = OperationFace.CenterPlane,
+                DepthMode = OperationDepthMode.Through,
+                Countersunk = false,
+                SupportKind = supportKind
+            });
         }
 
         private static void AddSheet(WorkbenchModel model, SheetPart sheet, double x, double y, double z, AssemblyOrientation orientation)
