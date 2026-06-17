@@ -42,11 +42,13 @@
     <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\HealthApplicationService.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
+    <Compile Include="Application\IProductBuilder.cs" />
     <Compile Include="Application\IOrderRepository.cs" />
     <Compile Include="Application\OrderApplicationService.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductCatalogApplicationService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
+    <Compile Include="Application\ProductRegistry.cs" />
     <Compile Include="Application\PortalRuntimeOptions.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />
     <Compile Include="Application\WorkflowApplicationService.cs" />

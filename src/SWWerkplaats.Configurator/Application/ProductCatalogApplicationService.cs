@@ -21,47 +21,21 @@ namespace SWWerkplaats.Configurator.Application
 
     public sealed class ProductCatalogApplicationService
     {
+        private readonly ProductRegistry products;
+
+        public ProductCatalogApplicationService()
+            : this(new ProductRegistry())
+        {
+        }
+
+        public ProductCatalogApplicationService(ProductRegistry products)
+        {
+            this.products = products ?? new ProductRegistry();
+        }
+
         public ProductCatalogItem[] ListProducts()
         {
-            return new[]
-            {
-                new ProductCatalogItem
-                {
-                    Product = "cabinet",
-                    Name = "Cabinet / kast",
-                    Category = "kast",
-                    DefaultWidthMm = ProductDefaults.CabinetWidthMm,
-                    DefaultDepthMm = ProductDefaults.CabinetDepthMm,
-                    DefaultHeightMm = ProductDefaults.CabinetHeightMm,
-                    DefaultUnitCount = ProductDefaults.CabinetUnitCount,
-                    DefaultShelfCount = ProductDefaults.CabinetDefaultShelfCount,
-                    DefaultDrawerCount = ProductDefaults.CabinetDefaultDrawerCount,
-                    DefaultShelfStartMode = ProductDefaults.CabinetDefaultShelfStartMode,
-                    SupportsProfiles = false,
-                    SupportsDrawers = true,
-                    SupportsDoors = true,
-                    SupportsBackPanel = true,
-                    SupportsAdjustableShelfHoles = true
-                },
-                new ProductCatalogItem
-                {
-                    Product = "werktafel",
-                    Name = "Werktafel",
-                    Category = "werkbank",
-                    DefaultWidthMm = ProductDefaults.WorkbenchWidthMm,
-                    DefaultDepthMm = ProductDefaults.WorkbenchDepthMm,
-                    DefaultHeightMm = ProductDefaults.WorkbenchHeightMm,
-                    DefaultUnitCount = ProductDefaults.WorkbenchUnitCount,
-                    DefaultShelfCount = ProductDefaults.WorkbenchDefaultShelfCount,
-                    DefaultDrawerCount = ProductDefaults.WorkbenchDefaultDrawerCount,
-                    DefaultShelfStartMode = "bottom",
-                    SupportsProfiles = true,
-                    SupportsDrawers = false,
-                    SupportsDoors = false,
-                    SupportsBackPanel = false,
-                    SupportsAdjustableShelfHoles = false
-                }
-            };
+            return products.CatalogItems();
         }
     }
 }

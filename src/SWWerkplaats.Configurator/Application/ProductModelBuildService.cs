@@ -1,12 +1,23 @@
 using System;
 using SWWerkplaats.Configurator.Domain;
-using SWWerkplaats.Configurator.Engine;
 using SWWerkplaats.Configurator.Portal;
 
 namespace SWWerkplaats.Configurator.Application
 {
     public sealed class ProductModelBuildService
     {
+        private readonly ProductRegistry products;
+
+        public ProductModelBuildService()
+            : this(new ProductRegistry())
+        {
+        }
+
+        public ProductModelBuildService(ProductRegistry products)
+        {
+            this.products = products ?? new ProductRegistry();
+        }
+
         public WorkbenchModel Build(PortalQuoteRequest request)
         {
             return Build(new PortalConfigurationFactory(), request);
@@ -16,23 +27,9 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (factory == null) throw new ArgumentNullException("factory");
 
-            WorkbenchModel model;
-            if (IsCabinet(request))
-            {
-                model = new CabinetEngine().Build(factory.BuildCabinet(request));
-            }
-            else
-            {
-                model = new WorkbenchEngine().Build(factory.BuildWorkbench(request));
-            }
-
+            var model = products.Resolve(request).Build(factory, request);
             ApplyOrderQuantity(model, request);
             return model;
-        }
-
-        public static bool IsCabinet(PortalQuoteRequest request)
-        {
-            return request == null || string.IsNullOrWhiteSpace(request.Product) || request.Product.ToLowerInvariant() != "werktafel";
         }
 
         private static void ApplyOrderQuantity(WorkbenchModel model, PortalQuoteRequest request)
