@@ -48,6 +48,7 @@ namespace SWWerkplaats.Configurator.Engine
             AddSheet(model, plinth, 0, config.PlinthHeightMm / 2.0, frontZ + config.PlinthDepthMm + t / 2.0, AssemblyOrientation.SheetVerticalX);
 
             var leftSide = SidePanel("Zijwand links", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
+            AddBottomReceivingGrooveToUpright(leftSide, config);
             AddRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddTopDrawerRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddAdjustableShelfHoles(leftSide, config, shelfZoneTop);
@@ -55,6 +56,7 @@ namespace SWWerkplaats.Configurator.Engine
             AddSheet(model, leftSide, -config.WidthMm / 2.0 + t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
 
             var rightSide = SidePanel("Zijwand rechts", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
+            AddBottomReceivingGrooveToUpright(rightSide, config);
             AddRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddTopDrawerRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddAdjustableShelfHoles(rightSide, config, shelfZoneTop);
@@ -66,6 +68,7 @@ namespace SWWerkplaats.Configurator.Engine
                 var x = -config.WidthMm / 2.0 + unitWidth * i;
                 var dividerHeight = bodyHeight + AlignmentGrooveDepthMm(worktop);
                 var divider = SidePanel("Tussenschot " + i.ToString(CultureInfo.InvariantCulture), carcass, config.DepthMm, dividerHeight, plinthNotchDepth, config.PlinthHeightMm);
+                AddBottomReceivingGrooveToUpright(divider, config);
                 AddRailHolesForPanel(divider, config, i, bodyHeight);
                 AddTopDrawerRailHolesForPanel(divider, config, i, bodyHeight);
                 AddAdjustableShelfHoles(divider, config, shelfZoneTop);
@@ -85,6 +88,7 @@ namespace SWWerkplaats.Configurator.Engine
             {
                 var backPanel = Sheet("Achterwand", back, config.WidthMm, bodyHeight);
                 AddDividerGroovesToBackPanel(backPanel, config, bodyHeight);
+                AddBottomReceivingGrooveToBackPanel(backPanel, config, bodyHeight);
                 AddBackPanelMountingHoles(backPanel, config, bodyHeight);
                 AddSheet(model, backPanel, 0, bodyHeight / 2.0, backZ + back.ThicknessMm / 2.0, AssemblyOrientation.SheetVerticalX);
             }
@@ -374,6 +378,52 @@ namespace SWWerkplaats.Configurator.Engine
             var note = "3mm verdiepte montagerabat voor zijwand/tussenschot; prototype bij bodemplaat per unit";
             AddPocket(bottom, "Linker staander-rabat", 0, 0, grooveWidth, bottom.WidthMm, grooveDepth, note);
             AddPocket(bottom, "Rechter staander-rabat", bottom.LengthMm - grooveWidth, 0, grooveWidth, bottom.WidthMm, grooveDepth, note);
+        }
+
+        private static void AddBottomReceivingGrooveToUpright(SheetPart upright, CabinetConfig config)
+        {
+            if (upright == null || config == null) return;
+            var materialThickness = MaterialThickness(config.CarcassMaterial);
+            var grooveHeight = Math.Min(upright.WidthMm - 2.0, materialThickness + AlignmentGrooveClearanceMm());
+            if (grooveHeight <= 0) return;
+
+            var y = Math.Max(0, config.PlinthHeightMm - AlignmentGrooveClearanceMm() / 2.0);
+            if (y + grooveHeight > upright.WidthMm)
+            {
+                y = Math.Max(0, upright.WidthMm - grooveHeight);
+            }
+
+            AddPocket(
+                upright,
+                "Bodem positioneergroef",
+                0,
+                y,
+                upright.LengthMm,
+                grooveHeight,
+                AlignmentGrooveDepthMm(upright),
+                "3mm verdiepte groef zodat bodemplaat in staander valt en niet hoeft uit te lijnen");
+        }
+
+        private static void AddBottomReceivingGrooveToBackPanel(SheetPart backPanel, CabinetConfig config, double bodyHeight)
+        {
+            if (backPanel == null || config == null) return;
+            var materialThickness = MaterialThickness(config.CarcassMaterial);
+            var grooveHeight = Math.Min(backPanel.WidthMm - 2.0, materialThickness + AlignmentGrooveClearanceMm());
+            if (grooveHeight <= 0) return;
+
+            var y = Math.Max(0, config.PlinthHeightMm - AlignmentGrooveClearanceMm() / 2.0);
+            var maxY = Math.Min(backPanel.WidthMm, bodyHeight) - grooveHeight;
+            if (y > maxY) y = Math.Max(0, maxY);
+
+            AddPocket(
+                backPanel,
+                "Bodemlijn achterwandgroef",
+                0,
+                y,
+                backPanel.LengthMm,
+                grooveHeight,
+                AlignmentGrooveDepthMm(backPanel),
+                "3mm verdiepte groef zodat achterzijde bodemplaten in achterwand valt");
         }
 
         private static void AddDrawerBottomGroove(SheetPart panel, Material drawerMaterial)
