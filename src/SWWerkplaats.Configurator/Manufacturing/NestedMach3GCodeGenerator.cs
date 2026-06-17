@@ -38,7 +38,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Voorraadplaat: " + stock.Material.Name + " " + F(stock.StockLengthMm) + " x " + F(stock.StockWidthMm) + " mm)");
             sb.AppendLine("(Contourtool: " + contourTool.Name + ", diameter " + F(contourTool.DiameterMm) + " mm)");
             sb.AppendLine("(Gatentool: " + holeTool.Name + ", diameter " + F(holeTool.DiameterMm) + " mm)");
-            sb.AppendLine("(Origin: links onder, Z0 op bovenzijde materiaal)");
+            sb.AppendLine("(WERKSTUKNULPUNT: G54 X0/Y0 = links-onder van deze voorraadplaat)");
+            sb.AppendLine("(Z0 = bovenzijde materiaal)");
+            sb.AppendLine("(Let op: machine-home/machine-0 is alleen wissel-/parkeerpositie, niet het plaatnulpunt)");
             sb.AppendLine("(Initialisatie volgens veilige Mach3/Fusion stijl)");
             sb.AppendLine("G90 G94 G91.1 G40 G49 G17");
             sb.AppendLine("G21");
@@ -120,7 +122,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("T" + toolNumber + " M6");
             sb.AppendLine("G17 G90 G94");
             sb.AppendLine("G54");
-            sb.AppendLine("(Controleer tool, spanmoer en Z0 op bovenzijde materiaal voordat je start)");
+            sb.AppendLine("(Controleer: G54 X0/Y0 moet links-onder op de plaat liggen; Z0 op bovenzijde materiaal)");
+            sb.AppendLine("(Machine-home mag ergens anders liggen dan G54 plaatnulpunt)");
+            sb.AppendLine("(Controleer tool en spanmoer voordat je start)");
             sb.AppendLine("M3 S" + F(tool.SpindleRpm));
         }
 
