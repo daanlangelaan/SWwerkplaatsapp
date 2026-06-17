@@ -34,7 +34,7 @@ namespace SWWerkplaats.Configurator.Portal
         {
             if (IsRunning) return;
             Directory.CreateDirectory(RootFolder);
-            listener = new TcpListener(IPAddress.Loopback, PortFromPrefix(Prefix));
+            listener = new TcpListener(BindAddressFromPrefix(Prefix), PortFromPrefix(Prefix));
             listener.Start();
             IsRunning = true;
             worker = new Thread(ListenLoop);
@@ -314,6 +314,30 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var uri = new Uri(prefix);
             return uri.Port;
+        }
+
+        private static IPAddress BindAddressFromPrefix(string prefix)
+        {
+            var uri = new Uri(prefix);
+            var host = (uri.Host ?? "").Trim();
+            if (string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase) || string.Equals(host, "+", StringComparison.OrdinalIgnoreCase))
+            {
+                return IPAddress.Any;
+            }
+
+            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
+            {
+                return IPAddress.Loopback;
+            }
+
+            IPAddress parsed;
+            if (IPAddress.TryParse(host, out parsed))
+            {
+                if (IPAddress.IsLoopback(parsed)) return IPAddress.Loopback;
+                return parsed;
+            }
+
+            return IPAddress.Any;
         }
 
         private static string StatusText(int status)
