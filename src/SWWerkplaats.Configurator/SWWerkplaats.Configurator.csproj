@@ -44,6 +44,7 @@
     <Compile Include="Application\IOrderRepository.cs" />
     <Compile Include="Application\OrderApplicationService.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
+    <Compile Include="Application\ProductCatalogApplicationService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Application\PortalRuntimeOptions.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />

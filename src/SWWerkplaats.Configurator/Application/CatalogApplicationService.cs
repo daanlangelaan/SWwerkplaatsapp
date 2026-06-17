@@ -7,6 +7,7 @@ namespace SWWerkplaats.Configurator.Application
         public Material[] Sheets { get; set; }
         public Material[] Profiles { get; set; }
         public string[] Statuses { get; set; }
+        public ProductCatalogItem[] Products { get; set; }
     }
 
     public sealed class CatalogApplicationService
@@ -29,7 +30,8 @@ namespace SWWerkplaats.Configurator.Application
             {
                 Sheets = catalog.Sheets(),
                 Profiles = catalog.Profiles(),
-                Statuses = OrderWorkflowStatus.All()
+                Statuses = OrderWorkflowStatus.All(),
+                Products = new ProductCatalogApplicationService().ListProducts()
             };
         }
     }

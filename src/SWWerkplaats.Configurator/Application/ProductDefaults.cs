@@ -7,11 +7,17 @@ namespace SWWerkplaats.Configurator.Application
         public const double WorkbenchWidthMm = 1500;
         public const double WorkbenchDepthMm = 750;
         public const double WorkbenchHeightMm = 900;
+        public const int WorkbenchUnitCount = 1;
+        public const int WorkbenchDefaultShelfCount = 0;
+        public const int WorkbenchDefaultDrawerCount = 0;
 
         public const double CabinetWidthMm = 2400;
         public const double CabinetDepthMm = 600;
         public const double CabinetHeightMm = 900;
         public const int CabinetUnitCount = 4;
+        public const int CabinetDefaultShelfCount = 3;
+        public const int CabinetDefaultDrawerCount = 1;
+        public const string CabinetDefaultShelfStartMode = "top";
 
         public const int DefaultSheetIndex = 2;
         public const int DefaultProfileIndex = 1;

@@ -136,7 +136,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "GET" && path == "/api/catalog")
             {
                 var catalog = new CatalogApplicationService().GetCatalog();
-                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, statuses = catalog.Statuses });
+                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, statuses = catalog.Statuses, products = catalog.Products });
                 return;
             }
 
