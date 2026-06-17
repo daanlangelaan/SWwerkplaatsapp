@@ -36,12 +36,13 @@ namespace SWWerkplaats.Configurator.Engine
             var backThickness = config.IncludeBackPanel ? back.ThicknessMm : 0;
             var topDepth = config.DepthMm + backThickness;
             var topCenterZ = backThickness / 2.0;
+            var backAlignmentDepth = config.IncludeBackPanel ? AlignmentGrooveDepthMmForMaterial(back) : 0;
             var plinthNotchDepth = Math.Min(config.DepthMm - 1, config.PlinthDepthMm + t + 2.0);
             var topDrawerHeight = TopDrawerHeight(config, bodyHeight);
             var shelfZoneTop = topDrawerHeight > 0 ? bodyHeight - topDrawerHeight : bodyHeight;
 
             var worktop = Sheet("Werkblad", top, config.WidthMm, topDepth);
-            AddDividerGroovesToHorizontalSheet(worktop, config, config.WidthMm, config.DepthMm, "Tussenschot in werkblad");
+            AddDividerGroovesToHorizontalSheet(worktop, config, config.WidthMm, config.DepthMm + backAlignmentDepth, "Tussenschot in werkblad");
             AddWorktopToUprightHoles(worktop, config, topDepth);
             AddSheet(model, worktop, 0, config.WorktopHeightMm - topT / 2.0, topCenterZ, AssemblyOrientation.SheetHorizontal);
             var plinth = Sheet("Plint voor", carcass, config.WidthMm, config.PlinthHeightMm);
@@ -68,14 +69,15 @@ namespace SWWerkplaats.Configurator.Engine
             {
                 var x = -config.WidthMm / 2.0 + unitWidth * i;
                 var dividerHeight = bodyHeight + AlignmentGrooveDepthMm(worktop);
-                var divider = SidePanel("Tussenschot " + i.ToString(CultureInfo.InvariantCulture), carcass, config.DepthMm, dividerHeight, plinthNotchDepth, config.PlinthHeightMm);
+                var dividerDepth = config.DepthMm + backAlignmentDepth;
+                var divider = SidePanel("Tussenschot " + i.ToString(CultureInfo.InvariantCulture), carcass, dividerDepth, dividerHeight, plinthNotchDepth, config.PlinthHeightMm);
                 AddBottomReceivingGrooveToUpright(divider, config);
                 AddRailHolesForPanel(divider, config, i, bodyHeight);
                 AddTopDrawerRailHolesForPanel(divider, config, i, bodyHeight);
                 AddAdjustableShelfHoles(divider, config, shelfZoneTop);
                 AddBottomToUprightHoles(divider, config, i);
                 AddBottomToUprightHoles(divider, config, i + 1);
-                AddSheet(model, divider, x, dividerHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
+                AddSheet(model, divider, x, dividerHeight / 2.0, backAlignmentDepth / 2.0, AssemblyOrientation.SheetVerticalZ);
             }
 
             for (var i = 0; i < config.UnitCount; i++)
