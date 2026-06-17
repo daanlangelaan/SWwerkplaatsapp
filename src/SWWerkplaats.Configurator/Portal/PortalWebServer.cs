@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using SWWerkplaats.Configurator.Application;
-using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
 {
@@ -155,36 +154,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "POST" && path == "/api/quote")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
-                var preview = new ProductionOutputService().BuildPreview(quoteRequest);
-                var price = new PortalPricingService().Calculate(preview.Model, preview.NestingPlan);
-                var response = new PortalQuoteResponse
-                {
-                    QuoteId = "Q-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"),
-                    ProductName = ProductName(quoteRequest),
-                    Summary = Summary(preview.Model, quoteRequest),
-                    PriceExVat = price.ExVat,
-                    Material = price.Material,
-                    Hardware = price.Hardware,
-                    Machine = price.Machine,
-                    Labour = price.Labour,
-                    Margin = price.Margin,
-                    Vat = price.Vat,
-                    PriceIncVat = price.IncVat,
-                    LeadTime = "Indicatie: 5-10 werkdagen na controle",
-                    SheetPartCount = CountSheets(preview.Model),
-                    ProfilePartCount = CountProfiles(preview.Model),
-                    PreviewSvg = new PortalVisualizationService().BuildProductSvg(preview.Model, quoteRequest),
-                    NestingSvg = preview.NestingSvg
-                };
-                response.Files.Add("BOM.csv");
-                response.Files.Add("CAM-operaties.csv");
-                response.Files.Add("Nesting\\NestVisualisatie.svg");
-                response.Files.Add("Nesting\\*.tap na interne vrijgave");
-                foreach (var part in new PortalAssembly3DService().Build(preview.Model, quoteRequest))
-                {
-                    response.Assembly3D.Add(part);
-                }
-                WriteJson(stream, 200, response);
+                WriteJson(stream, 200, new QuoteApplicationService().BuildQuote(quoteRequest));
                 return;
             }
 
@@ -332,41 +302,6 @@ namespace SWWerkplaats.Configurator.Portal
             if (status == 404) return "Not Found";
             if (status == 500) return "Internal Server Error";
             return "OK";
-        }
-
-        private static string ProductName(PortalQuoteRequest request)
-        {
-            if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
-            return "Cabinet";
-        }
-
-        private static string Summary(WorkbenchModel model, PortalQuoteRequest request)
-        {
-            var quantity = request == null ? 1 : Math.Max(1, request.Quantity);
-            var prefix = quantity > 1 ? quantity.ToString() + " stuks - " : "";
-            return prefix + model.ProjectName + ": " + CountSheets(model) + " plaatdelen, " + CountProfiles(model) + " profieldelen, " + model.Hardware.Count + " beslagregels.";
-        }
-
-        private static int CountSheets(WorkbenchModel model)
-        {
-            var count = 0;
-            foreach (var sheet in model.Sheets)
-            {
-                count += Math.Max(1, sheet.Quantity);
-            }
-
-            return count;
-        }
-
-        private static int CountProfiles(WorkbenchModel model)
-        {
-            var count = 0;
-            foreach (var profile in model.Profiles)
-            {
-                count += Math.Max(1, profile.Quantity);
-            }
-
-            return count;
         }
 
         public void Dispose()
