@@ -51,8 +51,8 @@ namespace SWWerkplaats.Configurator.Application
         public const double DrawerBackClearanceMm = 30;
         public const double DoorGapMm = 2;
 
-        public const double DefaultToolDiameterMm = 4;
-        public const double DefaultToolPassDepthMm = 3;
+        public const double DefaultToolDiameterMm = 6;
+        public const double DefaultToolPassDepthMm = 6.25;
 
         public static MachineProfile DefaultMachine()
         {

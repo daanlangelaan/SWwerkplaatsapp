@@ -25,10 +25,13 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             tool = tool ?? jobOptions.PrimaryTool;
+            var contourTool = tool;
+            var holeTool = FindHoleTool(jobOptions, contourTool);
             sb.AppendLine("(Project: " + stock.Name + ")");
             sb.AppendLine("(Machine: " + machine.Name + ")");
             sb.AppendLine("(Voorraadplaat: " + stock.Material.Name + " " + F(stock.StockLengthMm) + " x " + F(stock.StockWidthMm) + " mm)");
-            sb.AppendLine("(Tool: " + tool.Name + ", diameter " + F(tool.DiameterMm) + " mm)");
+            sb.AppendLine("(Contourtool: " + contourTool.Name + ", diameter " + F(contourTool.DiameterMm) + " mm)");
+            sb.AppendLine("(Gatentool: " + holeTool.Name + ", diameter " + F(holeTool.DiameterMm) + " mm)");
             sb.AppendLine("(Origin: links onder, Z0 op bovenzijde materiaal)");
             sb.AppendLine("G21");
             sb.AppendLine("G90");
@@ -43,7 +46,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             sb.AppendLine();
-            sb.AppendLine("(Laad tool T1: " + tool.Name + " voor groeven, kopkamers, gaten en contouren)");
+            sb.AppendLine("(Laad tool T1: " + contourTool.Name + " voor groeven, kopkamers en contouren)");
             if (jobOptions.EnablePencilMarking)
             {
                 sb.AppendLine("(Plaats frees. Zet Z0 opnieuw op bovenzijde materiaal na de potloodmarkering.)");
@@ -55,7 +58,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             sb.AppendLine("M5");
             sb.AppendLine("T1 M6");
-            sb.AppendLine("M3 S" + F(tool.SpindleRpm));
+            sb.AppendLine("M3 S" + F(contourTool.SpindleRpm));
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets op geneste plaat ---)");
@@ -63,7 +66,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             {
                 foreach (var pocket in placement.Part.Pockets)
                 {
-                    AddRectangularPocket(sb, placement, pocket, tool, machine);
+                    AddRectangularPocket(sb, placement, pocket, contourTool, machine);
                 }
             }
 
@@ -73,26 +76,44 @@ namespace SWWerkplaats.Configurator.Manufacturing
             {
                 foreach (var hole in placement.Part.Holes)
                 {
-                    AddCountersink(sb, placement, hole, tool, machine);
+                    AddCountersink(sb, placement, hole, contourTool, machine);
                 }
             }
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 3: alle gaten op geneste plaat ---)");
+            if (!SameTool(holeTool, contourTool))
+            {
+                sb.AppendLine();
+                sb.AppendLine("(Laad tool T" + ToolNumber(jobOptions, holeTool) + ": " + holeTool.Name + " voor montagegaten)");
+                sb.AppendLine("M5");
+                sb.AppendLine("T" + ToolNumber(jobOptions, holeTool) + " M6");
+                sb.AppendLine("M3 S" + F(holeTool.SpindleRpm));
+            }
+
             foreach (var placement in stock.Placements)
             {
                 foreach (var hole in placement.Part.Holes)
                 {
                     var p = Transform(placement, hole.Xmm, hole.Ymm);
-                    AddHole(sb, placement, hole, p.X, p.Y, tool, machine);
+                    AddHole(sb, placement, hole, p.X, p.Y, holeTool, machine);
                 }
             }
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 4: buitencontouren geneste onderdelen ---)");
+            if (!SameTool(holeTool, contourTool))
+            {
+                sb.AppendLine();
+                sb.AppendLine("(Laad tool T1: " + contourTool.Name + " voor buitencontouren)");
+                sb.AppendLine("M5");
+                sb.AppendLine("T1 M6");
+                sb.AppendLine("M3 S" + F(contourTool.SpindleRpm));
+            }
+
             foreach (var placement in stock.Placements)
             {
-                AddContour(sb, placement, tool, machine);
+                AddContour(sb, placement, contourTool, machine);
             }
 
             sb.AppendLine("M5");
@@ -100,6 +121,36 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("G0 X0 Y0");
             sb.AppendLine("M30");
             return sb.ToString();
+        }
+
+        private static ToolDefinition FindHoleTool(CamJobOptions jobOptions, ToolDefinition contourTool)
+        {
+            var best = contourTool;
+            foreach (var candidate in jobOptions.Tools)
+            {
+                if (candidate.Kind != ToolKind.EndMill) continue;
+                if (candidate.DiameterMm < best.DiameterMm)
+                {
+                    best = candidate;
+                }
+            }
+
+            return best;
+        }
+
+        private static int ToolNumber(CamJobOptions jobOptions, ToolDefinition tool)
+        {
+            for (var i = 0; i < jobOptions.Tools.Count; i++)
+            {
+                if (SameTool(jobOptions.Tools[i], tool)) return i + 1;
+            }
+
+            return 1;
+        }
+
+        private static bool SameTool(ToolDefinition left, ToolDefinition right)
+        {
+            return left != null && right != null && Math.Abs(left.DiameterMm - right.DiameterMm) < 0.001;
         }
 
         private static void AddCountersink(StringBuilder sb, NestedSheetPlacement placement, SheetHole hole, ToolDefinition tool, MachineProfile machine)

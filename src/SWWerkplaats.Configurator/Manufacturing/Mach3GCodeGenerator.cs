@@ -9,55 +9,71 @@ namespace SWWerkplaats.Configurator.Manufacturing
     {
         public string GenerateSheetPart(SheetPart part, ToolDefinition tool, MachineProfile machine, double materialThicknessMm, double tabWidthMm, double tabHeightMm)
         {
+            return GenerateSheetPart(part, tool, tool, machine, materialThicknessMm, tabWidthMm, tabHeightMm);
+        }
+
+        public string GenerateSheetPart(SheetPart part, ToolDefinition holeTool, ToolDefinition contourTool, MachineProfile machine, double materialThicknessMm, double tabWidthMm, double tabHeightMm)
+        {
             if (part == null) throw new ArgumentNullException("part");
-            if (tool == null) throw new ArgumentNullException("tool");
+            if (holeTool == null) throw new ArgumentNullException("holeTool");
+            if (contourTool == null) throw new ArgumentNullException("contourTool");
             if (machine == null) throw new ArgumentNullException("machine");
             if (part.LengthMm > machine.MaxXmm || part.WidthMm > machine.MaxYmm)
             {
                 throw new InvalidOperationException("Plaatdeel past niet binnen het machinebereik.");
             }
-            ValidateToolCanMachinePart(part, tool);
+            ValidateToolCanMachinePart(part, holeTool, contourTool);
 
             var sb = new StringBuilder();
-            Header(sb, part, tool, machine);
+            Header(sb, part, contourTool, machine);
 
             if (HasCountersinks(part))
             {
-                BeginTool(sb, 1, tool.Name + " voor groeven, kopkamers, gaten en buitencontour", tool);
+                BeginTool(sb, 1, contourTool.Name + " voor groeven, kopkamers en buitencontour", contourTool);
                 sb.AppendLine();
                 sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets ---)");
                 foreach (var pocket in part.Pockets)
                 {
-                    AddRectangularPocket(sb, pocket, tool, machine);
+                    AddRectangularPocket(sb, pocket, contourTool, machine);
                 }
                 sb.AppendLine();
                 sb.AppendLine("(--- BEWERKING 2: alle kopkamers helix-frezen ---)");
                 foreach (var hole in part.Holes)
                 {
-                    AddCountersink(sb, hole, tool, machine);
+                    AddCountersink(sb, hole, contourTool, machine);
                 }
             }
             else
             {
-                BeginTool(sb, 1, tool.Name + " voor groeven, gaten en buitencontour", tool);
+                BeginTool(sb, 1, contourTool.Name + " voor groeven en buitencontour", contourTool);
                 sb.AppendLine();
                 sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets ---)");
                 foreach (var pocket in part.Pockets)
                 {
-                    AddRectangularPocket(sb, pocket, tool, machine);
+                    AddRectangularPocket(sb, pocket, contourTool, machine);
                 }
             }
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 3: alle montagegaten ---)");
+            if (!SameTool(holeTool, contourTool))
+            {
+                BeginTool(sb, 2, holeTool.Name + " voor montagegaten", holeTool);
+            }
+
             foreach (var hole in part.Holes)
             {
-                AddHole(sb, hole, tool, machine, materialThicknessMm);
+                AddHole(sb, hole, holeTool, machine, materialThicknessMm);
             }
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 4: buitencontour ---)");
-            AddOutsideRectangle(sb, part, tool, machine, materialThicknessMm, tabWidthMm, tabHeightMm);
+            if (!SameTool(holeTool, contourTool))
+            {
+                BeginTool(sb, 1, contourTool.Name + " voor buitencontour", contourTool);
+            }
+
+            AddOutsideRectangle(sb, part, contourTool, machine, materialThicknessMm, tabWidthMm, tabHeightMm);
 
             sb.AppendLine("M5");
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
@@ -239,24 +255,29 @@ namespace SWWerkplaats.Configurator.Manufacturing
             return false;
         }
 
-        private static void ValidateToolCanMachinePart(SheetPart part, ToolDefinition tool)
+        private static void ValidateToolCanMachinePart(SheetPart part, ToolDefinition holeTool, ToolDefinition contourTool)
         {
             foreach (var hole in part.Holes)
             {
-                if (hole.DiameterMm < tool.DiameterMm * 0.95)
+                if (hole.DiameterMm < holeTool.DiameterMm * 0.95)
                 {
                     throw new InvalidOperationException(
-                        "Tool " + F(tool.DiameterMm) + "mm is te groot voor " + hole.Name +
+                        "Tool " + F(holeTool.DiameterMm) + "mm is te groot voor " + hole.Name +
                         " diameter " + F(hole.DiameterMm) + "mm in " + part.Name + ".");
                 }
 
-                if (hole.Countersunk && hole.CountersinkDiameterMm > 0 && hole.CountersinkDiameterMm < tool.DiameterMm * 0.95)
+                if (hole.Countersunk && hole.CountersinkDiameterMm > 0 && hole.CountersinkDiameterMm < contourTool.DiameterMm * 0.95)
                 {
                     throw new InvalidOperationException(
-                        "Tool " + F(tool.DiameterMm) + "mm is te groot voor kopkamer " + hole.Name +
+                        "Tool " + F(contourTool.DiameterMm) + "mm is te groot voor kopkamer " + hole.Name +
                         " diameter " + F(hole.CountersinkDiameterMm) + "mm in " + part.Name + ".");
                 }
             }
+        }
+
+        private static bool SameTool(ToolDefinition left, ToolDefinition right)
+        {
+            return left != null && right != null && Math.Abs(left.DiameterMm - right.DiameterMm) < 0.001;
         }
 
         private static void DrillPeck(StringBuilder sb, ToolDefinition tool, MachineProfile machine, double materialThicknessMm)

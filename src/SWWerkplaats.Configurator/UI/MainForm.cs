@@ -106,7 +106,9 @@ namespace SWWerkplaats.Configurator.UI
             countersinkDiameter = Number(14, 8, 40);
             countersinkDepth = Number(8, 0.5m, 20);
             toolDiameter = Number(6, 1, 30);
-            passDepth = Number(4, 0.5m, 20);
+            passDepth = Number(6.25m, 0.5m, 20);
+            passDepth.DecimalPlaces = 2;
+            passDepth.Increment = 0.25m;
             nestStockLength = Number((decimal)appSettings.NestStockLengthMm, 300, 3020);
             nestStockWidth = Number((decimal)appSettings.NestStockWidthMm, 300, 1520);
             nestSpacing = Number((decimal)appSettings.NestSpacingMm, 0, 100);
@@ -361,8 +363,10 @@ namespace SWWerkplaats.Configurator.UI
             try
             {
                 var isCabinet = productMode.SelectedItem != null && productMode.SelectedItem.ToString() == "Cabinet";
-                var tool = BuildTool();
-                var camJob = BuildCamJobOptions(tool);
+                var contourTool = BuildTool();
+                var holeTool = BuildHoleTool(contourTool);
+                var camJob = BuildCamJobOptions(contourTool);
+                camJob.AddTool(holeTool);
                 var machine = BuildMachine();
                 var model = isCabinet ? new CabinetEngine().Build(BuildCabinetConfig()) : new WorkbenchEngine().Build(BuildConfig());
 
@@ -375,14 +379,14 @@ namespace SWWerkplaats.Configurator.UI
                 new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profielbewerkingen.xlsx"), model.ProfileOperations);
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielStationPlan.txt"), csv.ExportProfileStationPlan(model));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "Plaatgaten.csv"), csv.ExportSheetHoleList(model.Sheets));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, tool));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, contourTool));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ToolLibrary.csv"), csv.ExportToolLibrary(camJob));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "BOM.csv"), csv.ExportBom(model));
 
                 var gcode = new Mach3GCodeGenerator();
                 foreach (var sheet in model.Sheets)
                 {
-                    var tap = gcode.GenerateSheetPart(sheet, tool, machine, sheet.Material.ThicknessMm, (double)8, (double)1.5);
+                    var tap = gcode.GenerateSheetPart(sheet, holeTool, contourTool, machine, sheet.Material.ThicknessMm, (double)8, (double)1.5);
                     File.WriteAllText(Path.Combine(outputFolder.Text, sheet.Name + ".tap"), tap);
                 }
 
@@ -400,7 +404,7 @@ namespace SWWerkplaats.Configurator.UI
                 var nestedGcode = new NestedMach3GCodeGenerator();
                 foreach (var stock in nestingPlan.StockSheets)
                 {
-                    File.WriteAllText(Path.Combine(nestingFolder, stock.Name + ".tap"), nestedGcode.Generate(stock, tool, machine, camJob));
+                    File.WriteAllText(Path.Combine(nestingFolder, stock.Name + ".tap"), nestedGcode.Generate(stock, contourTool, machine, camJob));
                 }
 
                 var plan = SolidWorksExportPlan.FromWorkbench(model);
@@ -551,6 +555,16 @@ namespace SWWerkplaats.Configurator.UI
             return LibraryCatalog.DefaultEndMill((double)toolDiameter.Value, (double)passDepth.Value);
         }
 
+        private ToolDefinition BuildHoleTool(ToolDefinition contourTool)
+        {
+            if (contourTool != null && contourTool.DiameterMm <= 4.5)
+            {
+                return contourTool;
+            }
+
+            return LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3));
+        }
+
         private CamJobOptions BuildCamJobOptions(ToolDefinition primaryTool)
         {
             var options = CamJobOptions.FromPrimaryTool(primaryTool);
@@ -569,7 +583,7 @@ namespace SWWerkplaats.Configurator.UI
 
             if (jobTool6mm.Checked)
             {
-                options.AddTool(LibraryCatalog.DefaultEndMill(6, Math.Min((double)passDepth.Value, 4)));
+                options.AddTool(LibraryCatalog.DefaultEndMill(6, Math.Min((double)passDepth.Value, 6.25)));
             }
 
             return options;

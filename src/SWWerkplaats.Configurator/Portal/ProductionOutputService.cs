@@ -39,8 +39,10 @@ namespace SWWerkplaats.Configurator.Portal
         public ProductionOutput GenerateOrderFiles(PortalQuoteRequest request, string outputFolder)
         {
             var factory = new PortalConfigurationFactory();
-            var tool = factory.DefaultTool();
-            var camJob = CamJobOptions.FromPrimaryTool(tool);
+            var contourTool = factory.DefaultTool();
+            var holeTool = LibraryCatalog.DefaultEndMill(4, 3);
+            var camJob = CamJobOptions.FromPrimaryTool(contourTool);
+            camJob.AddTool(holeTool);
             var machine = factory.DefaultMachine();
             var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
@@ -64,7 +66,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (HasSheets(model))
             {
                 Write(output, outputFolder, "Plaatgaten.csv", csv.ExportSheetHoleList(model.Sheets));
-                Write(output, outputFolder, "CAM-operaties.csv", csv.ExportCamOperations(model.Sheets, tool));
+                Write(output, outputFolder, "CAM-operaties.csv", csv.ExportCamOperations(model.Sheets, contourTool));
                 Write(output, outputFolder, "ToolLibrary.csv", csv.ExportToolLibrary(camJob));
             }
 
@@ -91,7 +93,7 @@ namespace SWWerkplaats.Configurator.Portal
                 var gcode = new Mach3GCodeGenerator();
                 foreach (var sheet in model.Sheets)
                 {
-                    Write(output, outputFolder, SafeFileName(sheet.Name) + ".tap", gcode.GenerateSheetPart(sheet, tool, machine, sheet.Material.ThicknessMm, 8, 1.5));
+                    Write(output, outputFolder, SafeFileName(sheet.Name) + ".tap", gcode.GenerateSheetPart(sheet, holeTool, contourTool, machine, sheet.Material.ThicknessMm, 8, 1.5));
                 }
 
                 var nestingFolder = Path.Combine(outputFolder, "Nesting");
@@ -111,8 +113,8 @@ namespace SWWerkplaats.Configurator.Portal
 
                 foreach (var stock in nestingPlan.StockSheets)
                 {
-                    Write(output, nestingFolder, "Nesting\\" + SafeFileName(stock.Name) + ".tap", nestedGcode.Generate(stock, tool, machine, camJob));
-                    Write(output, nestingFolder, "Nesting\\ToolpathPreview_" + SafeFileName(stock.Name) + ".svg", toolpathPreview.ExportSvg(stock, tool));
+                    Write(output, nestingFolder, "Nesting\\" + SafeFileName(stock.Name) + ".tap", nestedGcode.Generate(stock, contourTool, machine, camJob));
+                    Write(output, nestingFolder, "Nesting\\ToolpathPreview_" + SafeFileName(stock.Name) + ".svg", toolpathPreview.ExportSvg(stock, contourTool));
                 }
             }
 

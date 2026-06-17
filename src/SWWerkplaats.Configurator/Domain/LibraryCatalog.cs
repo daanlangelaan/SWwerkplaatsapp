@@ -298,14 +298,15 @@ namespace SWWerkplaats.Configurator.Domain
 
         public static ToolDefinition DefaultEndMill(double diameterMm, double passDepthMm)
         {
+            var isTestedSixMillimeterFlat = Math.Abs(diameterMm - 6) < 0.001;
             return new ToolDefinition
             {
                 Id = "endmill_" + diameterMm.ToString("0.##").Replace(",", ".") + "mm",
                 Name = "Frees " + diameterMm.ToString("0.##") + "mm",
                 Kind = ToolKind.EndMill,
                 DiameterMm = diameterMm,
-                FeedRateMmMin = 1800,
-                PlungeRateMmMin = 400,
+                FeedRateMmMin = isTestedSixMillimeterFlat ? 3200 : 1800,
+                PlungeRateMmMin = isTestedSixMillimeterFlat ? 800 : 400,
                 SpindleRpm = 18000,
                 PassDepthMm = passDepthMm
             };
