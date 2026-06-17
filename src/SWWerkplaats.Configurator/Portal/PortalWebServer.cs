@@ -13,6 +13,7 @@ namespace SWWerkplaats.Configurator.Portal
     {
         private readonly JavaScriptSerializer serializer;
         private readonly OrderApplicationService orders;
+        private readonly HealthApplicationService health;
         private TcpListener listener;
         private Thread worker;
         private bool disposed;
@@ -23,6 +24,7 @@ namespace SWWerkplaats.Configurator.Portal
             RootFolder = rootFolder;
             serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
             orders = new OrderApplicationService(new FileOrderRepository(rootFolder));
+            health = new HealthApplicationService(DateTime.Now);
         }
 
         public string Prefix { get; private set; }
@@ -137,6 +139,12 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var catalog = new CatalogApplicationService().GetCatalog();
                 WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, statuses = catalog.Statuses, products = catalog.Products });
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/health")
+            {
+                WriteJson(stream, 200, health.GetHealth(RootFolder, Prefix));
                 return;
             }
 

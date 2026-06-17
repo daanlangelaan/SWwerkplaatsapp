@@ -40,6 +40,7 @@
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
+    <Compile Include="Application\HealthApplicationService.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
     <Compile Include="Application\IOrderRepository.cs" />
     <Compile Include="Application\OrderApplicationService.cs" />
