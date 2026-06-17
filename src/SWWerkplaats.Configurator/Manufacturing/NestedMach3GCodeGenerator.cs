@@ -18,6 +18,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         public string Generate(NestedStockSheet stock, ToolDefinition tool, MachineProfile machine, CamJobOptions jobOptions)
         {
+            return Generate(stock, tool, machine, jobOptions, 1, 1, null);
+        }
+
+        public string Generate(NestedStockSheet stock, ToolDefinition tool, MachineProfile machine, CamJobOptions jobOptions, int plateNumber, int plateCount, string nextProgramFile)
+        {
             var sb = new StringBuilder();
             if (jobOptions == null)
             {
@@ -28,6 +33,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var contourTool = tool;
             var holeTool = FindHoleTool(jobOptions, contourTool);
             sb.AppendLine("(Project: " + stock.Name + ")");
+            sb.AppendLine("(Plaat: " + Math.Max(1, plateNumber).ToString(CultureInfo.InvariantCulture) + " van " + Math.Max(1, plateCount).ToString(CultureInfo.InvariantCulture) + ")");
             sb.AppendLine("(Machine: " + machine.Name + ")");
             sb.AppendLine("(Voorraadplaat: " + stock.Material.Name + " " + F(stock.StockLengthMm) + " x " + F(stock.StockWidthMm) + " mm)");
             sb.AppendLine("(Contourtool: " + contourTool.Name + ", diameter " + F(contourTool.DiameterMm) + " mm)");
@@ -94,7 +100,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 AddContour(sb, placement, contourTool, machine);
             }
 
-            EndProgram(sb);
+            EndProgram(sb, plateNumber, plateCount, nextProgramFile);
             return sb.ToString();
         }
 
@@ -118,7 +124,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("M3 S" + F(tool.SpindleRpm));
         }
 
-        private static void EndProgram(StringBuilder sb)
+        private static void EndProgram(StringBuilder sb, int plateNumber, int plateCount, string nextProgramFile)
         {
             sb.AppendLine("M9");
             sb.AppendLine("M5");
@@ -128,6 +134,17 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Daarna X/Y naar machine-home)");
             sb.AppendLine("G28 G91 X0. Y0.");
             sb.AppendLine("G90");
+            if (!string.IsNullOrWhiteSpace(nextProgramFile))
+            {
+                sb.AppendLine("(PLAAT " + plateNumber.ToString(CultureInfo.InvariantCulture) + " VAN " + plateCount.ToString(CultureInfo.InvariantCulture) + " KLAAR)");
+                sb.AppendLine("(Machine staat op home. Plaats de volgende voorraadplaat.)");
+                sb.AppendLine("(Start daarna bestand: " + nextProgramFile + ")");
+                sb.AppendLine("(Controleer opspanning en zet/controleer Z0 op bovenzijde materiaal.)");
+            }
+            else
+            {
+                sb.AppendLine("(LAATSTE PLAAT KLAAR - machine staat op home)");
+            }
             sb.AppendLine("M30");
         }
 

@@ -111,9 +111,17 @@ namespace SWWerkplaats.Configurator.Portal
                     Write(output, nestingFolder, "Nesting\\PotloodMarkeerPlan.csv", pencilMarking.ExportPlan(nestingPlan, camJob.BuildPencilMarkingOptions()));
                 }
 
-                foreach (var stock in nestingPlan.StockSheets)
+                for (var stockIndex = 0; stockIndex < nestingPlan.StockSheets.Count; stockIndex++)
                 {
-                    Write(output, nestingFolder, "Nesting\\" + SafeFileName(stock.Name) + ".tap", nestedGcode.Generate(stock, contourTool, machine, camJob));
+                    var stock = nestingPlan.StockSheets[stockIndex];
+                    var nextProgramFile = stockIndex + 1 < nestingPlan.StockSheets.Count
+                        ? SafeFileName(nestingPlan.StockSheets[stockIndex + 1].Name) + ".tap"
+                        : null;
+                    Write(
+                        output,
+                        nestingFolder,
+                        "Nesting\\" + SafeFileName(stock.Name) + ".tap",
+                        nestedGcode.Generate(stock, contourTool, machine, camJob, stockIndex + 1, nestingPlan.StockSheets.Count, nextProgramFile));
                     Write(output, nestingFolder, "Nesting\\ToolpathPreview_" + SafeFileName(stock.Name) + ".svg", toolpathPreview.ExportSvg(stock, contourTool));
                 }
             }
