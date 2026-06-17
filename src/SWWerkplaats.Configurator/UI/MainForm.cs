@@ -365,8 +365,8 @@ namespace SWWerkplaats.Configurator.UI
                 var isCabinet = productMode.SelectedItem != null && productMode.SelectedItem.ToString() == "Cabinet";
                 var contourTool = BuildTool();
                 var holeTool = BuildHoleTool(contourTool);
-                var camJob = BuildCamJobOptions(contourTool);
-                camJob.AddTool(holeTool);
+                var camJob = BuildCamJobOptions(holeTool);
+                camJob.AddTool(contourTool);
                 var machine = BuildMachine();
                 var model = isCabinet ? new CabinetEngine().Build(BuildCabinetConfig()) : new WorkbenchEngine().Build(BuildConfig());
 
@@ -562,7 +562,7 @@ namespace SWWerkplaats.Configurator.UI
                 return contourTool;
             }
 
-            return LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3));
+            return LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3.5));
         }
 
         private CamJobOptions BuildCamJobOptions(ToolDefinition primaryTool)
@@ -578,7 +578,7 @@ namespace SWWerkplaats.Configurator.UI
 
             if (jobTool4mm.Checked)
             {
-                options.AddTool(LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3)));
+                options.AddTool(LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3.5)));
             }
 
             if (jobTool6mm.Checked)

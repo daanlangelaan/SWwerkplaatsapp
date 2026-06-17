@@ -22,7 +22,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             {
                 if (Tools.Count == 0)
                 {
-                    return LibraryCatalog.DefaultEndMill(4, 3);
+                    return LibraryCatalog.DefaultEndMill(4, 3.5);
                 }
 
                 return Tools[0];

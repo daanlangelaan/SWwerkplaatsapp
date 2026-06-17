@@ -40,9 +40,9 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var factory = new PortalConfigurationFactory();
             var contourTool = factory.DefaultTool();
-            var holeTool = LibraryCatalog.DefaultEndMill(4, 3);
-            var camJob = CamJobOptions.FromPrimaryTool(contourTool);
-            camJob.AddTool(holeTool);
+            var holeTool = LibraryCatalog.DefaultEndMill(4, 3.5);
+            var camJob = CamJobOptions.FromPrimaryTool(holeTool);
+            camJob.AddTool(contourTool);
             var machine = factory.DefaultMachine();
             var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();

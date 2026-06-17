@@ -45,35 +45,14 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 new PencilMarkingGCodeGenerator().Append(sb, stock, machine, jobOptions.BuildPencilMarkingOptions());
             }
 
-            BeginTool(sb, 1, contourTool.Name + " voor groeven, kopkamers en contouren", contourTool);
-
-            sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets op geneste plaat ---)");
-            foreach (var placement in stock.Placements)
-            {
-                foreach (var pocket in placement.Part.Pockets)
-                {
-                    AddRectangularPocket(sb, placement, pocket, contourTool, machine);
-                }
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 2: alle kopkamers op geneste plaat ---)");
-            foreach (var placement in stock.Placements)
-            {
-                foreach (var hole in placement.Part.Holes)
-                {
-                    AddCountersink(sb, placement, hole, contourTool, machine);
-                }
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 3: alle gaten op geneste plaat ---)");
-            if (!SameTool(holeTool, contourTool))
+            var hasHoles = HasHoles(stock);
+            if (hasHoles)
             {
                 BeginTool(sb, ToolNumber(jobOptions, holeTool), holeTool.Name + " voor montagegaten", holeTool);
             }
 
+            sb.AppendLine();
+            sb.AppendLine("(--- BEWERKING 1: alle gaten op geneste plaat ---)");
             foreach (var placement in stock.Placements)
             {
                 foreach (var hole in placement.Part.Holes)
@@ -83,13 +62,33 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 }
             }
 
-            sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 4: buitencontouren geneste onderdelen ---)");
-            if (!SameTool(holeTool, contourTool))
+            if (!hasHoles || !SameTool(holeTool, contourTool))
             {
-                BeginTool(sb, 1, contourTool.Name + " voor buitencontouren", contourTool);
+                BeginTool(sb, ToolNumber(jobOptions, contourTool), contourTool.Name + " voor groeven, kopkamers en contouren", contourTool);
             }
 
+            sb.AppendLine();
+            sb.AppendLine("(--- BEWERKING 2: alle positioneergroeven / pockets op geneste plaat ---)");
+            foreach (var placement in stock.Placements)
+            {
+                foreach (var pocket in placement.Part.Pockets)
+                {
+                    AddRectangularPocket(sb, placement, pocket, contourTool, machine);
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("(--- BEWERKING 3: alle kopkamers op geneste plaat ---)");
+            foreach (var placement in stock.Placements)
+            {
+                foreach (var hole in placement.Part.Holes)
+                {
+                    AddCountersink(sb, placement, hole, contourTool, machine);
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("(--- BEWERKING 4: buitencontouren geneste onderdelen ---)");
             foreach (var placement in stock.Placements)
             {
                 AddContour(sb, placement, contourTool, machine);
@@ -160,6 +159,16 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static bool SameTool(ToolDefinition left, ToolDefinition right)
         {
             return left != null && right != null && Math.Abs(left.DiameterMm - right.DiameterMm) < 0.001;
+        }
+
+        private static bool HasHoles(NestedStockSheet stock)
+        {
+            foreach (var placement in stock.Placements)
+            {
+                if (placement.Part.Holes.Count > 0) return true;
+            }
+
+            return false;
         }
 
         private static void AddCountersink(StringBuilder sb, NestedSheetPlacement placement, SheetHole hole, ToolDefinition tool, MachineProfile machine)
