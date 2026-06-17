@@ -150,7 +150,7 @@ namespace SWWerkplaats.Configurator.Engine
 
                     var drawerFront = Sheet("Ladefront U" + unitNumber + "-" + (drawerIndex + 1), frontMaterial, frontWidth, frontHeight);
                     AddDrawerFrontGrooves(drawerFront, boxWidth, drawerMaterial);
-                    AddSheet(model, drawerFront, centerX, centerY, frontZ - frontMaterial.ThicknessMm / 2.0, AssemblyOrientation.SheetVerticalX);
+                    AddSheet(model, drawerFront, centerX, centerY, FlushFrontCenterZ(frontZ, frontMaterial), AssemblyOrientation.SheetVerticalX);
                     var drawerBottom = Sheet("Ladebodem U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, bottomWidth, bottomDepth);
                     var drawerSideLeft = Sheet("Ladezijde links U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, sideLength, frontHeight);
                     var drawerSideRight = Sheet("Ladezijde rechts U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, sideLength, frontHeight);
@@ -233,7 +233,7 @@ namespace SWWerkplaats.Configurator.Engine
 
             var drawerFront = Sheet("Bovenlade front U" + unitNumber, frontMaterial, frontWidth, frontHeight);
             AddDrawerFrontGrooves(drawerFront, boxWidth, drawerMaterial);
-            AddSheet(model, drawerFront, centerX, centerY, frontZ - frontMaterial.ThicknessMm / 2.0, AssemblyOrientation.SheetVerticalX);
+            AddSheet(model, drawerFront, centerX, centerY, FlushFrontCenterZ(frontZ, frontMaterial), AssemblyOrientation.SheetVerticalX);
             var drawerBottom = Sheet("Bovenlade bodem U" + unitNumber, drawerMaterial, bottomWidth, bottomDepth);
             var drawerSideLeft = Sheet("Bovenlade zijde links U" + unitNumber, drawerMaterial, sideLength, frontHeight);
             var drawerSideRight = Sheet("Bovenlade zijde rechts U" + unitNumber, drawerMaterial, sideLength, frontHeight);
@@ -261,6 +261,12 @@ namespace SWWerkplaats.Configurator.Engine
         private static double DrawerBoxDepth(CabinetConfig config, double innerDepth)
         {
             return Math.Max(120, innerDepth - config.DrawerBackClearanceMm);
+        }
+
+        private static double FlushFrontCenterZ(double frontZ, Material frontMaterial)
+        {
+            var thickness = frontMaterial == null ? 18.0 : frontMaterial.ThicknessMm;
+            return frontZ + thickness / 2.0;
         }
 
         private static double TopDrawerHeight(CabinetConfig config, double bodyHeight)
