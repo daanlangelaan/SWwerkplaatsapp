@@ -46,7 +46,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 foreach (var packer in openSheets)
                 {
                     var candidate = packer.FindBest(part);
-                    if (candidate != null && (best == null || candidate.Score < best.Score))
+                    if (candidate != null && IsBetterCandidate(candidate, best))
                     {
                         best = candidate;
                     }
@@ -67,6 +67,18 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
                 best.Packer.Place(best, CountExistingPlacements(plan, part.Name) + 1);
             }
+        }
+
+        private static bool IsBetterCandidate(PlacementCandidate candidate, PlacementCandidate currentBest)
+        {
+            if (currentBest == null) return true;
+            // Prefer filling earlier stock sheets before optimizing the local fit on newer sheets.
+            if (candidate.SheetNumber != currentBest.SheetNumber)
+            {
+                return candidate.SheetNumber < currentBest.SheetNumber;
+            }
+
+            return candidate.Score < currentBest.Score;
         }
 
         private static NestedStockSheet NewStockSheet(Material material, double length, double width, int sheetNumber)
@@ -169,6 +181,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
                     Width = stockLength - 2 * margin,
                     Height = stockWidth - 2 * margin
                 });
+            }
+
+            public int SheetNumber
+            {
+                get { return stock.SheetNumber; }
             }
 
             public PlacementCandidate FindBest(SheetPart part)
@@ -309,6 +326,10 @@ namespace SWWerkplaats.Configurator.Manufacturing
             public double Width { get; set; }
             public bool Rotated { get; set; }
             public double Score { get; set; }
+            public int SheetNumber
+            {
+                get { return Packer.SheetNumber; }
+            }
         }
 
         private sealed class FreeRect
