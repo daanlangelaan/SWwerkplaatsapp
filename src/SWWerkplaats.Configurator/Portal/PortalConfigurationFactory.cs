@@ -54,6 +54,8 @@ namespace SWWerkplaats.Configurator.Portal
             var height = Clamp(request.HeightMm, 300, 2400, 900);
             var units = (int)Clamp(request.UnitCount, 1, 12, 4);
             var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
+            var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? "multiplex_15" : request.DrawerMaterialId));
+            var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? "multiplex_15" : request.BackMaterialId));
             var rail = CloneRail(LibraryCatalog.DrawerRails()[1]);
 
             var config = new CabinetConfig
@@ -68,14 +70,15 @@ namespace SWWerkplaats.Configurator.Portal
                 IncludeBackPanel = request.IncludeBackPanel,
                 CarcassMaterial = carcass,
                 WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
-                DrawerMaterial = CloneMaterial(FindSheet("multiplex_15")),
+                DrawerMaterial = drawer,
                 FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
-                BackMaterial = CloneMaterial(FindSheet("multiplex_15")),
+                BackMaterial = back,
                 SheetFastener = CloneFastener(LibraryCatalog.SheetFasteners()[0]),
                 DrawerRail = rail,
                 ShelfSupport = CloneShelfSupport(LibraryCatalog.ShelfSupports()[0]),
                 IncludeFullWidthTopDrawer = request.IncludeTopDrawer,
                 FullWidthTopDrawerHeightMm = 160,
+                ShelfStartMode = NormalizeShelfStartMode(request.ShelfStartMode),
                 IncludeAdjustableShelfHoles = request.IncludeAdjustableShelfHoles,
                 AdjustableShelfHoleEndMarginMm = 80,
                 AutoTabs = true,
@@ -131,6 +134,13 @@ namespace SWWerkplaats.Configurator.Portal
             if (value == "links" || value == "left") return CabinetDoorHand.Links;
             if (value == "rechts" || value == "right") return CabinetDoorHand.Rechts;
             return CabinetDoorHand.Geen;
+        }
+
+        private static string NormalizeShelfStartMode(string value)
+        {
+            value = (value ?? "").Trim().ToLowerInvariant();
+            if (value == "boven" || value == "top") return "top";
+            return "bottom";
         }
 
         private static double Clamp(double value, double min, double max, double fallback)

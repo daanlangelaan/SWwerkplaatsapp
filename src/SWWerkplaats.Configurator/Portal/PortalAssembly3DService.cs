@@ -64,6 +64,7 @@ namespace SWWerkplaats.Configurator.Portal
                     SizeZmm = Math.Max(2, sz)
                 };
                 AddHoles(part, placement, sheet, thickness);
+                AddPockets(part, placement, sheet, thickness);
                 parts.Add(part);
             }
 
@@ -91,6 +92,7 @@ namespace SWWerkplaats.Configurator.Portal
                     {
                         var part = Part(sheet.Name, "sheet", 0, sheet.CenterHeightMm, 0, sheet.LengthMm, thickness, sheet.WidthMm);
                         AddHoles(part, placement, sheet, thickness);
+                        AddPockets(part, placement, sheet, thickness);
                         parts.Add(part);
                     }
                 }
@@ -106,6 +108,7 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var fallback = Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, sheet.LengthMm, thickness, sheet.WidthMm);
                 AddHoles(fallback, placement, sheet, thickness);
+                AddPockets(fallback, placement, sheet, thickness);
                 parts.Add(fallback);
                 return;
             }
@@ -117,6 +120,7 @@ namespace SWWerkplaats.Configurator.Portal
             AddHoles(center, placement, sheet, thickness);
             AddHoles(left, placement, sheet, thickness);
             AddHoles(right, placement, sheet, thickness);
+            AddPockets(center, placement, sheet, thickness);
             parts.Add(center);
             parts.Add(left);
             parts.Add(right);
@@ -142,6 +146,7 @@ namespace SWWerkplaats.Configurator.Portal
             var lower = Part(placement.PartName + " plintvoet", "sheet", placement.Xmm, notchHeight / 2.0, lowerZ, thickness, notchHeight, lowerDepth);
             AddHoles(upper, placement, sheet, thickness);
             AddHoles(lower, placement, sheet, thickness);
+            AddPockets(upper, placement, sheet, thickness);
             parts.Add(upper);
             parts.Add(lower);
         }
@@ -153,33 +158,297 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var localX = hole.Xmm - sheet.LengthMm / 2.0;
                 var localY = hole.Ymm - sheet.WidthMm / 2.0;
-                var assemblyHole = new PortalAssemblyHole { DiameterMm = Math.Max(3, hole.DiameterMm) };
+                var assemblyHole = new PortalAssemblyHole { DiameterMm = Math.Max(3, hole.DiameterMm), DepthMm = hole.DepthMm };
 
                 if (placement.Orientation == AssemblyOrientation.SheetHorizontal)
                 {
                     assemblyHole.Xmm = placement.Xmm + localX;
                     assemblyHole.Ymm = placement.Ymm + thickness / 2.0 + 0.8;
                     assemblyHole.Zmm = placement.Zmm + localY;
+                    assemblyHole.Plane = "y";
                 }
                 else if (placement.Orientation == AssemblyOrientation.SheetVerticalX)
                 {
                     assemblyHole.Xmm = placement.Xmm + localX;
                     assemblyHole.Ymm = placement.Ymm + localY;
-                    assemblyHole.Zmm = placement.Zmm - thickness / 2.0 - 0.8;
+                    assemblyHole.Zmm = placement.Zmm + VerticalXHoleFaceOffset(placement.PartName, thickness, 0.8);
+                    assemblyHole.Plane = "z";
                 }
                 else if (placement.Orientation == AssemblyOrientation.SheetVerticalZ)
                 {
-                    assemblyHole.Xmm = placement.Xmm - thickness / 2.0 - 0.8;
+                    var side = VerticalZFaceOffset(placement.PartName, hole.Name, thickness, 0.8);
+                    assemblyHole.Xmm = placement.Xmm + side;
                     assemblyHole.Ymm = placement.Ymm + localY;
                     assemblyHole.Zmm = placement.Zmm + localX;
+                    assemblyHole.Plane = "x";
                 }
                 else
                 {
                     continue;
                 }
 
+                if (!IsInsidePartBounds(part, assemblyHole)) continue;
                 part.Holes.Add(assemblyHole);
             }
+        }
+
+        private static bool IsInsidePartBounds(PortalAssemblyPart part, PortalAssemblyHole hole)
+        {
+            if (part == null || hole == null) return false;
+            var halfX = part.SizeXmm / 2.0 + 1.0;
+            var halfY = part.SizeYmm / 2.0 + 1.0;
+            var halfZ = part.SizeZmm / 2.0 + 1.0;
+            return hole.Xmm >= part.Xmm - halfX && hole.Xmm <= part.Xmm + halfX &&
+                   hole.Ymm >= part.Ymm - halfY && hole.Ymm <= part.Ymm + halfY &&
+                   hole.Zmm >= part.Zmm - halfZ && hole.Zmm <= part.Zmm + halfZ;
+        }
+
+        private static void AddPockets(PortalAssemblyPart part, AssemblyPlacement placement, SheetPart sheet, double thickness)
+        {
+            if (sheet == null) return;
+            foreach (var pocket in sheet.Pockets)
+            {
+                var localCenterX = pocket.Xmm + pocket.LengthMm / 2.0 - sheet.LengthMm / 2.0;
+                var localCenterY = pocket.Ymm + pocket.WidthMm / 2.0 - sheet.WidthMm / 2.0;
+                var assemblyPocket = new PortalAssemblyPocket
+                {
+                    Name = pocket.Name
+                };
+
+                if (placement.Orientation == AssemblyOrientation.SheetHorizontal)
+                {
+                    assemblyPocket.Xmm = placement.Xmm + localCenterX;
+                    assemblyPocket.Ymm = placement.Ymm + HorizontalPocketFaceOffset(sheet, pocket, thickness, 1.2);
+                    assemblyPocket.Zmm = placement.Zmm + localCenterY;
+                    assemblyPocket.SizeXmm = pocket.LengthMm;
+                    assemblyPocket.SizeYmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.SizeZmm = pocket.WidthMm;
+                    assemblyPocket.Plane = "y";
+                    AddHorizontalPocketEdgeReveals(part, placement, sheet, pocket, localCenterX, thickness);
+                }
+                else if (placement.Orientation == AssemblyOrientation.SheetVerticalX)
+                {
+                    assemblyPocket.Xmm = placement.Xmm + localCenterX;
+                    assemblyPocket.Ymm = placement.Ymm + localCenterY;
+                    assemblyPocket.Zmm = placement.Zmm + VerticalXPocketFaceOffset(placement.PartName, thickness, pocket.DepthMm);
+                    assemblyPocket.SizeXmm = pocket.LengthMm;
+                    assemblyPocket.SizeYmm = pocket.WidthMm;
+                    assemblyPocket.SizeZmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.Plane = "z";
+                }
+                else if (placement.Orientation == AssemblyOrientation.SheetVerticalZ)
+                {
+                    assemblyPocket.Xmm = placement.Xmm + VerticalZPocketFaceOffset(placement.PartName, thickness, pocket.DepthMm);
+                    assemblyPocket.Ymm = placement.Ymm + localCenterY;
+                    assemblyPocket.Zmm = placement.Zmm + localCenterX;
+                    assemblyPocket.SizeXmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.SizeYmm = pocket.WidthMm;
+                    assemblyPocket.SizeZmm = pocket.LengthMm;
+                    assemblyPocket.Plane = "x";
+                }
+                else
+                {
+                    continue;
+                }
+
+                part.Pockets.Add(assemblyPocket);
+            }
+        }
+
+        private static void AddHorizontalPocketEdgeReveals(PortalAssemblyPart part, AssemblyPlacement placement, SheetPart sheet, SheetPocket pocket, double localCenterX, double thickness)
+        {
+            if (part == null || sheet == null || pocket == null) return;
+            if (!StartsWith(sheet.Name, "Werkblad")) return;
+
+            var revealDepth = Math.Max(1.2, Math.Min(4.0, pocket.DepthMm));
+            if (pocket.Ymm <= 0.01)
+            {
+                part.Pockets.Add(new PortalAssemblyPocket
+                {
+                    Name = pocket.Name + " voorzijde zichtbaar",
+                    Xmm = placement.Xmm + localCenterX,
+                    Ymm = placement.Ymm - thickness / 2.0 + revealDepth / 2.0,
+                    Zmm = placement.Zmm - sheet.WidthMm / 2.0 - 1.2,
+                    SizeXmm = pocket.LengthMm,
+                    SizeYmm = revealDepth,
+                    SizeZmm = 1.2,
+                    Plane = "z"
+                });
+            }
+
+            if (pocket.Ymm + pocket.WidthMm >= sheet.WidthMm - 0.01)
+            {
+                part.Pockets.Add(new PortalAssemblyPocket
+                {
+                    Name = pocket.Name + " achterzijde zichtbaar",
+                    Xmm = placement.Xmm + localCenterX,
+                    Ymm = placement.Ymm - thickness / 2.0 + revealDepth / 2.0,
+                    Zmm = placement.Zmm + sheet.WidthMm / 2.0 + 1.2,
+                    SizeXmm = pocket.LengthMm,
+                    SizeYmm = revealDepth,
+                    SizeZmm = 1.2,
+                    Plane = "z"
+                });
+            }
+        }
+
+        private static double MaxPocketDepth(SheetPart sheet)
+        {
+            var max = 0.0;
+            if (sheet == null) return max;
+            foreach (var pocket in sheet.Pockets)
+            {
+                if (pocket.DepthMm > max) max = pocket.DepthMm;
+            }
+
+            return max;
+        }
+
+        private static List<Range1> PocketXRanges(SheetPart sheet)
+        {
+            var ranges = new List<Range1>();
+            if (sheet == null) return ranges;
+            foreach (var pocket in sheet.Pockets)
+            {
+                if (pocket.DepthMm <= 0 || pocket.LengthMm <= 0) continue;
+                ranges.Add(new Range1(
+                    Math.Max(0, Math.Min(sheet.LengthMm, pocket.Xmm)),
+                    Math.Max(0, Math.Min(sheet.LengthMm, pocket.Xmm + pocket.LengthMm))));
+            }
+
+            ranges.Sort(delegate(Range1 a, Range1 b) { return a.Start.CompareTo(b.Start); });
+            var merged = new List<Range1>();
+            foreach (var range in ranges)
+            {
+                if (range.End <= range.Start) continue;
+                if (merged.Count == 0 || range.Start > merged[merged.Count - 1].End)
+                {
+                    merged.Add(range);
+                }
+                else if (range.End > merged[merged.Count - 1].End)
+                {
+                    merged[merged.Count - 1] = new Range1(merged[merged.Count - 1].Start, range.End);
+                }
+            }
+
+            return merged;
+        }
+
+        private static double HorizontalPocketFaceOffset(SheetPart sheet, SheetPocket pocket, double thickness, double visualDepth)
+        {
+            if (sheet != null && pocket != null && StartsWith(sheet.Name, "Werkblad"))
+            {
+                return -thickness / 2.0 + Math.Max(0.4, Math.Min(2.2, pocket.DepthMm)) / 2.0;
+            }
+
+            return thickness / 2.0 + visualDepth;
+        }
+
+        private static double VerticalXPocketFaceOffset(string partName, double thickness, double depth)
+        {
+            var d = Math.Max(0.4, depth);
+            if (StartsWith(partName, "Ladefront") || StartsWith(partName, "Bovenlade front"))
+            {
+                return thickness / 2.0 - d / 2.0;
+            }
+
+            if (StartsWith(partName, "Ladeachter") || StartsWith(partName, "Bovenlade achter"))
+            {
+                return -thickness / 2.0 + d / 2.0;
+            }
+
+            return -thickness / 2.0 - d / 2.0;
+        }
+
+        private static double VerticalZPocketFaceOffset(string partName, double thickness, double depth)
+        {
+            var d = Math.Max(0.4, depth);
+            if (StartsWith(partName, "Ladezijde links") || StartsWith(partName, "Bovenlade zijde links"))
+            {
+                return thickness / 2.0 - d / 2.0;
+            }
+
+            if (StartsWith(partName, "Ladezijde rechts") || StartsWith(partName, "Bovenlade zijde rechts"))
+            {
+                return -thickness / 2.0 + d / 2.0;
+            }
+
+            return -thickness / 2.0 - d / 2.0;
+        }
+
+        private static double VerticalZFaceOffset(string partName, string holeName, double thickness, double lift)
+        {
+            if (StartsWith(partName, "Zijwand links") || StartsWith(partName, "Ladezijde links"))
+            {
+                return thickness / 2.0 + lift;
+            }
+
+            if (StartsWith(partName, "Zijwand rechts") || StartsWith(partName, "Ladezijde rechts"))
+            {
+                return -thickness / 2.0 - lift;
+            }
+
+            var dividerNumber = DividerNumber(partName);
+            var unitNumber = UnitNumberFromHole(holeName);
+            if (dividerNumber > 0 && unitNumber > 0)
+            {
+                return unitNumber <= dividerNumber ? -thickness / 2.0 - lift : thickness / 2.0 + lift;
+            }
+
+            return thickness / 2.0 + lift;
+        }
+
+        private static double VerticalXHoleFaceOffset(string partName, double thickness, double lift)
+        {
+            if (StartsWith(partName, "Achterwand"))
+            {
+                return thickness / 2.0 + lift;
+            }
+
+            if (StartsWith(partName, "Ladefront") || StartsWith(partName, "Bovenlade front"))
+            {
+                return thickness / 2.0 + lift;
+            }
+
+            if (StartsWith(partName, "Ladeachter") || StartsWith(partName, "Bovenlade achter"))
+            {
+                return -thickness / 2.0 - lift;
+            }
+
+            return -thickness / 2.0 - lift;
+        }
+
+        private static int DividerNumber(string value)
+        {
+            return NumberAfter(value, "Tussenschot ");
+        }
+
+        private static int UnitNumberFromHole(string value)
+        {
+            return NumberAfter(value, "U");
+        }
+
+        private static int NumberAfter(string value, string marker)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(marker)) return 0;
+            var index = value.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (index < 0) return 0;
+            index += marker.Length;
+            var number = 0;
+            var found = false;
+            while (index < value.Length && char.IsDigit(value[index]))
+            {
+                found = true;
+                number = number * 10 + (value[index] - '0');
+                index++;
+            }
+
+            return found ? number : 0;
+        }
+
+        private static bool StartsWith(string value, string prefix)
+        {
+            return value != null && value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void AddWorkbenchFrame(List<PortalAssemblyPart> parts, PortalQuoteRequest request)
@@ -259,6 +528,18 @@ namespace SWWerkplaats.Configurator.Portal
         private static double ValueOr(double value, double fallback)
         {
             return value > 0 ? value : fallback;
+        }
+
+        private struct Range1
+        {
+            public readonly double Start;
+            public readonly double End;
+
+            public Range1(double start, double end)
+            {
+                Start = start;
+                End = end;
+            }
         }
     }
 }

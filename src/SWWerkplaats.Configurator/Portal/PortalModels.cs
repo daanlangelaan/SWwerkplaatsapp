@@ -8,13 +8,17 @@ namespace SWWerkplaats.Configurator.Portal
         public double WidthMm { get; set; }
         public double DepthMm { get; set; }
         public double HeightMm { get; set; }
+        public int Quantity { get; set; }
         public int UnitCount { get; set; }
         public string SheetMaterialId { get; set; }
+        public string DrawerMaterialId { get; set; }
+        public string BackMaterialId { get; set; }
         public string ProfileMaterialId { get; set; }
         public bool IncludeBackPanel { get; set; }
         public bool IncludeTopDrawer { get; set; }
         public bool IncludeAdjustableShelfHoles { get; set; }
         public int DefaultShelfCount { get; set; }
+        public string ShelfStartMode { get; set; }
         public int DefaultDrawerCount { get; set; }
         public string DoorMode { get; set; }
         public string CustomerName { get; set; }
@@ -33,6 +37,11 @@ namespace SWWerkplaats.Configurator.Portal
         public string ProductName { get; set; }
         public string Summary { get; set; }
         public decimal PriceExVat { get; set; }
+        public decimal Material { get; set; }
+        public decimal Hardware { get; set; }
+        public decimal Machine { get; set; }
+        public decimal Labour { get; set; }
+        public decimal Margin { get; set; }
         public decimal Vat { get; set; }
         public decimal PriceIncVat { get; set; }
         public string LeadTime { get; set; }
@@ -61,10 +70,12 @@ namespace SWWerkplaats.Configurator.Portal
         public double SizeYmm { get; set; }
         public double SizeZmm { get; set; }
         public List<PortalAssemblyHole> Holes { get; private set; }
+        public List<PortalAssemblyPocket> Pockets { get; private set; }
 
         public PortalAssemblyPart()
         {
             Holes = new List<PortalAssemblyHole>();
+            Pockets = new List<PortalAssemblyPocket>();
         }
     }
 
@@ -74,6 +85,20 @@ namespace SWWerkplaats.Configurator.Portal
         public double Ymm { get; set; }
         public double Zmm { get; set; }
         public double DiameterMm { get; set; }
+        public double DepthMm { get; set; }
+        public string Plane { get; set; }
+    }
+
+    public sealed class PortalAssemblyPocket
+    {
+        public string Name { get; set; }
+        public double Xmm { get; set; }
+        public double Ymm { get; set; }
+        public double Zmm { get; set; }
+        public double SizeXmm { get; set; }
+        public double SizeYmm { get; set; }
+        public double SizeZmm { get; set; }
+        public string Plane { get; set; }
     }
 
     public sealed class PortalOrderRecord

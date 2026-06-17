@@ -40,7 +40,7 @@ namespace SWWerkplaats.Configurator.Portal
             Directory.CreateDirectory(orderFolder);
 
             var output = new ProductionOutputService().GenerateOrderFiles(request, orderFolder);
-            var price = new PortalPricingService().Calculate(output.Model);
+            var price = new PortalPricingService().Calculate(output.Model, output.NestingPlan);
             var record = new PortalOrderRecord
             {
                 OrderId = orderId,

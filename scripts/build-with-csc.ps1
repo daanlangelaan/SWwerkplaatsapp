@@ -41,4 +41,11 @@ if (Test-Path $portalVendor) {
     Copy-Item -Path (Join-Path $portalVendor "*") -Destination $portalAssets -Recurse -Force
 }
 
+$portalImages = Join-Path $project "Portal\images"
+$portalImageAssets = Join-Path $outDir "PortalAssets\images"
+if (Test-Path $portalImages) {
+    New-Item -ItemType Directory -Force -Path $portalImageAssets | Out-Null
+    Copy-Item -Path (Join-Path $portalImages "*") -Destination $portalImageAssets -Recurse -Force
+}
+
 Write-Host "Build klaar: $exe"

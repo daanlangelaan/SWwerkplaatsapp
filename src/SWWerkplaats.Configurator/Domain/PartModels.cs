@@ -11,7 +11,9 @@ namespace SWWerkplaats.Configurator.Domain
     public enum SheetHoleSupportKind
     {
         ProfileNut,
-        TappedProfileEnd
+        TappedProfileEnd,
+        PanelScrew,
+        HingeScrew
     }
 
     public sealed class ProfilePart
@@ -44,10 +46,12 @@ namespace SWWerkplaats.Configurator.Domain
         public double ToeKickDepthMm { get; set; }
         public double ToeKickHeightMm { get; set; }
         public List<SheetHole> Holes { get; private set; }
+        public List<SheetPocket> Pockets { get; private set; }
 
         public SheetPart()
         {
             Holes = new List<SheetHole>();
+            Pockets = new List<SheetPocket>();
         }
     }
 
@@ -57,9 +61,21 @@ namespace SWWerkplaats.Configurator.Domain
         public double Xmm { get; set; }
         public double Ymm { get; set; }
         public double DiameterMm { get; set; }
+        public double DepthMm { get; set; }
         public bool Countersunk { get; set; }
         public double CountersinkDiameterMm { get; set; }
         public double CountersinkDepthMm { get; set; }
         public SheetHoleSupportKind SupportKind { get; set; }
+    }
+
+    public sealed class SheetPocket
+    {
+        public string Name { get; set; }
+        public double Xmm { get; set; }
+        public double Ymm { get; set; }
+        public double LengthMm { get; set; }
+        public double WidthMm { get; set; }
+        public double DepthMm { get; set; }
+        public string Note { get; set; }
     }
 }

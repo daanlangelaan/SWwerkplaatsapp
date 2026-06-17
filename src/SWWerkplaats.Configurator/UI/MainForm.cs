@@ -61,6 +61,10 @@ namespace SWWerkplaats.Configurator.UI
         private readonly CheckBox cabinetTopDrawer;
         private readonly CheckBox cabinetAdjustableShelfHoles;
         private readonly CheckBox exportSolidWorks;
+        private readonly CheckBox pencilMarking;
+        private readonly CheckBox jobTool4mm;
+        private readonly CheckBox jobTool6mm;
+        private readonly CheckBox jobToolCurrent;
         private readonly DataGridView cabinetUnits;
         private readonly DataGridView railLibrary;
         private readonly DataGridView shelfSupportLibrary;
@@ -90,6 +94,7 @@ namespace SWWerkplaats.Configurator.UI
             productMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
             productMode.Items.AddRange(new object[] { "Werktafel", "Cabinet" });
             productMode.SelectedIndex = 0;
+            var appSettings = AppSettings.Load();
             width = Number(1500, 300, 3020);
             depth = Number(750, 300, 1520);
             height = Number(900, 300, 2400);
@@ -102,10 +107,14 @@ namespace SWWerkplaats.Configurator.UI
             countersinkDepth = Number(8, 0.5m, 20);
             toolDiameter = Number(6, 1, 30);
             passDepth = Number(4, 0.5m, 20);
-            nestStockLength = Number(3020, 300, 3020);
-            nestStockWidth = Number(1520, 300, 1520);
-            nestSpacing = Number(15, 0, 100);
-            nestMargin = Number(15, 0, 100);
+            nestStockLength = Number((decimal)appSettings.NestStockLengthMm, 300, 3020);
+            nestStockWidth = Number((decimal)appSettings.NestStockWidthMm, 300, 1520);
+            nestSpacing = Number((decimal)appSettings.NestSpacingMm, 0, 100);
+            nestMargin = Number((decimal)appSettings.NestMarginMm, 0, 100);
+            nestStockLength.ValueChanged += delegate { SaveAppSettings(); };
+            nestStockWidth.ValueChanged += delegate { SaveAppSettings(); };
+            nestSpacing.ValueChanged += delegate { SaveAppSettings(); };
+            nestMargin.ValueChanged += delegate { SaveAppSettings(); };
             cabinetWidth = Number(2400, 300, 3020);
             cabinetDepth = Number(600, 250, 1520);
             cabinetWorktopHeight = Number(900, 300, 2400);
@@ -144,6 +153,10 @@ namespace SWWerkplaats.Configurator.UI
             cabinetAdjustableShelfHoles = new CheckBox { Text = "Legplankgaten onder bovenlade", Checked = false, AutoSize = true };
             autoTabs = new CheckBox { Text = "Tabs automatisch voor kleine delen", Checked = true, AutoSize = true };
             exportSolidWorks = new CheckBox { Text = "SolidWorks parts genereren", Checked = false, AutoSize = true };
+            pencilMarking = new CheckBox { Text = "Potloodmarkering eerst schrijven", Checked = false, AutoSize = true };
+            jobTool4mm = new CheckBox { Text = "Frees 4mm", Checked = true, AutoSize = true };
+            jobTool6mm = new CheckBox { Text = "Frees 6mm", Checked = false, AutoSize = true };
+            jobToolCurrent = new CheckBox { Text = "Primaire freesdiameter hierboven", Checked = true, Enabled = false, AutoSize = true };
             cabinetUnits = BuildCabinetUnitsGrid();
             outputFolder = new TextBox { Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WerktafelOutput"), Width = 520 };
             log = new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, ReadOnly = true, Dock = DockStyle.Fill, Font = new Font("Consolas", 9) };
@@ -295,6 +308,8 @@ namespace SWWerkplaats.Configurator.UI
             AddRow(panel, "Machine", new Label { Text = "Mach3 portaal 3020 x 1520, .tap, nulpunt links onder", AutoSize = true });
             AddRow(panel, "Freesdiameter mm", toolDiameter);
             AddRow(panel, "Passdiepte mm", passDepth);
+            AddRow(panel, "CAM functies", pencilMarking);
+            AddRow(panel, "Tools in job", BuildToolSelectionPanel());
             AddRow(panel, "Tabs", autoTabs);
             AddRow(panel, "Nest voorraad lengte mm", nestStockLength);
             AddRow(panel, "Nest voorraad breedte mm", nestStockWidth);
@@ -302,6 +317,15 @@ namespace SWWerkplaats.Configurator.UI
             AddRow(panel, "Nest randmarge mm", nestMargin);
 
             page.Controls.Add(panel);
+        }
+
+        private Control BuildToolSelectionPanel()
+        {
+            var panel = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
+            panel.Controls.Add(jobToolCurrent);
+            panel.Controls.Add(jobTool4mm);
+            panel.Controls.Add(jobTool6mm);
+            return panel;
         }
 
         private void FillOutputPage(Control page)
@@ -338,6 +362,7 @@ namespace SWWerkplaats.Configurator.UI
             {
                 var isCabinet = productMode.SelectedItem != null && productMode.SelectedItem.ToString() == "Cabinet";
                 var tool = BuildTool();
+                var camJob = BuildCamJobOptions(tool);
                 var machine = BuildMachine();
                 var model = isCabinet ? new CabinetEngine().Build(BuildCabinetConfig()) : new WorkbenchEngine().Build(BuildConfig());
 
@@ -351,7 +376,7 @@ namespace SWWerkplaats.Configurator.UI
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielStationPlan.txt"), csv.ExportProfileStationPlan(model));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "Plaatgaten.csv"), csv.ExportSheetHoleList(model.Sheets));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, tool));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "ToolLibrary.csv"), csv.ExportToolLibrary(tool));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "ToolLibrary.csv"), csv.ExportToolLibrary(camJob));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "BOM.csv"), csv.ExportBom(model));
 
                 var gcode = new Mach3GCodeGenerator();
@@ -367,10 +392,15 @@ namespace SWWerkplaats.Configurator.UI
                 var nestingExporter = new NestingExporter();
                 File.WriteAllText(Path.Combine(nestingFolder, "NestPlan.csv"), nestingExporter.ExportCsv(nestingPlan));
                 File.WriteAllText(Path.Combine(nestingFolder, "NestVisualisatie.svg"), nestingExporter.ExportSvg(nestingPlan));
+                if (camJob.EnablePencilMarking)
+                {
+                    File.WriteAllText(Path.Combine(nestingFolder, "PotloodMarkeerPlan.csv"), new PencilMarkingGCodeGenerator().ExportPlan(nestingPlan, camJob.BuildPencilMarkingOptions()));
+                }
+
                 var nestedGcode = new NestedMach3GCodeGenerator();
                 foreach (var stock in nestingPlan.StockSheets)
                 {
-                    File.WriteAllText(Path.Combine(nestingFolder, stock.Name + ".tap"), nestedGcode.Generate(stock, tool, machine));
+                    File.WriteAllText(Path.Combine(nestingFolder, stock.Name + ".tap"), nestedGcode.Generate(stock, tool, machine, camJob));
                 }
 
                 var plan = SolidWorksExportPlan.FromWorkbench(model);
@@ -412,6 +442,7 @@ namespace SWWerkplaats.Configurator.UI
                     + "- Plaatdelen .tap" + Environment.NewLine
                     + "- Nesting\\NestPlan.csv" + Environment.NewLine
                     + "- Nesting\\NestVisualisatie.svg" + Environment.NewLine
+                    + (camJob.EnablePencilMarking ? "- Nesting\\PotloodMarkeerPlan.csv" + Environment.NewLine : "")
                     + "- Nesting\\*.tap" + Environment.NewLine
                     + solidWorksLine
                     + "- SolidWorksExportPlan.txt" + Environment.NewLine;
@@ -520,6 +551,41 @@ namespace SWWerkplaats.Configurator.UI
             return LibraryCatalog.DefaultEndMill((double)toolDiameter.Value, (double)passDepth.Value);
         }
 
+        private CamJobOptions BuildCamJobOptions(ToolDefinition primaryTool)
+        {
+            var options = CamJobOptions.FromPrimaryTool(primaryTool);
+            options.EnablePencilMarking = pencilMarking.Checked;
+            options.PencilMarking = PencilMarkingOptions.Default();
+
+            if (jobToolCurrent.Checked)
+            {
+                options.AddTool(primaryTool);
+            }
+
+            if (jobTool4mm.Checked)
+            {
+                options.AddTool(LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3)));
+            }
+
+            if (jobTool6mm.Checked)
+            {
+                options.AddTool(LibraryCatalog.DefaultEndMill(6, Math.Min((double)passDepth.Value, 4)));
+            }
+
+            return options;
+        }
+
+        private void SaveAppSettings()
+        {
+            new AppSettings
+            {
+                NestStockLengthMm = (double)nestStockLength.Value,
+                NestStockWidthMm = (double)nestStockWidth.Value,
+                NestSpacingMm = (double)nestSpacing.Value,
+                NestMarginMm = (double)nestMargin.Value
+            }.Save();
+        }
+
         private static MachineProfile BuildMachine()
         {
             return new MachineProfile
@@ -547,6 +613,8 @@ namespace SWWerkplaats.Configurator.UI
 
         private static NumericUpDown Number(decimal value, decimal min, decimal max)
         {
+            if (value < min) value = min;
+            if (value > max) value = max;
             var number = new NumericUpDown
             {
                 Minimum = min,

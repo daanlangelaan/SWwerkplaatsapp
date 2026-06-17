@@ -69,16 +69,51 @@ namespace SWWerkplaats.Configurator.Portal
         {
             using (client)
             {
+                NetworkStream stream = null;
                 try
                 {
-                    var request = ReadRequest(client.GetStream());
-                    Handle(request, client.GetStream());
+                    stream = client.GetStream();
+                    var request = ReadRequest(stream);
+                    Handle(request, stream);
                 }
                 catch (Exception ex)
                 {
-                    WriteJson(client.GetStream(), 500, new { ok = false, error = ex.Message });
+                    if (IsClientDisconnect(ex)) return;
+
+                    LastError = ex.Message;
+                    try
+                    {
+                        if (stream == null) stream = client.GetStream();
+                        WriteJson(stream, 500, new { ok = false, error = ex.Message });
+                    }
+                    catch (Exception writeEx)
+                    {
+                        if (!IsClientDisconnect(writeEx))
+                        {
+                            LastError = writeEx.Message;
+                        }
+                    }
                 }
             }
+        }
+
+        private static bool IsClientDisconnect(Exception ex)
+        {
+            while (ex != null)
+            {
+                var socket = ex as SocketException;
+                if (socket != null)
+                {
+                    return socket.SocketErrorCode == SocketError.ConnectionReset
+                        || socket.SocketErrorCode == SocketError.ConnectionAborted
+                        || socket.SocketErrorCode == SocketError.Shutdown;
+                }
+
+                if (ex is ObjectDisposedException) return true;
+                ex = ex.InnerException;
+            }
+
+            return false;
         }
 
         private void Handle(HttpRequest request, Stream stream)
@@ -92,7 +127,7 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
-            if (request.Method == "GET" && path.StartsWith("/vendor/", StringComparison.OrdinalIgnoreCase))
+            if (request.Method == "GET" && (path.StartsWith("/vendor/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/images/", StringComparison.OrdinalIgnoreCase)))
             {
                 WriteStaticFile(stream, path);
                 return;
@@ -109,22 +144,38 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "POST" && path == "/api/shutdown")
+            {
+                WriteJson(stream, 200, new { ok = true, message = "Portal stopt. Start de configurator opnieuw om verse code te laden." });
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    Thread.Sleep(250);
+                    Environment.Exit(0);
+                });
+                return;
+            }
+
             if (request.Method == "POST" && path == "/api/quote")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
                 var preview = new ProductionOutputService().BuildPreview(quoteRequest);
-                var price = new PortalPricingService().Calculate(preview.Model);
+                var price = new PortalPricingService().Calculate(preview.Model, preview.NestingPlan);
                 var response = new PortalQuoteResponse
                 {
                     QuoteId = "Q-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"),
                     ProductName = ProductName(quoteRequest),
-                    Summary = Summary(preview.Model),
+                    Summary = Summary(preview.Model, quoteRequest),
                     PriceExVat = price.ExVat,
+                    Material = price.Material,
+                    Hardware = price.Hardware,
+                    Machine = price.Machine,
+                    Labour = price.Labour,
+                    Margin = price.Margin,
                     Vat = price.Vat,
                     PriceIncVat = price.IncVat,
                     LeadTime = "Indicatie: 5-10 werkdagen na controle",
-                    SheetPartCount = preview.Model.Sheets.Count,
-                    ProfilePartCount = preview.Model.Profiles.Count,
+                    SheetPartCount = CountSheets(preview.Model),
+                    ProfilePartCount = CountProfiles(preview.Model),
                     PreviewSvg = new PortalVisualizationService().BuildProductSvg(preview.Model, quoteRequest),
                     NestingSvg = preview.NestingSvg
                 };
@@ -265,6 +316,10 @@ namespace SWWerkplaats.Configurator.Portal
             if (extension == ".js") return "application/javascript; charset=utf-8";
             if (extension == ".css") return "text/css; charset=utf-8";
             if (extension == ".json") return "application/json; charset=utf-8";
+            if (extension == ".png") return "image/png";
+            if (extension == ".jpg" || extension == ".jpeg") return "image/jpeg";
+            if (extension == ".webp") return "image/webp";
+            if (extension == ".svg") return "image/svg+xml; charset=utf-8";
             return "application/octet-stream";
         }
 
@@ -288,9 +343,33 @@ namespace SWWerkplaats.Configurator.Portal
             return "Cabinet";
         }
 
-        private static string Summary(WorkbenchModel model)
+        private static string Summary(WorkbenchModel model, PortalQuoteRequest request)
         {
-            return model.ProjectName + ": " + model.Sheets.Count + " plaatdelen, " + model.Profiles.Count + " profieldelen, " + model.Hardware.Count + " beslagregels.";
+            var quantity = request == null ? 1 : Math.Max(1, request.Quantity);
+            var prefix = quantity > 1 ? quantity.ToString() + " stuks - " : "";
+            return prefix + model.ProjectName + ": " + CountSheets(model) + " plaatdelen, " + CountProfiles(model) + " profieldelen, " + model.Hardware.Count + " beslagregels.";
+        }
+
+        private static int CountSheets(WorkbenchModel model)
+        {
+            var count = 0;
+            foreach (var sheet in model.Sheets)
+            {
+                count += Math.Max(1, sheet.Quantity);
+            }
+
+            return count;
+        }
+
+        private static int CountProfiles(WorkbenchModel model)
+        {
+            var count = 0;
+            foreach (var profile in model.Profiles)
+            {
+                count += Math.Max(1, profile.Quantity);
+            }
+
+            return count;
         }
 
         public void Dispose()

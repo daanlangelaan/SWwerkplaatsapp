@@ -23,9 +23,15 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             if (HasCountersinks(part))
             {
-                BeginTool(sb, 1, tool.Name + " voor kopkamers, gaten en buitencontour", tool);
+                BeginTool(sb, 1, tool.Name + " voor groeven, kopkamers, gaten en buitencontour", tool);
                 sb.AppendLine();
-                sb.AppendLine("(--- BEWERKING 1: alle kopkamers helix-frezen ---)");
+                sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets ---)");
+                foreach (var pocket in part.Pockets)
+                {
+                    AddRectangularPocket(sb, pocket, tool, machine);
+                }
+                sb.AppendLine();
+                sb.AppendLine("(--- BEWERKING 2: alle kopkamers helix-frezen ---)");
                 foreach (var hole in part.Holes)
                 {
                     AddCountersink(sb, hole, tool, machine);
@@ -33,18 +39,24 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
             else
             {
-                BeginTool(sb, 1, tool.Name + " voor gaten en buitencontour", tool);
+                BeginTool(sb, 1, tool.Name + " voor groeven, gaten en buitencontour", tool);
+                sb.AppendLine();
+                sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets ---)");
+                foreach (var pocket in part.Pockets)
+                {
+                    AddRectangularPocket(sb, pocket, tool, machine);
+                }
             }
 
             sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 2: alle door-en-door montagegaten ---)");
+            sb.AppendLine("(--- BEWERKING 3: alle montagegaten ---)");
             foreach (var hole in part.Holes)
             {
                 AddHole(sb, hole, tool, machine, materialThicknessMm);
             }
 
             sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 3: buitencontour ---)");
+            sb.AppendLine("(--- BEWERKING 4: buitencontour ---)");
             AddOutsideRectangle(sb, part, tool, machine, materialThicknessMm, tabWidthMm, tabHeightMm);
 
             sb.AppendLine("M5");
@@ -80,13 +92,14 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static void AddHole(StringBuilder sb, SheetHole hole, ToolDefinition tool, MachineProfile machine, double materialThicknessMm)
         {
             sb.AppendLine();
-            sb.AppendLine("(" + hole.Name + " diameter " + F(hole.DiameterMm) + ", centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ")");
+            var cutDepth = HoleDepth(hole, materialThicknessMm);
+            sb.AppendLine("(" + hole.Name + " diameter " + F(hole.DiameterMm) + ", diepte " + F(cutDepth) + ", centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ")");
 
-            if (hole.DiameterMm <= tool.DiameterMm * 1.15)
+            if (hole.DiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Start op centrum, gat bijna gelijk aan tooldiameter)");
                 sb.AppendLine("G0 X" + F(hole.Xmm) + " Y" + F(hole.Ymm));
-                DrillPeck(sb, tool, machine, materialThicknessMm);
+                DrillPeck(sb, tool, machine, cutDepth);
                 return;
             }
 
@@ -96,9 +109,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("G0 X" + F(startX) + " Y" + F(hole.Ymm));
 
             var depth = 0.0;
-            while (depth > -materialThicknessMm)
+            while (depth > -cutDepth)
             {
-                depth = Math.Max(depth - tool.PassDepthMm, -materialThicknessMm);
+                depth = Math.Max(depth - tool.PassDepthMm, -cutDepth);
                 sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
                 sb.AppendLine("G2 X" + F(startX) + " Y" + F(hole.Ymm) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
             }
@@ -116,7 +129,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine();
             sb.AppendLine("(" + hole.Name + " kopkamer diameter " + F(hole.CountersinkDiameterMm) + " diepte " + F(hole.CountersinkDepthMm) + ", centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ")");
 
-            if (hole.CountersinkDiameterMm <= tool.DiameterMm * 1.15)
+            if (hole.CountersinkDiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Start op centrum, kopkamer bijna gelijk aan tooldiameter)");
                 sb.AppendLine("G0 X" + F(hole.Xmm) + " Y" + F(hole.Ymm));
@@ -140,6 +153,77 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             sb.AppendLine("G2 X" + F(startX) + " Y" + F(hole.Ymm) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+        }
+
+        private static double HoleDepth(SheetHole hole, double materialThicknessMm)
+        {
+            if (hole != null && hole.DepthMm > 0)
+            {
+                return Math.Min(hole.DepthMm, Math.Max(0.1, materialThicknessMm - 0.1));
+            }
+
+            return materialThicknessMm;
+        }
+
+        private static void AddRectangularPocket(StringBuilder sb, SheetPocket pocket, ToolDefinition tool, MachineProfile machine)
+        {
+            if (pocket == null || pocket.LengthMm <= 0 || pocket.WidthMm <= 0 || pocket.DepthMm <= 0)
+            {
+                return;
+            }
+
+            var inset = Math.Max(tool.RadiusMm, 0.1);
+            var x0 = pocket.Xmm + inset;
+            var y0 = pocket.Ymm + inset;
+            var x1 = pocket.Xmm + pocket.LengthMm - inset;
+            var y1 = pocket.Ymm + pocket.WidthMm - inset;
+            if (x1 <= x0 || y1 <= y0)
+            {
+                x0 = pocket.Xmm + pocket.LengthMm / 2.0;
+                y0 = pocket.Ymm + pocket.WidthMm / 2.0;
+                x1 = x0;
+                y1 = y0;
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("(" + pocket.Name + " pocket X" + F(pocket.Xmm) + " Y" + F(pocket.Ymm) + " " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(pocket.DepthMm) + ")");
+            sb.AppendLine("G0 X" + F(x0) + " Y" + F(y0));
+            var depth = 0.0;
+            while (depth > -pocket.DepthMm)
+            {
+                depth = Math.Max(depth - tool.PassDepthMm, -pocket.DepthMm);
+                sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
+                AddPocketClearingPass(sb, x0, y0, x1, y1, tool);
+            }
+
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+        }
+
+        private static void AddPocketClearingPass(StringBuilder sb, double x0, double y0, double x1, double y1, ToolDefinition tool)
+        {
+            if (Math.Abs(x1 - x0) < 0.001 && Math.Abs(y1 - y0) < 0.001)
+            {
+                sb.AppendLine("G1 X" + F(x0) + " Y" + F(y0) + " F" + F(tool.FeedRateMmMin));
+                return;
+            }
+
+            var step = Math.Max(1.0, tool.DiameterMm * 0.65);
+            var y = y0;
+            var forward = true;
+            while (true)
+            {
+                var targetX = forward ? x1 : x0;
+                sb.AppendLine("G1 X" + F(targetX) + " Y" + F(y) + " F" + F(tool.FeedRateMmMin));
+                if (Math.Abs(y - y1) < 0.001) break;
+
+                var nextY = Math.Min(y + step, y1);
+                if (Math.Abs(nextY - y) < 0.001) break;
+                sb.AppendLine("G1 X" + F(targetX) + " Y" + F(nextY));
+                y = nextY;
+                forward = !forward;
+            }
+
+            AddRectanglePass(sb, x0, y0, x1, y1, tool);
         }
 
         private static bool HasCountersinks(SheetPart part)
@@ -188,16 +272,13 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         private static void AddOutsideRectangle(StringBuilder sb, SheetPart part, ToolDefinition tool, MachineProfile machine, double materialThicknessMm, double tabWidthMm, double tabHeightMm)
         {
-            var r = tool.RadiusMm;
-            var x0 = -r;
-            var y0 = -r;
-            var x1 = part.LengthMm + r;
-            var y1 = part.WidthMm + r;
+            var points = ContourPoints(part, tool.RadiusMm);
+            var start = points[0];
             var tabZ = -Math.Max(0, materialThicknessMm - tabHeightMm);
 
             sb.AppendLine();
             sb.AppendLine("(Buitencontour met automatische tool-offset)");
-            sb.AppendLine("G0 X" + F(x0) + " Y" + F(y0));
+            sb.AppendLine("G0 X" + F(start.X) + " Y" + F(start.Y));
 
             var depth = 0.0;
             while (depth > -materialThicknessMm)
@@ -205,25 +286,110 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 depth = Math.Max(depth - tool.PassDepthMm, -materialThicknessMm);
                 sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
 
-                if (part.HasCornerNotches)
+                if (part.UseTabs && Math.Abs(depth + materialThicknessMm) < 0.001)
                 {
-                    AddNotchedPass(sb, part, tool);
-                }
-                else if (part.HasToeKickNotch)
-                {
-                    AddToeKickPass(sb, part, tool);
-                }
-                else if (part.UseTabs && Math.Abs(depth + materialThicknessMm) < 0.001)
-                {
-                    AddTabbedRectanglePass(sb, x0, y0, x1, y1, tool, tabWidthMm, tabZ, depth);
+                    AddTabbedPolylinePass(sb, points, tool, tabWidthMm, tabZ, depth);
                 }
                 else
                 {
-                    AddRectanglePass(sb, x0, y0, x1, y1, tool);
+                    AddPolylinePass(sb, points, tool);
                 }
             }
 
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+        }
+
+        private static void AddPolylinePass(StringBuilder sb, System.Collections.Generic.List<Point2> points, ToolDefinition tool)
+        {
+            for (var i = 1; i < points.Count; i++)
+            {
+                sb.AppendLine("G1 X" + F(points[i].X) + " Y" + F(points[i].Y) + " F" + F(tool.FeedRateMmMin));
+            }
+        }
+
+        private static void AddTabbedPolylinePass(StringBuilder sb, System.Collections.Generic.List<Point2> points, ToolDefinition tool, double tabWidth, double tabZ, double cutZ)
+        {
+            for (var i = 1; i < points.Count; i++)
+            {
+                AddTabbedSegment(sb, points[i - 1], points[i], tool, tabWidth, tabZ, cutZ);
+            }
+        }
+
+        private static void AddTabbedSegment(StringBuilder sb, Point2 start, Point2 end, ToolDefinition tool, double tabWidth, double tabZ, double cutZ)
+        {
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            if (length <= tabWidth * 3.0)
+            {
+                sb.AppendLine("G1 X" + F(end.X) + " Y" + F(end.Y) + " F" + F(tool.FeedRateMmMin));
+                return;
+            }
+
+            var half = tabWidth / 2.0;
+            var t0 = Math.Max(0, (length / 2.0 - half) / length);
+            var t1 = Math.Min(1, (length / 2.0 + half) / length);
+            var before = new Point2(start.X + dx * t0, start.Y + dy * t0);
+            var after = new Point2(start.X + dx * t1, start.Y + dy * t1);
+
+            sb.AppendLine("G1 X" + F(before.X) + " Y" + F(before.Y) + " F" + F(tool.FeedRateMmMin));
+            sb.AppendLine("G1 Z" + F(tabZ) + " F" + F(tool.PlungeRateMmMin));
+            sb.AppendLine("G1 X" + F(after.X) + " Y" + F(after.Y) + " F" + F(tool.FeedRateMmMin));
+            sb.AppendLine("G1 Z" + F(cutZ) + " F" + F(tool.PlungeRateMmMin));
+            sb.AppendLine("G1 X" + F(end.X) + " Y" + F(end.Y) + " F" + F(tool.FeedRateMmMin));
+        }
+
+        private static System.Collections.Generic.List<Point2> ContourPoints(SheetPart part, double radius)
+        {
+            var points = new System.Collections.Generic.List<Point2>();
+            var x0 = -radius;
+            var y0 = -radius;
+            var x1 = part.LengthMm + radius;
+            var y1 = part.WidthMm + radius;
+
+            if (part.HasToeKickNotch)
+            {
+                var notchX = Math.Min(part.ToeKickDepthMm + radius, x1);
+                var notchY = Math.Min(part.ToeKickHeightMm + radius, y1);
+                points.Add(new Point2(notchX, y0));
+                points.Add(new Point2(x1, y0));
+                points.Add(new Point2(x1, y1));
+                points.Add(new Point2(x0, y1));
+                points.Add(new Point2(x0, notchY));
+                points.Add(new Point2(notchX, notchY));
+                points.Add(new Point2(notchX, y0));
+                return points;
+            }
+
+            if (!part.HasCornerNotches)
+            {
+                points.Add(new Point2(x0, y0));
+                points.Add(new Point2(x1, y0));
+                points.Add(new Point2(x1, y1));
+                points.Add(new Point2(x0, y1));
+                points.Add(new Point2(x0, y0));
+                return points;
+            }
+
+            var n = part.CornerNotchSizeMm;
+            var nx0 = n + radius;
+            var ny0 = n + radius;
+            var nx1 = part.LengthMm - n - radius;
+            var ny1 = part.WidthMm - n - radius;
+            points.Add(new Point2(nx0, y0));
+            points.Add(new Point2(nx1, y0));
+            points.Add(new Point2(nx1, ny0));
+            points.Add(new Point2(x1, ny0));
+            points.Add(new Point2(x1, ny1));
+            points.Add(new Point2(nx1, ny1));
+            points.Add(new Point2(nx1, y1));
+            points.Add(new Point2(nx0, y1));
+            points.Add(new Point2(nx0, ny1));
+            points.Add(new Point2(x0, ny1));
+            points.Add(new Point2(x0, ny0));
+            points.Add(new Point2(nx0, ny0));
+            points.Add(new Point2(nx0, y0));
+            return points;
         }
 
         private static void AddNotchedPass(StringBuilder sb, SheetPart part, ToolDefinition tool)
@@ -315,6 +481,18 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static string F(double value)
         {
             return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private struct Point2
+        {
+            public readonly double X;
+            public readonly double Y;
+
+            public Point2(double x, double y)
+            {
+                X = x;
+                Y = y;
+            }
         }
     }
 }

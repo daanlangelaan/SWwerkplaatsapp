@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using SWWerkplaats.Configurator.Domain;
 
@@ -9,6 +10,7 @@ namespace SWWerkplaats.Configurator.Portal
     public sealed class PortalPrice
     {
         public decimal Material { get; set; }
+        public decimal Hardware { get; set; }
         public decimal Machine { get; set; }
         public decimal Labour { get; set; }
         public decimal Margin { get; set; }
@@ -41,22 +43,29 @@ namespace SWWerkplaats.Configurator.Portal
     {
         public PortalPrice Calculate(WorkbenchModel model)
         {
+            return Calculate(model, null);
+        }
+
+        public PortalPrice Calculate(WorkbenchModel model, NestingPlan nestingPlan)
+        {
             var price = new PortalPrice();
-            AddSheetLines(price, model);
+            AddSheetLines(price, model, nestingPlan);
             AddProfileLines(price, model);
             AddHardwareLines(price, model);
-            AddMachineAndLabourLines(price, model);
+            AddMachineAndLabourLines(price, model, nestingPlan);
 
             foreach (var line in price.Lines)
             {
                 price.ExVat += line.SalesTotal;
                 if (line.Category == "Machine") price.Machine += line.SalesTotal;
                 else if (line.Category == "Arbeid") price.Labour += line.SalesTotal;
-                else price.Material += line.SalesTotal;
+                else if (line.Category == "Materiaal") price.Material += line.PurchaseTotal;
+                else if (line.Category == "Beslag") price.Hardware += line.PurchaseTotal;
                 price.Margin += line.SalesTotal - line.PurchaseTotal;
             }
 
             price.Material = RoundMoney(price.Material);
+            price.Hardware = RoundMoney(price.Hardware);
             price.Machine = RoundMoney(price.Machine);
             price.Labour = RoundMoney(price.Labour);
             price.Margin = RoundMoney(price.Margin);
@@ -115,7 +124,51 @@ namespace SWWerkplaats.Configurator.Portal
             return sb.ToString();
         }
 
-        private static void AddSheetLines(PortalPrice price, WorkbenchModel model)
+        private static void AddSheetLines(PortalPrice price, WorkbenchModel model, NestingPlan nestingPlan)
+        {
+            if (nestingPlan != null && nestingPlan.StockSheets.Count > 0)
+            {
+                AddNestedStockSheetLines(price, nestingPlan);
+                return;
+            }
+
+            AddNetSheetPartLines(price, model);
+        }
+
+        private static void AddNestedStockSheetLines(PortalPrice price, NestingPlan nestingPlan)
+        {
+            var totals = new Dictionary<string, MaterialAmount>();
+            foreach (var stock in nestingPlan.StockSheets)
+            {
+                if (stock.Material == null) continue;
+                var key = stock.Material.Id + "|" + stock.Material.ThicknessMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "|" + stock.StockLengthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "|" + stock.StockWidthMm.ToString("0.###", CultureInfo.InvariantCulture);
+                MaterialAmount amount;
+                if (!totals.TryGetValue(key, out amount))
+                {
+                    var estimate = PriceEstimate("Materiaal", stock.Material.Id, EstimatedSheetM2Price(stock.Material), 35);
+                    amount = new MaterialAmount
+                    {
+                        Name = stock.Material.Name + " voorraadplaat " + stock.StockLengthMm.ToString("0") + "x" + stock.StockWidthMm.ToString("0") + "mm",
+                        Unit = SheetPriceIsPerPlate(estimate.Unit) ? "plaat" : "m2",
+                        UnitPrice = estimate.UnitPrice,
+                        MarkupPercent = estimate.MarkupPercent,
+                        Note = estimate.Note + " - gerekend op gebruikte volledige nestingplaten"
+                    };
+                    totals.Add(key, amount);
+                }
+
+                amount.Quantity += SheetPriceIsPerPlate(amount.Unit) ? 1m : (decimal)(stock.StockLengthMm * stock.StockWidthMm / 1000000.0);
+            }
+
+            foreach (var amount in totals.Values)
+            {
+                AddLine(price, "Materiaal", amount.Name, amount.Quantity, amount.Unit, amount.UnitPrice, amount.MarkupPercent, amount.Note);
+            }
+        }
+
+        private static void AddNetSheetPartLines(PortalPrice price, WorkbenchModel model)
         {
             var totals = new Dictionary<string, MaterialAmount>();
             foreach (var sheet in model.Sheets)
@@ -125,7 +178,8 @@ namespace SWWerkplaats.Configurator.Portal
                 MaterialAmount amount;
                 if (!totals.TryGetValue(key, out amount))
                 {
-                    amount = new MaterialAmount { Name = sheet.Material.Name, Unit = "m2", UnitPrice = EstimatedSheetM2Price(sheet.Material), MarkupPercent = 35, Note = "Geschatte inkoop plaatmateriaal per m2" };
+                    var estimate = PriceEstimate("Materiaal", sheet.Material.Id, EstimatedSheetM2Price(sheet.Material), 35);
+                    amount = new MaterialAmount { Name = sheet.Material.Name, Unit = "m2", UnitPrice = estimate.UnitPrice, MarkupPercent = estimate.MarkupPercent, Note = estimate.Note };
                     totals.Add(key, amount);
                 }
 
@@ -148,7 +202,8 @@ namespace SWWerkplaats.Configurator.Portal
                 MaterialAmount amount;
                 if (!totals.TryGetValue(key, out amount))
                 {
-                    amount = new MaterialAmount { Name = profile.Material.Name, Unit = "m", UnitPrice = EstimatedProfileMeterPrice(profile.Material), MarkupPercent = 30, Note = "Geschatte inkoop profiel per meter" };
+                    var estimate = PriceEstimate("Profiel", profile.Material.Id, EstimatedProfileMeterPrice(profile.Material), 30);
+                    amount = new MaterialAmount { Name = profile.Material.Name, Unit = "m", UnitPrice = estimate.UnitPrice, MarkupPercent = estimate.MarkupPercent, Note = estimate.Note };
                     totals.Add(key, amount);
                 }
 
@@ -165,23 +220,31 @@ namespace SWWerkplaats.Configurator.Portal
         {
             foreach (var item in model.Hardware)
             {
-                AddLine(price, "Beslag", item.Name, Math.Max(0, item.Quantity), item.Unit ?? "st", EstimatedHardwareUnitPrice(item), 45, "Geschatte inkoop beslag/verbruiksmateriaal");
+                var estimate = PriceEstimate("Beslag", HardwarePriceKey(item), EstimatedHardwareUnitPrice(item), 45);
+                AddLine(price, "Beslag", item.Name, Math.Max(0, item.Quantity), item.Unit ?? "st", estimate.UnitPrice, estimate.MarkupPercent, estimate.Note);
             }
         }
 
-        private static void AddMachineAndLabourLines(PortalPrice price, WorkbenchModel model)
+        private static void AddMachineAndLabourLines(PortalPrice price, WorkbenchModel model, NestingPlan nestingPlan)
         {
             var holeCount = 0;
             foreach (var sheet in model.Sheets) holeCount += sheet.Holes.Count * Math.Max(1, sheet.Quantity);
-            var sheetCount = 0;
-            foreach (var sheet in model.Sheets) sheetCount += Math.Max(1, sheet.Quantity);
+            var stockSheetCount = 0;
+            if (nestingPlan != null) stockSheetCount = nestingPlan.StockSheets.Count;
+            if (stockSheetCount <= 0)
+            {
+                foreach (var sheet in model.Sheets) stockSheetCount += Math.Max(1, sheet.Quantity);
+            }
+
             var profileCount = 0;
             foreach (var profile in model.Profiles) profileCount += Math.Max(1, profile.Quantity);
 
-            var cncMinutes = Math.Max(25, sheetCount * 7 + holeCount * 0.55m);
-            var labourMinutes = Math.Max(35, (sheetCount + profileCount) * 4.5m);
-            AddLine(price, "Machine", "CNC frezen / boren", cncMinutes / 60m, "uur", 38m, 40, "Geschatte machinekost incl. frees/slijtage");
-            AddLine(price, "Arbeid", "Voorbereiding, controle en handling", labourMinutes / 60m, "uur", 42m, 35, "Geschat intern uurtarief");
+            var cncMinutes = Math.Max(25, stockSheetCount * 7 + holeCount * 0.08m);
+            var labourMinutes = Math.Max(25, stockSheetCount * 6 + profileCount * 4.5m);
+            var machine = PriceEstimate("Machine", "cnc_hour", 38m, 40);
+            var labour = PriceEstimate("Arbeid", "labour_hour", 42m, 35);
+            AddLine(price, "Machine", "CNC frezen / boren", cncMinutes / 60m, "uur", machine.UnitPrice, machine.MarkupPercent, machine.Note);
+            AddLine(price, "Arbeid", "Voorbereiding, controle en handling", labourMinutes / 60m, "uur", labour.UnitPrice, labour.MarkupPercent, labour.Note);
         }
 
         private static void AddLine(PortalPrice price, string category, string description, decimal quantity, string unit, decimal purchaseUnitPrice, decimal markupPercent, string note)
@@ -231,6 +294,160 @@ namespace SWWerkplaats.Configurator.Portal
             return 0.75m;
         }
 
+        private static string HardwarePriceKey(HardwareItem item)
+        {
+            var name = (item == null ? "" : item.Name ?? "").ToLowerInvariant();
+            if (name.IndexOf("rail") >= 0 || name.IndexOf("ladegeleider") >= 0) return "drawer_rail";
+            if (name.IndexOf("scharnier") >= 0) return "hinge";
+            if (name.IndexOf("schroef") >= 0 || name.IndexOf("bout") >= 0 || name.IndexOf("ring") >= 0) return "fastener";
+            return name;
+        }
+
+        private static PricingEstimate PriceEstimate(string category, string key, decimal fallbackUnitPrice, decimal fallbackMarkupPercent)
+        {
+            PricingEstimate estimate;
+            if (!string.IsNullOrEmpty(key) && PricingEstimates().TryGetValue(PriceKey(category, key), out estimate))
+            {
+                return estimate;
+            }
+
+            return new PricingEstimate
+            {
+                UnitPrice = fallbackUnitPrice,
+                MarkupPercent = fallbackMarkupPercent,
+                Note = "Fallback schatting; geen regel gevonden in config/pricing-estimates.csv"
+            };
+        }
+
+        private static bool SheetPriceIsPerPlate(string unit)
+        {
+            unit = (unit ?? "").Trim().ToLowerInvariant();
+            return unit == "plaat" || unit == "platen" || unit == "st" || unit == "stuk";
+        }
+
+        private static Dictionary<string, PricingEstimate> pricingEstimates;
+
+        private static Dictionary<string, PricingEstimate> PricingEstimates()
+        {
+            if (pricingEstimates != null) return pricingEstimates;
+            pricingEstimates = new Dictionary<string, PricingEstimate>(StringComparer.OrdinalIgnoreCase);
+
+            var path = PricingConfigPath();
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return pricingEstimates;
+
+            string[] lines;
+            try
+            {
+                lines = File.ReadAllLines(path);
+            }
+            catch
+            {
+                return pricingEstimates;
+            }
+
+            for (var i = 1; i < lines.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                var columns = SplitCsvLine(lines[i]);
+                if (columns.Length < 6) continue;
+
+                decimal unitPrice;
+                decimal markup;
+                if (!TryParseMoney(columns[4], out unitPrice)) continue;
+                if (!TryParseMoney(columns[5], out markup)) markup = 0;
+
+                var category = columns[0];
+                var key = columns[1];
+                if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
+
+                pricingEstimates[PriceKey(category, key)] = new PricingEstimate
+                {
+                    Unit = columns.Length > 3 ? columns[3] : "",
+                    UnitPrice = unitPrice,
+                    MarkupPercent = markup,
+                    Note = columns.Length > 6 && !string.IsNullOrWhiteSpace(columns[6]) ? columns[6] : "Uit config/pricing-estimates.csv"
+                };
+            }
+
+            return pricingEstimates;
+        }
+
+        private static string PricingConfigPath()
+        {
+            var fromBase = FindPricingConfigUpwards(AppDomain.CurrentDomain.BaseDirectory);
+            if (fromBase != null) return fromBase;
+
+            var fromCurrent = FindPricingConfigUpwards(Environment.CurrentDirectory);
+            if (fromCurrent != null) return fromCurrent;
+
+            return null;
+        }
+
+        private static string FindPricingConfigUpwards(string startFolder)
+        {
+            if (string.IsNullOrEmpty(startFolder)) return null;
+
+            var folder = Path.GetFullPath(startFolder);
+            for (var i = 0; i < 6 && !string.IsNullOrEmpty(folder); i++)
+            {
+                var candidate = Path.Combine(folder, "config", "pricing-estimates.csv");
+                if (File.Exists(candidate)) return candidate;
+
+                var parent = Directory.GetParent(folder);
+                if (parent == null) break;
+                folder = parent.FullName;
+            }
+
+            return null;
+        }
+
+        private static string PriceKey(string category, string key)
+        {
+            return (category ?? "").Trim() + "|" + (key ?? "").Trim();
+        }
+
+        private static bool TryParseMoney(string value, out decimal result)
+        {
+            value = (value ?? "").Trim().Replace(',', '.');
+            return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+        }
+
+        private static string[] SplitCsvLine(string line)
+        {
+            var columns = new List<string>();
+            var current = new StringBuilder();
+            var quoted = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var ch = line[i];
+                if (ch == '"')
+                {
+                    if (quoted && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        current.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        quoted = !quoted;
+                    }
+                }
+                else if (ch == ';' && !quoted)
+                {
+                    columns.Add(current.ToString());
+                    current.Length = 0;
+                }
+                else
+                {
+                    current.Append(ch);
+                }
+            }
+
+            columns.Add(current.ToString());
+            return columns.ToArray();
+        }
+
         private static string ProductName(PortalQuoteRequest request)
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
@@ -267,6 +484,14 @@ namespace SWWerkplaats.Configurator.Portal
         {
             public string Name { get; set; }
             public decimal Quantity { get; set; }
+            public string Unit { get; set; }
+            public decimal UnitPrice { get; set; }
+            public decimal MarkupPercent { get; set; }
+            public string Note { get; set; }
+        }
+
+        private sealed class PricingEstimate
+        {
             public string Unit { get; set; }
             public decimal UnitPrice { get; set; }
             public decimal MarkupPercent { get; set; }

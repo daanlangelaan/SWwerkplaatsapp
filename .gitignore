@@ -5,3 +5,5 @@ obj/
 *.suo
 TestResults/
 *.log
+backups/
+config/app-settings.json

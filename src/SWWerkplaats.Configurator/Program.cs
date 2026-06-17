@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Sockets;
 using System.Windows.Forms;
 using SWWerkplaats.Configurator.Portal;
 using SWWerkplaats.Configurator.UI;
@@ -9,9 +10,10 @@ namespace SWWerkplaats.Configurator
     internal static class Program
     {
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
             PortalWebServer portal = null;
+            var portalOnly = args != null && Array.IndexOf(args, "--portal-only") >= 0;
             Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
             {
                 MessageBox.Show(e.Exception.ToString(), "SWWerkplaats.Configurator fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -27,13 +29,28 @@ namespace SWWerkplaats.Configurator
                 var portalRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PortalData");
                 try
                 {
-                    portal = new PortalWebServer(portalRoot, "http://localhost:8088/");
-                    portal.Start();
+                    if (IsLocalPortOpen(8088))
+                    {
+                        if (portalOnly) return;
+                    }
+                    else
+                    {
+                        portal = new PortalWebServer(portalRoot, "http://localhost:8088/");
+                        portal.Start();
+                        if (portalOnly)
+                        {
+                            System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
+                            return;
+                        }
+                    }
                 }
                 catch (Exception portalEx)
                 {
                     portal = null;
-                    MessageBox.Show("Webportal kon niet starten op http://localhost:8088/." + Environment.NewLine + portalEx.Message, "SW Werkplaats Portal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (portalOnly || !IsLocalPortOpen(8088))
+                    {
+                        MessageBox.Show("Webportal kon niet starten op http://localhost:8088/." + Environment.NewLine + portalEx.Message, "SW Werkplaats Portal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
 
                 Application.EnableVisualStyles();
@@ -47,6 +64,25 @@ namespace SWWerkplaats.Configurator
             finally
             {
                 if (portal != null) portal.Dispose();
+            }
+        }
+
+        private static bool IsLocalPortOpen(int port)
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect("127.0.0.1", port, null, null);
+                    var connected = result.AsyncWaitHandle.WaitOne(250);
+                    if (!connected) return false;
+                    client.EndConnect(result);
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
     }

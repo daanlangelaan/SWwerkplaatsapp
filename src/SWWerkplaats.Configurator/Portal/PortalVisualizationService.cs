@@ -92,9 +92,13 @@ namespace SWWerkplaats.Configurator.Portal
                 }
                 else
                 {
+                    var shelfPitch = Math.Min(52.0, (zoneBottom - zoneTop) / (shelves + 1));
+                    var startTop = IsShelfStartTop(request == null ? null : request.ShelfStartMode);
                     for (var s = 1; s <= shelves; s++)
                     {
-                        var y = zoneTop + (zoneBottom - zoneTop) * s / (shelves + 1);
+                        var y = startTop
+                            ? zoneTop + shelfPitch * s
+                            : zoneBottom - shelfPitch * (shelves - s + 1);
                         sb.AppendLine("<line class=\"shelf\" x1=\"" + F(x) + "\" y1=\"" + F(y) + "\" x2=\"" + F(x + w) + "\" y2=\"" + F(y) + "\"/>");
                     }
                 }
@@ -114,6 +118,12 @@ namespace SWWerkplaats.Configurator.Portal
             DrawDimension(sb, sideX, 414, sideX + sideW, 414, F0(depthMm) + " mm diep");
             sb.AppendLine("</svg>");
             return sb.ToString();
+        }
+
+        private static bool IsShelfStartTop(string value)
+        {
+            value = (value ?? "").Trim().ToLowerInvariant();
+            return value == "top" || value == "boven";
         }
 
         private static string BuildWorkbenchSvg(WorkbenchModel model, PortalQuoteRequest request)

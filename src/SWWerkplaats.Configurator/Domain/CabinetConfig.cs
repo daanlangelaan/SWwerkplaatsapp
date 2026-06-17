@@ -29,6 +29,7 @@ namespace SWWerkplaats.Configurator.Domain
         public ShelfSupportTemplate ShelfSupport { get; set; }
         public bool IncludeFullWidthTopDrawer { get; set; }
         public double FullWidthTopDrawerHeightMm { get; set; }
+        public string ShelfStartMode { get; set; }
         public bool IncludeAdjustableShelfHoles { get; set; }
         public double AdjustableShelfHoleEndMarginMm { get; set; }
         public bool AutoTabs { get; set; }

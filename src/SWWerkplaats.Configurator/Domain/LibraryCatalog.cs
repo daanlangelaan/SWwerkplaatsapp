@@ -1,8 +1,23 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Web.Script.Serialization;
+
 namespace SWWerkplaats.Configurator.Domain
 {
     public static class LibraryCatalog
     {
         public static Material[] Profiles()
+        {
+            return MergeConfiguredMaterials(DefaultProfiles(), MaterialKind.Profile);
+        }
+
+        public static Material[] Sheets()
+        {
+            return MergeConfiguredMaterials(DefaultSheets(), MaterialKind.Sheet);
+        }
+
+        private static Material[] DefaultProfiles()
         {
             return new[]
             {
@@ -13,7 +28,7 @@ namespace SWWerkplaats.Configurator.Domain
             };
         }
 
-        public static Material[] Sheets()
+        private static Material[] DefaultSheets()
         {
             return new[]
             {
@@ -21,6 +36,122 @@ namespace SWWerkplaats.Configurator.Domain
                 new Material { Id = "betonplex_12", Name = "Betonplex 12mm", Kind = MaterialKind.Sheet, ThicknessMm = 12, SheetLengthMm = 2500, SheetWidthMm = 1250 },
                 new Material { Id = "betonplex_18", Name = "Betonplex 18mm", Kind = MaterialKind.Sheet, ThicknessMm = 18, SheetLengthMm = 2500, SheetWidthMm = 1250 },
                 new Material { Id = "multiplex_15", Name = "Multiplex 15mm", Kind = MaterialKind.Sheet, ThicknessMm = 15, SheetLengthMm = 2500, SheetWidthMm = 1250 }
+            };
+        }
+
+        private static Material[] MergeConfiguredMaterials(Material[] defaults, MaterialKind kind)
+        {
+            var merged = new List<Material>();
+            var indexById = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < defaults.Length; i++)
+            {
+                merged.Add(Clone(defaults[i]));
+                if (!string.IsNullOrEmpty(defaults[i].Id)) indexById[defaults[i].Id] = i;
+            }
+
+            foreach (var material in ConfiguredMaterials(kind))
+            {
+                int existingIndex;
+                if (!string.IsNullOrEmpty(material.Id) && indexById.TryGetValue(material.Id, out existingIndex))
+                {
+                    merged[existingIndex] = material;
+                }
+                else
+                {
+                    indexById[material.Id] = merged.Count;
+                    merged.Add(material);
+                }
+            }
+
+            return merged.ToArray();
+        }
+
+        private static IEnumerable<Material> ConfiguredMaterials(MaterialKind kind)
+        {
+            var path = MaterialsConfigPath();
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) yield break;
+
+            MaterialConfig config;
+            try
+            {
+                config = new JavaScriptSerializer().Deserialize<MaterialConfig>(File.ReadAllText(path));
+            }
+            catch
+            {
+                yield break;
+            }
+
+            if (config == null || config.materials == null) yield break;
+            foreach (var item in config.materials)
+            {
+                var material = ToMaterial(item);
+                if (material != null && material.Kind == kind) yield return material;
+            }
+        }
+
+        private static string MaterialsConfigPath()
+        {
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var candidates = new[]
+            {
+                Path.Combine(baseDir, "config", "materials.json"),
+                Path.Combine(baseDir, "..", "config", "materials.json"),
+                Path.Combine(baseDir, "..", "..", "config", "materials.json")
+            };
+
+            foreach (var candidate in candidates)
+            {
+                var fullPath = Path.GetFullPath(candidate);
+                if (File.Exists(fullPath)) return fullPath;
+            }
+
+            return null;
+        }
+
+        private static Material ToMaterial(MaterialConfigItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.id)) return null;
+            MaterialKind kind;
+            if (string.Equals(item.kind, "profile", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = MaterialKind.Profile;
+            }
+            else if (string.Equals(item.kind, "sheet", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = MaterialKind.Sheet;
+            }
+            else
+            {
+                return null;
+            }
+
+            return new Material
+            {
+                Id = item.id,
+                Name = string.IsNullOrWhiteSpace(item.name) ? item.id : item.name,
+                Kind = kind,
+                ThicknessMm = item.thicknessMm,
+                WidthMm = item.widthMm,
+                HeightMm = item.heightMm,
+                StockLengthMm = item.stockLengthMm,
+                SheetLengthMm = item.sheetLengthMm,
+                SheetWidthMm = item.sheetWidthMm
+            };
+        }
+
+        private static Material Clone(Material material)
+        {
+            return new Material
+            {
+                Id = material.Id,
+                Name = material.Name,
+                Kind = material.Kind,
+                ThicknessMm = material.ThicknessMm,
+                WidthMm = material.WidthMm,
+                HeightMm = material.HeightMm,
+                StockLengthMm = material.StockLengthMm,
+                SheetLengthMm = material.SheetLengthMm,
+                SheetWidthMm = material.SheetWidthMm
             };
         }
 
@@ -178,6 +309,24 @@ namespace SWWerkplaats.Configurator.Domain
                 SpindleRpm = 18000,
                 PassDepthMm = passDepthMm
             };
+        }
+
+        private sealed class MaterialConfig
+        {
+            public MaterialConfigItem[] materials { get; set; }
+        }
+
+        private sealed class MaterialConfigItem
+        {
+            public string id { get; set; }
+            public string name { get; set; }
+            public string kind { get; set; }
+            public double thicknessMm { get; set; }
+            public double widthMm { get; set; }
+            public double heightMm { get; set; }
+            public double stockLengthMm { get; set; }
+            public double sheetLengthMm { get; set; }
+            public double sheetWidthMm { get; set; }
         }
     }
 }

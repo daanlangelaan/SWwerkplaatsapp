@@ -8,9 +8,23 @@ namespace SWWerkplaats.Configurator.Manufacturing
 {
     public sealed class NestedMach3GCodeGenerator
     {
+        private const double DefaultTabWidthMm = 8.0;
+        private const double DefaultTabHeightMm = 1.5;
+
         public string Generate(NestedStockSheet stock, ToolDefinition tool, MachineProfile machine)
         {
+            return Generate(stock, tool, machine, CamJobOptions.FromPrimaryTool(tool));
+        }
+
+        public string Generate(NestedStockSheet stock, ToolDefinition tool, MachineProfile machine, CamJobOptions jobOptions)
+        {
             var sb = new StringBuilder();
+            if (jobOptions == null)
+            {
+                jobOptions = CamJobOptions.FromPrimaryTool(tool);
+            }
+
+            tool = tool ?? jobOptions.PrimaryTool;
             sb.AppendLine("(Project: " + stock.Name + ")");
             sb.AppendLine("(Machine: " + machine.Name + ")");
             sb.AppendLine("(Voorraadplaat: " + stock.Material.Name + " " + F(stock.StockLengthMm) + " x " + F(stock.StockWidthMm) + " mm)");
@@ -22,14 +36,39 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("G40");
             sb.AppendLine("G49");
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+
+            if (jobOptions.EnablePencilMarking)
+            {
+                new PencilMarkingGCodeGenerator().Append(sb, stock, machine, jobOptions.BuildPencilMarkingOptions());
+            }
+
             sb.AppendLine();
-            sb.AppendLine("(Laad tool T1: " + tool.Name + " voor kopkamers, gaten en contouren)");
+            sb.AppendLine("(Laad tool T1: " + tool.Name + " voor groeven, kopkamers, gaten en contouren)");
+            if (jobOptions.EnablePencilMarking)
+            {
+                sb.AppendLine("(Plaats frees. Zet Z0 opnieuw op bovenzijde materiaal na de potloodmarkering.)");
+            }
+            else
+            {
+                sb.AppendLine("(Plaats frees. Zet Z0 op bovenzijde materiaal.)");
+            }
+
             sb.AppendLine("M5");
             sb.AppendLine("T1 M6");
             sb.AppendLine("M3 S" + F(tool.SpindleRpm));
 
             sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 1: alle kopkamers op geneste plaat ---)");
+            sb.AppendLine("(--- BEWERKING 1: alle positioneergroeven / pockets op geneste plaat ---)");
+            foreach (var placement in stock.Placements)
+            {
+                foreach (var pocket in placement.Part.Pockets)
+                {
+                    AddRectangularPocket(sb, placement, pocket, tool, machine);
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("(--- BEWERKING 2: alle kopkamers op geneste plaat ---)");
             foreach (var placement in stock.Placements)
             {
                 foreach (var hole in placement.Part.Holes)
@@ -39,7 +78,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 2: alle door-en-door gaten op geneste plaat ---)");
+            sb.AppendLine("(--- BEWERKING 3: alle gaten op geneste plaat ---)");
             foreach (var placement in stock.Placements)
             {
                 foreach (var hole in placement.Part.Holes)
@@ -50,7 +89,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             sb.AppendLine();
-            sb.AppendLine("(--- BEWERKING 3: buitencontouren geneste onderdelen ---)");
+            sb.AppendLine("(--- BEWERKING 4: buitencontouren geneste onderdelen ---)");
             foreach (var placement in stock.Placements)
             {
                 AddContour(sb, placement, tool, machine);
@@ -79,15 +118,26 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static void AddHole(StringBuilder sb, NestedSheetPlacement placement, SheetHole hole, double x, double y, ToolDefinition tool, MachineProfile machine)
         {
             sb.AppendLine();
-            sb.AppendLine("(" + placement.Label + " - " + hole.Name + " diameter " + F(hole.DiameterMm) + ", centrum X" + F(x) + " Y" + F(y) + ")");
-            if (hole.DiameterMm <= tool.DiameterMm * 1.15)
+            var cutDepth = HoleDepth(hole, placement.Part.Material.ThicknessMm);
+            sb.AppendLine("(" + placement.Label + " - " + hole.Name + " diameter " + F(hole.DiameterMm) + ", diepte " + F(cutDepth) + ", centrum X" + F(x) + " Y" + F(y) + ")");
+            if (hole.DiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
-                DrillPeck(sb, tool, machine, placement.Part.Material.ThicknessMm);
+                DrillPeck(sb, tool, machine, cutDepth);
                 return;
             }
 
-            CircularPocket(sb, x, y, hole.DiameterMm, placement.Part.Material.ThicknessMm, tool, machine);
+            CircularPocket(sb, x, y, hole.DiameterMm, cutDepth, tool, machine);
+        }
+
+        private static double HoleDepth(SheetHole hole, double materialThicknessMm)
+        {
+            if (hole != null && hole.DepthMm > 0)
+            {
+                return Math.Min(hole.DepthMm, Math.Max(0.1, materialThicknessMm - 0.1));
+            }
+
+            return materialThicknessMm;
         }
 
         private static void CircularPocket(StringBuilder sb, double x, double y, double diameter, double depthMm, ToolDefinition tool, MachineProfile machine)
@@ -116,6 +166,80 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
         }
 
+        private static void AddRectangularPocket(StringBuilder sb, NestedSheetPlacement placement, SheetPocket pocket, ToolDefinition tool, MachineProfile machine)
+        {
+            if (pocket == null || pocket.LengthMm <= 0 || pocket.WidthMm <= 0 || pocket.DepthMm <= 0)
+            {
+                return;
+            }
+
+            var inset = Math.Max(tool.RadiusMm, 0.1);
+            var lx0 = pocket.Xmm + inset;
+            var ly0 = pocket.Ymm + inset;
+            var lx1 = pocket.Xmm + pocket.LengthMm - inset;
+            var ly1 = pocket.Ymm + pocket.WidthMm - inset;
+            if (lx1 <= lx0 || ly1 <= ly0)
+            {
+                lx0 = pocket.Xmm + pocket.LengthMm / 2.0;
+                ly0 = pocket.Ymm + pocket.WidthMm / 2.0;
+                lx1 = lx0;
+                ly1 = ly0;
+            }
+
+            var p0 = Transform(placement, lx0, ly0);
+            var p1 = Transform(placement, lx1, ly0);
+            var p2 = Transform(placement, lx1, ly1);
+            var p3 = Transform(placement, lx0, ly1);
+            sb.AppendLine();
+            sb.AppendLine("(" + placement.Label + " - " + pocket.Name + " pocket " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(pocket.DepthMm) + ")");
+            sb.AppendLine("G0 X" + F(p0.X) + " Y" + F(p0.Y));
+            var depth = 0.0;
+            while (depth > -pocket.DepthMm)
+            {
+                depth = Math.Max(depth - tool.PassDepthMm, -pocket.DepthMm);
+                sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
+                AddPocketClearingPass(sb, placement, lx0, ly0, lx1, ly1, tool);
+            }
+
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+        }
+
+        private static void AddPocketClearingPass(StringBuilder sb, NestedSheetPlacement placement, double lx0, double ly0, double lx1, double ly1, ToolDefinition tool)
+        {
+            if (Math.Abs(lx1 - lx0) < 0.001 && Math.Abs(ly1 - ly0) < 0.001)
+            {
+                AddLocalMove(sb, placement, lx0, ly0, tool);
+                return;
+            }
+
+            var step = Math.Max(1.0, tool.DiameterMm * 0.65);
+            var y = ly0;
+            var forward = true;
+            while (true)
+            {
+                var targetX = forward ? lx1 : lx0;
+                AddLocalMove(sb, placement, targetX, y, tool);
+                if (Math.Abs(y - ly1) < 0.001) break;
+
+                var nextY = Math.Min(y + step, ly1);
+                if (Math.Abs(nextY - y) < 0.001) break;
+                AddLocalMove(sb, placement, targetX, nextY, tool);
+                y = nextY;
+                forward = !forward;
+            }
+
+            AddLocalMove(sb, placement, lx1, ly0, tool);
+            AddLocalMove(sb, placement, lx1, ly1, tool);
+            AddLocalMove(sb, placement, lx0, ly1, tool);
+            AddLocalMove(sb, placement, lx0, ly0, tool);
+        }
+
+        private static void AddLocalMove(StringBuilder sb, NestedSheetPlacement placement, double x, double y, ToolDefinition tool)
+        {
+            var p = Transform(placement, x, y);
+            sb.AppendLine("G1 X" + F(p.X) + " Y" + F(p.Y) + " F" + F(tool.FeedRateMmMin));
+        }
+
         private static void DrillPeck(StringBuilder sb, ToolDefinition tool, MachineProfile machine, double depthMm)
         {
             var depth = 0.0;
@@ -140,14 +264,64 @@ namespace SWWerkplaats.Configurator.Manufacturing
             {
                 depth = Math.Max(depth - tool.PassDepthMm, -placement.Part.Material.ThicknessMm);
                 sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
-                for (var i = 1; i < points.Count; i++)
+
+                if (placement.Part.UseTabs && Math.Abs(depth + placement.Part.Material.ThicknessMm) < 0.001)
                 {
-                    var p = Transform(placement, points[i].X, points[i].Y);
-                    sb.AppendLine("G1 X" + F(p.X) + " Y" + F(p.Y) + " F" + F(tool.FeedRateMmMin));
+                    var tabZ = -Math.Max(0, placement.Part.Material.ThicknessMm - DefaultTabHeightMm);
+                    AddTabbedPolylinePass(sb, placement, points, tool, DefaultTabWidthMm, tabZ, depth);
+                }
+                else
+                {
+                    AddPolylinePass(sb, placement, points, tool);
                 }
             }
 
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
+        }
+
+        private static void AddPolylinePass(StringBuilder sb, NestedSheetPlacement placement, List<Point2> points, ToolDefinition tool)
+        {
+            for (var i = 1; i < points.Count; i++)
+            {
+                var p = Transform(placement, points[i].X, points[i].Y);
+                sb.AppendLine("G1 X" + F(p.X) + " Y" + F(p.Y) + " F" + F(tool.FeedRateMmMin));
+            }
+        }
+
+        private static void AddTabbedPolylinePass(StringBuilder sb, NestedSheetPlacement placement, List<Point2> points, ToolDefinition tool, double tabWidth, double tabZ, double cutZ)
+        {
+            for (var i = 1; i < points.Count; i++)
+            {
+                AddTabbedSegment(sb, placement, points[i - 1], points[i], tool, tabWidth, tabZ, cutZ);
+            }
+        }
+
+        private static void AddTabbedSegment(StringBuilder sb, NestedSheetPlacement placement, Point2 start, Point2 end, ToolDefinition tool, double tabWidth, double tabZ, double cutZ)
+        {
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            if (length <= tabWidth * 3.0)
+            {
+                var shortEndPoint = Transform(placement, end.X, end.Y);
+                sb.AppendLine("G1 X" + F(shortEndPoint.X) + " Y" + F(shortEndPoint.Y) + " F" + F(tool.FeedRateMmMin));
+                return;
+            }
+
+            var half = tabWidth / 2.0;
+            var t0 = Math.Max(0, (length / 2.0 - half) / length);
+            var t1 = Math.Min(1, (length / 2.0 + half) / length);
+            var before = new Point2(start.X + dx * t0, start.Y + dy * t0);
+            var after = new Point2(start.X + dx * t1, start.Y + dy * t1);
+            var beforePoint = Transform(placement, before.X, before.Y);
+            var afterPoint = Transform(placement, after.X, after.Y);
+            var endPoint = Transform(placement, end.X, end.Y);
+
+            sb.AppendLine("G1 X" + F(beforePoint.X) + " Y" + F(beforePoint.Y) + " F" + F(tool.FeedRateMmMin));
+            sb.AppendLine("G1 Z" + F(tabZ) + " F" + F(tool.PlungeRateMmMin));
+            sb.AppendLine("G1 X" + F(afterPoint.X) + " Y" + F(afterPoint.Y) + " F" + F(tool.FeedRateMmMin));
+            sb.AppendLine("G1 Z" + F(cutZ) + " F" + F(tool.PlungeRateMmMin));
+            sb.AppendLine("G1 X" + F(endPoint.X) + " Y" + F(endPoint.Y) + " F" + F(tool.FeedRateMmMin));
         }
 
         private static List<Point2> ContourPoints(SheetPart part, double radius)
