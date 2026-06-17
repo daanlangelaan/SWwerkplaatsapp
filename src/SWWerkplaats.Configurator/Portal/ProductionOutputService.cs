@@ -77,6 +77,7 @@ namespace SWWerkplaats.Configurator.Portal
             Write(output, outputFolder, "AssemblageControle.txt", control.ExportAssemblyControl(model, request));
             Write(output, outputFolder, "AssemblageControle.csv", control.ExportAssemblyControlCsv(model, request));
             Write(output, outputFolder, "TekencontractControle.csv", control.ExportDrawingContractControl(model));
+            Write(output, outputFolder, "TekencontractValidatie.csv", control.ExportDrawingContractValidation(model));
             Write(output, outputFolder, "BOM.csv", csv.ExportBom(model));
             var pricing = new PortalPricingService();
             var price = pricing.Calculate(model, nestingPlan);

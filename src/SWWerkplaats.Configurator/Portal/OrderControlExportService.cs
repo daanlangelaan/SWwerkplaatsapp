@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Engine;
 
@@ -135,6 +136,21 @@ namespace SWWerkplaats.Configurator.Portal
                 sb.Append(contract.SheetYSign).Append(';');
                 sb.Append(E(contract.DefaultOperationFace.ToString())).Append(';');
                 sb.AppendLine(E(contract.Notes));
+            }
+
+            return sb.ToString();
+        }
+
+        public string ExportDrawingContractValidation(WorkbenchModel model)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Severity;Code;Onderdeel;Message");
+            foreach (var finding in new DrawingContractValidationService().Validate(model))
+            {
+                sb.Append(E(finding.Severity)).Append(';');
+                sb.Append(E(finding.Code)).Append(';');
+                sb.Append(E(finding.PartName)).Append(';');
+                sb.AppendLine(E(finding.Message));
             }
 
             return sb.ToString();

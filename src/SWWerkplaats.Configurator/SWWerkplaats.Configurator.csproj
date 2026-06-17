@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
+    <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />

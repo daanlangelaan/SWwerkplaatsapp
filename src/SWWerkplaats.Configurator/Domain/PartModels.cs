@@ -57,11 +57,19 @@ namespace SWWerkplaats.Configurator.Domain
 
     public sealed class SheetHole
     {
+        public SheetHole()
+        {
+            Face = OperationFace.CenterPlane;
+            DepthMode = OperationDepthMode.Through;
+        }
+
         public string Name { get; set; }
         public double Xmm { get; set; }
         public double Ymm { get; set; }
         public double DiameterMm { get; set; }
         public double DepthMm { get; set; }
+        public OperationFace Face { get; set; }
+        public OperationDepthMode DepthMode { get; set; }
         public bool Countersunk { get; set; }
         public double CountersinkDiameterMm { get; set; }
         public double CountersinkDepthMm { get; set; }
@@ -70,12 +78,20 @@ namespace SWWerkplaats.Configurator.Domain
 
     public sealed class SheetPocket
     {
+        public SheetPocket()
+        {
+            Face = OperationFace.CenterPlane;
+            DepthMode = OperationDepthMode.PocketFromFace;
+        }
+
         public string Name { get; set; }
         public double Xmm { get; set; }
         public double Ymm { get; set; }
         public double LengthMm { get; set; }
         public double WidthMm { get; set; }
         public double DepthMm { get; set; }
+        public OperationFace Face { get; set; }
+        public OperationDepthMode DepthMode { get; set; }
         public string Note { get; set; }
     }
 }

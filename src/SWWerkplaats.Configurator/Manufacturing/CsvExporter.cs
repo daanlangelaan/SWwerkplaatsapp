@@ -106,7 +106,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
         public string ExportSheetHoleList(IEnumerable<SheetPart> sheets)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Plaat;Aantal;Materiaal;Lengte_mm;Breedte_mm;Gatnaam;X_vanaf_links_mm;Y_vanaf_onder_mm;Diameter_mm;Gatdiepte_mm;Doorlopend;Kopkamer;Kopkamerdiameter_mm;Kopkamerdiepte_mm;Bevestiging;Opmerking");
+            sb.AppendLine("Plaat;Aantal;Materiaal;Lengte_mm;Breedte_mm;Gatnaam;X_vanaf_links_mm;Y_vanaf_onder_mm;Diameter_mm;Gatdiepte_mm;Doorlopend;Bewerkingsvlak;Dieptemodus;Kopkamer;Kopkamerdiameter_mm;Kopkamerdiepte_mm;Bevestiging;Opmerking");
             foreach (var sheet in sheets)
             {
                 foreach (var hole in sheet.Holes)
@@ -122,6 +122,8 @@ namespace SWWerkplaats.Configurator.Manufacturing
                     sb.Append(F(hole.DiameterMm)).Append(';');
                     sb.Append(hole.DepthMm > 0 ? F(hole.DepthMm) : "").Append(';');
                     sb.Append(hole.DepthMm > 0 ? "nee" : "ja").Append(';');
+                    sb.Append(E(hole.Face.ToString())).Append(';');
+                    sb.Append(E(hole.DepthMode.ToString())).Append(';');
                     sb.Append(hole.Countersunk ? "ja" : "nee").Append(';');
                     sb.Append(hole.Countersunk ? F(hole.CountersinkDiameterMm) : "").Append(';');
                     sb.Append(hole.Countersunk ? F(hole.CountersinkDepthMm) : "").Append(';');

@@ -554,6 +554,8 @@ namespace SWWerkplaats.Configurator.Engine
                 LengthMm = Math.Round(safeLength, 3),
                 WidthMm = Math.Round(safeWidth, 3),
                 DepthMm = Math.Round(Math.Min(depth, Math.Max(0.1, sheet.Material.ThicknessMm - 0.1)), 3),
+                Face = OperationFace.CenterPlane,
+                DepthMode = OperationDepthMode.PocketFromFace,
                 Note = note
             });
         }
@@ -646,6 +648,8 @@ namespace SWWerkplaats.Configurator.Engine
                 Ymm = y,
                 DiameterMm = diameter,
                 DepthMm = 0,
+                Face = OperationFace.CenterPlane,
+                DepthMode = OperationDepthMode.Through,
                 Countersunk = false,
                 SupportKind = supportKind
             });
@@ -854,6 +858,8 @@ namespace SWWerkplaats.Configurator.Engine
                         Ymm = Math.Round(railY, 3),
                         DiameterMm = rail.HoleDiameterMm,
                         DepthMm = BlindDepthForOutsidePanel(panel),
+                        Face = BlindFaceForOutsidePanel(panel),
+                        DepthMode = BlindDepthForOutsidePanel(panel) > 0 ? OperationDepthMode.BlindFromFace : OperationDepthMode.Through,
                         Countersunk = false,
                         SupportKind = SheetHoleSupportKind.ProfileNut
                     });
@@ -890,6 +896,8 @@ namespace SWWerkplaats.Configurator.Engine
                     Ymm = y,
                     DiameterMm = diameter,
                     DepthMm = depthMm,
+                    Face = depthMm > 0 ? BlindFaceForOutsidePanel(panel) : OperationFace.CenterPlane,
+                    DepthMode = depthMm > 0 ? OperationDepthMode.BlindFromFace : OperationDepthMode.Through,
                     Countersunk = false,
                     SupportKind = SheetHoleSupportKind.ProfileNut
                 });
@@ -949,9 +957,19 @@ namespace SWWerkplaats.Configurator.Engine
                 Ymm = Math.Round(y, 3),
                 DiameterMm = diameter,
                 DepthMm = depthMm,
+                Face = depthMm > 0 ? BlindFaceForOutsidePanel(panel) : OperationFace.CenterPlane,
+                DepthMode = depthMm > 0 ? OperationDepthMode.BlindFromFace : OperationDepthMode.Through,
                 Countersunk = false,
                 SupportKind = SheetHoleSupportKind.ProfileNut
             });
+        }
+
+        private static OperationFace BlindFaceForOutsidePanel(SheetPart panel)
+        {
+            if (panel == null || panel.Name == null) return OperationFace.CenterPlane;
+            if (panel.Name.StartsWith("Zijwand links", StringComparison.OrdinalIgnoreCase)) return OperationFace.NegativeX;
+            if (panel.Name.StartsWith("Zijwand rechts", StringComparison.OrdinalIgnoreCase)) return OperationFace.PositiveX;
+            return OperationFace.CenterPlane;
         }
 
         private static List<double> RailHolePositions(string explicitPositions, int count, double firstOffset, double spacing)
