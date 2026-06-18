@@ -137,6 +137,10 @@ namespace SWWerkplaats.Configurator.Application
             CopyTapFiles(Path.Combine(record.OutputFolder, "Nesting"), target);
             CopyIfExists(Path.Combine(record.OutputFolder, "BOM.csv"), Path.Combine(target, "BOM.csv"));
             CopyIfExists(Path.Combine(record.OutputFolder, "CAM-operaties.csv"), Path.Combine(target, "CAM-operaties.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "Plaatgaten.csv"), Path.Combine(target, "Plaatgaten.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "RailgatenControle.csv"), Path.Combine(target, "RailgatenControle.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "RailTemplateControle.csv"), Path.Combine(target, "RailTemplateControle.csv"));
+            CopyIfExists(Path.Combine(record.OutputFolder, "RailTemplateVisualisatie.svg"), Path.Combine(target, "RailTemplateVisualisatie.svg"));
             CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestPlan.csv"), Path.Combine(target, "NestPlan.csv"));
             CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestVisualisatie.svg"), Path.Combine(target, "NestVisualisatie.svg"));
             return target;

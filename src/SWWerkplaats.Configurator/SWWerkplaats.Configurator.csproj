@@ -77,6 +77,10 @@
     <Compile Include="Domain\ToolDefinition.cs" />
     <Compile Include="Domain\WorkbenchConfig.cs" />
     <Compile Include="Domain\WorkbenchModel.cs" />
+    <Compile Include="Drawing\Products\CubbyCabinet\CubbyCabinetDrawingRules.cs" />
+    <Compile Include="Drawing\SheetDrawing.cs" />
+    <Compile Include="Drawing\SheetOperations.cs" />
+    <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
     <Compile Include="Engine\CabinetEngine.cs" />
     <Compile Include="Manufacturing\CsvExporter.cs" />

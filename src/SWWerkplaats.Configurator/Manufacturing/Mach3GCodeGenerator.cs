@@ -35,7 +35,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 BeginTool(sb, 1, holeTool.Name + " voor montagegaten", holeTool);
                 foreach (var hole in part.Holes)
                 {
-                    AddHole(sb, hole, holeTool, machine, materialThicknessMm);
+                    AddHole(sb, part, hole, holeTool, machine, materialThicknessMm);
                 }
             }
 
@@ -48,7 +48,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(--- BEWERKING 2: alle positioneergroeven / pockets ---)");
             foreach (var pocket in part.Pockets)
             {
-                AddRectangularPocket(sb, pocket, contourTool, machine);
+                AddRectangularPocket(sb, part, pocket, contourTool, machine);
             }
 
             if (HasCountersinks(part))
@@ -57,7 +57,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 sb.AppendLine("(--- BEWERKING 3: alle kopkamers helix-frezen ---)");
                 foreach (var hole in part.Holes)
                 {
-                    AddCountersink(sb, hole, contourTool, machine);
+                    AddCountersink(sb, part, hole, contourTool, machine);
                 }
             }
 
@@ -100,6 +100,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Druk pas op Cycle Start als frees, spanmoer en Z0 gecontroleerd zijn.)");
             sb.AppendLine("M0");
             sb.AppendLine("T" + toolNumber + " M6");
+            sb.AppendLine("(Extra veiligheid na Cycle Start: Z opnieuw naar machine-home voordat XY naar het onderdeel beweegt)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
             sb.AppendLine("G17 G90 G94");
             sb.AppendLine("G54");
             sb.AppendLine("(Controleer tool, spanmoer en Z0 op bovenzijde materiaal voordat je start)");
@@ -119,37 +122,39 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("M30");
         }
 
-        private static void AddHole(StringBuilder sb, SheetHole hole, ToolDefinition tool, MachineProfile machine, double materialThicknessMm)
+        private static void AddHole(StringBuilder sb, SheetPart part, SheetHole hole, ToolDefinition tool, MachineProfile machine, double materialThicknessMm)
         {
             sb.AppendLine();
             var cutDepth = HoleDepth(hole, materialThicknessMm);
-            sb.AppendLine("(" + hole.Name + " diameter " + F(hole.DiameterMm) + ", diepte " + F(cutDepth) + ", centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ")");
+            var x = MirrorX(part, hole.Xmm);
+            var y = hole.Ymm;
+            sb.AppendLine("(" + hole.Name + " diameter " + F(hole.DiameterMm) + ", diepte " + F(cutDepth) + ", centrum X" + F(x) + " Y" + F(y) + ")");
 
             if (hole.DiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Start op centrum, gat bijna gelijk aan tooldiameter)");
-                sb.AppendLine("G0 X" + F(hole.Xmm) + " Y" + F(hole.Ymm));
+                sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
                 DrillPeck(sb, tool, machine, cutDepth);
                 return;
             }
 
             var radius = (hole.DiameterMm - tool.DiameterMm) / 2.0;
-            var startX = hole.Xmm + radius;
-            sb.AppendLine("(Centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ", freesbaan start X" + F(startX) + " Y" + F(hole.Ymm) + ", baanradius " + F(radius) + ")");
-            sb.AppendLine("G0 X" + F(startX) + " Y" + F(hole.Ymm));
+            var startX = x + radius;
+            sb.AppendLine("(Centrum X" + F(x) + " Y" + F(y) + ", freesbaan start X" + F(startX) + " Y" + F(y) + ", baanradius " + F(radius) + ")");
+            sb.AppendLine("G0 X" + F(startX) + " Y" + F(y));
 
             var depth = 0.0;
             while (depth > -cutDepth)
             {
                 depth = Math.Max(depth - tool.PassDepthMm, -cutDepth);
                 sb.AppendLine("G1 Z" + F(depth) + " F" + F(tool.PlungeRateMmMin));
-                sb.AppendLine("G2 X" + F(startX) + " Y" + F(hole.Ymm) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
+                sb.AppendLine("G2 X" + F(startX) + " Y" + F(y) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
             }
 
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
         }
 
-        private static void AddCountersink(StringBuilder sb, SheetHole hole, ToolDefinition tool, MachineProfile machine)
+        private static void AddCountersink(StringBuilder sb, SheetPart part, SheetHole hole, ToolDefinition tool, MachineProfile machine)
         {
             if (!hole.Countersunk || hole.CountersinkDiameterMm <= hole.DiameterMm || hole.CountersinkDepthMm <= 0)
             {
@@ -157,31 +162,33 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             sb.AppendLine();
-            sb.AppendLine("(" + hole.Name + " kopkamer diameter " + F(hole.CountersinkDiameterMm) + " diepte " + F(hole.CountersinkDepthMm) + ", centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ")");
+            var x = MirrorX(part, hole.Xmm);
+            var y = hole.Ymm;
+            sb.AppendLine("(" + hole.Name + " kopkamer diameter " + F(hole.CountersinkDiameterMm) + " diepte " + F(hole.CountersinkDepthMm) + ", centrum X" + F(x) + " Y" + F(y) + ")");
 
             if (hole.CountersinkDiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Start op centrum, kopkamer bijna gelijk aan tooldiameter)");
-                sb.AppendLine("G0 X" + F(hole.Xmm) + " Y" + F(hole.Ymm));
+                sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
                 sb.AppendLine("G1 Z" + F(-hole.CountersinkDepthMm) + " F" + F(tool.PlungeRateMmMin));
                 sb.AppendLine("G0 Z" + F(machine.SafeZmm));
                 return;
             }
 
             var radius = (hole.CountersinkDiameterMm - tool.DiameterMm) / 2.0;
-            var startX = hole.Xmm + radius;
-            sb.AppendLine("(Centrum X" + F(hole.Xmm) + " Y" + F(hole.Ymm) + ", freesbaan start X" + F(startX) + " Y" + F(hole.Ymm) + ", baanradius " + F(radius) + ")");
-            sb.AppendLine("G0 X" + F(startX) + " Y" + F(hole.Ymm));
+            var startX = x + radius;
+            sb.AppendLine("(Centrum X" + F(x) + " Y" + F(y) + ", freesbaan start X" + F(startX) + " Y" + F(y) + ", baanradius " + F(radius) + ")");
+            sb.AppendLine("G0 X" + F(startX) + " Y" + F(y));
             sb.AppendLine("G1 Z0 F" + F(tool.PlungeRateMmMin));
 
             var depth = 0.0;
             while (depth > -hole.CountersinkDepthMm)
             {
                 depth = Math.Max(depth - tool.PassDepthMm, -hole.CountersinkDepthMm);
-                sb.AppendLine("G2 X" + F(startX) + " Y" + F(hole.Ymm) + " Z" + F(depth) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
+                sb.AppendLine("G2 X" + F(startX) + " Y" + F(y) + " Z" + F(depth) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
             }
 
-            sb.AppendLine("G2 X" + F(startX) + " Y" + F(hole.Ymm) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
+            sb.AppendLine("G2 X" + F(startX) + " Y" + F(y) + " I" + F(-radius) + " J0 F" + F(tool.FeedRateMmMin));
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
         }
 
@@ -195,21 +202,22 @@ namespace SWWerkplaats.Configurator.Manufacturing
             return materialThicknessMm;
         }
 
-        private static void AddRectangularPocket(StringBuilder sb, SheetPocket pocket, ToolDefinition tool, MachineProfile machine)
+        private static void AddRectangularPocket(StringBuilder sb, SheetPart part, SheetPocket pocket, ToolDefinition tool, MachineProfile machine)
         {
             if (pocket == null || pocket.LengthMm <= 0 || pocket.WidthMm <= 0 || pocket.DepthMm <= 0)
             {
                 return;
             }
 
+            var pocketX = part != null && part.MirrorInNestingX ? part.LengthMm - pocket.Xmm - pocket.LengthMm : pocket.Xmm;
             var inset = Math.Max(tool.RadiusMm, 0.1);
-            var x0 = pocket.Xmm + inset;
+            var x0 = pocketX + inset;
             var y0 = pocket.Ymm + inset;
-            var x1 = pocket.Xmm + pocket.LengthMm - inset;
+            var x1 = pocketX + pocket.LengthMm - inset;
             var y1 = pocket.Ymm + pocket.WidthMm - inset;
             if (x1 <= x0 || y1 <= y0)
             {
-                x0 = pocket.Xmm + pocket.LengthMm / 2.0;
+                x0 = pocketX + pocket.LengthMm / 2.0;
                 y0 = pocket.Ymm + pocket.WidthMm / 2.0;
                 x1 = x0;
                 y1 = y0;
@@ -237,7 +245,29 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 return;
             }
 
-            var step = Math.Max(1.0, tool.DiameterMm * 0.65);
+            var step = Math.Max(1.0, tool.DiameterMm * 0.45);
+            var runVertical = Math.Abs(y1 - y0) > Math.Abs(x1 - x0);
+            if (runVertical)
+            {
+                var x = x0;
+                var forwardY = true;
+                while (true)
+                {
+                    var targetY = forwardY ? y1 : y0;
+                    sb.AppendLine("G1 X" + F(x) + " Y" + F(targetY) + " F" + F(tool.FeedRateMmMin));
+                    if (Math.Abs(x - x1) < 0.001) break;
+
+                    var nextX = Math.Min(x + step, x1);
+                    if (Math.Abs(nextX - x) < 0.001) break;
+                    sb.AppendLine("G1 X" + F(nextX) + " Y" + F(targetY));
+                    x = nextX;
+                    forwardY = !forwardY;
+                }
+
+                AddRectanglePass(sb, x0, y0, x1, y1, tool);
+                return;
+            }
+
             var y = y0;
             var forward = true;
             while (true)
@@ -254,6 +284,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
 
             AddRectanglePass(sb, x0, y0, x1, y1, tool);
+        }
+
+        private static double MirrorX(SheetPart part, double x)
+        {
+            return part != null && part.MirrorInNestingX ? part.LengthMm - x : x;
         }
 
         private static bool HasCountersinks(SheetPart part)
@@ -398,7 +433,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 points.Add(new Point2(x0, notchY));
                 points.Add(new Point2(notchX, notchY));
                 points.Add(new Point2(notchX, y0));
-                return points;
+                return MaybeMirrorContour(part, points);
             }
 
             if (!part.HasCornerNotches)
@@ -408,7 +443,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 points.Add(new Point2(x1, y1));
                 points.Add(new Point2(x0, y1));
                 points.Add(new Point2(x0, y0));
-                return points;
+                return MaybeMirrorContour(part, points);
             }
 
             var n = part.CornerNotchSizeMm;
@@ -429,7 +464,20 @@ namespace SWWerkplaats.Configurator.Manufacturing
             points.Add(new Point2(x0, ny0));
             points.Add(new Point2(nx0, ny0));
             points.Add(new Point2(nx0, y0));
-            return points;
+            return MaybeMirrorContour(part, points);
+        }
+
+        private static System.Collections.Generic.List<Point2> MaybeMirrorContour(SheetPart part, System.Collections.Generic.List<Point2> points)
+        {
+            if (part == null || !part.MirrorInNestingX) return points;
+
+            var mirrored = new System.Collections.Generic.List<Point2>();
+            foreach (var point in points)
+            {
+                mirrored.Add(new Point2(part.LengthMm - point.X, point.Y));
+            }
+
+            return mirrored;
         }
 
         private static void AddNotchedPass(StringBuilder sb, SheetPart part, ToolDefinition tool)

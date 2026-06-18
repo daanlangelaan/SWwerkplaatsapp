@@ -53,15 +53,16 @@ namespace SWWerkplaats.Configurator.Engine
             AddBottomReceivingGrooveToUpright(leftSide, config);
             AddRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddTopDrawerRailHolesForPanel(leftSide, config, 0, bodyHeight);
-            AddAdjustableShelfHoles(leftSide, config, shelfZoneTop);
+            AddAdjustableShelfHolesForPanel(leftSide, config, 0, bodyHeight, shelfZoneTop);
             AddBottomToUprightHoles(leftSide, config, 1);
             AddSheet(model, leftSide, -config.WidthMm / 2.0 + t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
 
             var rightSide = SidePanel("Zijwand rechts", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
+            rightSide.MirrorInNestingX = true;
             AddBottomReceivingGrooveToUpright(rightSide, config);
             AddRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddTopDrawerRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
-            AddAdjustableShelfHoles(rightSide, config, shelfZoneTop);
+            AddAdjustableShelfHolesForPanel(rightSide, config, config.UnitCount, bodyHeight, shelfZoneTop);
             AddBottomToUprightHoles(rightSide, config, config.UnitCount);
             AddSheet(model, rightSide, config.WidthMm / 2.0 - t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
 
@@ -74,7 +75,7 @@ namespace SWWerkplaats.Configurator.Engine
                 AddBottomReceivingGrooveToUpright(divider, config);
                 AddRailHolesForPanel(divider, config, i, bodyHeight);
                 AddTopDrawerRailHolesForPanel(divider, config, i, bodyHeight);
-                AddAdjustableShelfHoles(divider, config, shelfZoneTop);
+                AddAdjustableShelfHolesForPanel(divider, config, i, bodyHeight, shelfZoneTop);
                 AddBottomToUprightHoles(divider, config, i);
                 AddBottomToUprightHoles(divider, config, i + 1);
                 AddSheet(model, divider, x, dividerHeight / 2.0, backAlignmentDepth / 2.0, AssemblyOrientation.SheetVerticalZ);
@@ -171,6 +172,7 @@ namespace SWWerkplaats.Configurator.Engine
                     var drawerBottom = Sheet("Ladebodem U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, bottomWidth, bottomDepth);
                     var drawerSideLeft = Sheet("Ladezijde links U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, sideLength, frontHeight);
                     var drawerSideRight = Sheet("Ladezijde rechts U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, sideLength, frontHeight);
+                    drawerSideRight.MirrorInNestingX = true;
                     var drawerBack = Sheet("Ladeachter U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, bottomWidth, frontHeight);
                     AddDrawerBottomGroove(drawerSideLeft, drawerMaterial);
                     AddDrawerBottomGroove(drawerSideRight, drawerMaterial);
@@ -254,6 +256,7 @@ namespace SWWerkplaats.Configurator.Engine
             var drawerBottom = Sheet("Bovenlade bodem U" + unitNumber, drawerMaterial, bottomWidth, bottomDepth);
             var drawerSideLeft = Sheet("Bovenlade zijde links U" + unitNumber, drawerMaterial, sideLength, frontHeight);
             var drawerSideRight = Sheet("Bovenlade zijde rechts U" + unitNumber, drawerMaterial, sideLength, frontHeight);
+            drawerSideRight.MirrorInNestingX = true;
             var drawerBack = Sheet("Bovenlade achter U" + unitNumber, drawerMaterial, bottomWidth, frontHeight);
             AddDrawerBottomGroove(drawerSideLeft, drawerMaterial);
             AddDrawerBottomGroove(drawerSideRight, drawerMaterial);
@@ -1012,7 +1015,26 @@ namespace SWWerkplaats.Configurator.Engine
             return SheetOperations.HasHoleAt(panel, x, y, diameter);
         }
 
-        private static void AddAdjustableShelfHoles(SheetPart panel, CabinetConfig config, double usableHeight)
+        private static void AddAdjustableShelfHolesForPanel(SheetPart panel, CabinetConfig config, int boundaryIndex, double bodyHeight, double shelfZoneTop)
+        {
+            var zones = new List<VerticalZone>();
+            AddShelfHoleZoneForUnit(zones, config, boundaryIndex, shelfZoneTop);
+            AddShelfHoleZoneForUnit(zones, config, boundaryIndex + 1, shelfZoneTop);
+            AddAdjustableShelfHoles(panel, config, bodyHeight, zones);
+        }
+
+        private static void AddShelfHoleZoneForUnit(List<VerticalZone> zones, CabinetConfig config, int unitNumber, double shelfZoneTop)
+        {
+            if (zones == null || config == null || unitNumber < 1 || unitNumber > config.UnitCount) return;
+            var unit = GetUnit(config, unitNumber);
+            var zone = ShelfZoneForUnit(unit, config, shelfZoneTop);
+            if (zone.MaxMm > zone.MinMm)
+            {
+                zones.Add(zone);
+            }
+        }
+
+        private static void AddAdjustableShelfHoles(SheetPart panel, CabinetConfig config, double usableHeight, List<VerticalZone> zones)
         {
             if (!config.IncludeAdjustableShelfHoles || config.ShelfSupport == null) return;
             var support = config.ShelfSupport;
@@ -1023,11 +1045,33 @@ namespace SWWerkplaats.Configurator.Engine
             if (frontX <= 5 || backX >= panel.LengthMm - 5 || frontX >= backX) return;
 
             var index = 1;
+            var shelfHoleYs = new List<double>();
             for (var y = support.FirstHoleHeightMm; y <= endY; y += spacing)
             {
+                if (!IsInsideAnyShelfZone(y, zones)) continue;
+                shelfHoleYs.Add(y);
+            }
+
+            foreach (var y in shelfHoleYs)
+            {
                 AddShelfSupportHole(panel, frontX, y, support.HoleDiameterMm, index++, BlindDepthForOutsidePanel(panel));
+            }
+
+            foreach (var y in shelfHoleYs)
+            {
                 AddShelfSupportHole(panel, backX, y, support.HoleDiameterMm, index++, BlindDepthForOutsidePanel(panel));
             }
+        }
+
+        private static bool IsInsideAnyShelfZone(double y, List<VerticalZone> zones)
+        {
+            if (zones == null || zones.Count == 0) return true;
+            foreach (var zone in zones)
+            {
+                if (y >= zone.MinMm && y <= zone.MaxMm) return true;
+            }
+
+            return false;
         }
 
         private static void AddShelfSupportHole(SheetPart panel, double x, double y, double diameter, int index, double depthMm)

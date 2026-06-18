@@ -31,7 +31,7 @@ namespace SWWerkplaats.Configurator.Portal
             var machine = factory.DefaultMachine();
             var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
-            var nestingPlan = new SheetNestingEngine().Build(model, machine, settings.NestSpacingMm, settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
+            var nestingPlan = new SheetNestingEngine().Build(model, machine, EffectiveNestSpacing(settings), settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
             var nestingSvg = new NestingExporter().ExportSvg(nestingPlan);
             return new ProductionOutput { Model = model, NestingPlan = nestingPlan, NestingSvg = nestingSvg };
         }
@@ -46,7 +46,7 @@ namespace SWWerkplaats.Configurator.Portal
             var machine = factory.DefaultMachine();
             var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
-            var nestingPlan = new SheetNestingEngine().Build(model, machine, settings.NestSpacingMm, settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
+            var nestingPlan = new SheetNestingEngine().Build(model, machine, EffectiveNestSpacing(settings), settings.NestMarginMm, settings.NestStockLengthMm, settings.NestStockWidthMm);
 
             Directory.CreateDirectory(outputFolder);
             var output = new ProductionOutput { Model = model, NestingPlan = nestingPlan };
@@ -74,6 +74,7 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 Write(output, outputFolder, "RailgatenControle.csv", control.ExportRailHoleControl(model));
                 Write(output, outputFolder, "RailTemplateControle.csv", control.ExportUsedRailTemplates(model));
+                Write(output, outputFolder, "RailTemplateVisualisatie.svg", control.ExportUsedRailTemplatesSvg(model));
             }
 
             Write(output, outputFolder, "AssemblageControle.txt", control.ExportAssemblyControl(model, request));
@@ -134,6 +135,12 @@ namespace SWWerkplaats.Configurator.Portal
         private static bool HasProfiles(WorkbenchModel model)
         {
             return model != null && ((model.Profiles != null && model.Profiles.Count > 0) || (model.ProfileOperations != null && model.ProfileOperations.Count > 0));
+        }
+
+        private static double EffectiveNestSpacing(AppSettings settings)
+        {
+            var configured = settings == null ? 0 : settings.NestSpacingMm;
+            return Math.Max(configured, 18.0);
         }
 
         private static bool HasSheets(WorkbenchModel model)

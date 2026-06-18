@@ -123,6 +123,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Druk pas op Cycle Start als frees, spanmoer en Z0 gecontroleerd zijn.)");
             sb.AppendLine("M0");
             sb.AppendLine("T" + toolNumber + " M6");
+            sb.AppendLine("(Extra veiligheid na Cycle Start: Z opnieuw naar machine-home voordat XY naar de plaat beweegt)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
             sb.AppendLine("G17 G90 G94");
             sb.AppendLine("G54");
             sb.AppendLine("(Controleer: G54 X0/Y0 moet links-onder op de plaat liggen; Z0 op bovenzijde materiaal)");
@@ -266,11 +269,16 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 return;
             }
 
+            var overcut = OpenPocketOvercutMm(pocket, placement.Part, tool);
             var inset = Math.Max(tool.RadiusMm, 0.1);
             var lx0 = pocket.Xmm + inset;
             var ly0 = pocket.Ymm + inset;
             var lx1 = pocket.Xmm + pocket.LengthMm - inset;
             var ly1 = pocket.Ymm + pocket.WidthMm - inset;
+            if (pocket.Xmm <= 0.001) lx0 = pocket.Xmm - overcut;
+            if (pocket.Ymm <= 0.001) ly0 = pocket.Ymm - overcut;
+            if (pocket.Xmm + pocket.LengthMm >= placement.Part.LengthMm - 0.001) lx1 = pocket.Xmm + pocket.LengthMm + overcut;
+            if (pocket.Ymm + pocket.WidthMm >= placement.Part.WidthMm - 0.001) ly1 = pocket.Ymm + pocket.WidthMm + overcut;
             if (lx1 <= lx0 || ly1 <= ly0)
             {
                 lx0 = pocket.Xmm + pocket.LengthMm / 2.0;
@@ -305,7 +313,32 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 return;
             }
 
-            var step = Math.Max(1.0, tool.DiameterMm * 0.65);
+            var step = Math.Max(1.0, tool.DiameterMm * 0.45);
+            var runVertical = Math.Abs(ly1 - ly0) > Math.Abs(lx1 - lx0);
+            if (runVertical)
+            {
+                var x = lx0;
+                var forwardY = true;
+                while (true)
+                {
+                    var targetY = forwardY ? ly1 : ly0;
+                    AddLocalMove(sb, placement, x, targetY, tool);
+                    if (Math.Abs(x - lx1) < 0.001) break;
+
+                    var nextX = Math.Min(x + step, lx1);
+                    if (Math.Abs(nextX - x) < 0.001) break;
+                    AddLocalMove(sb, placement, nextX, targetY, tool);
+                    x = nextX;
+                    forwardY = !forwardY;
+                }
+
+                AddLocalMove(sb, placement, lx1, ly0, tool);
+                AddLocalMove(sb, placement, lx1, ly1, tool);
+                AddLocalMove(sb, placement, lx0, ly1, tool);
+                AddLocalMove(sb, placement, lx0, ly0, tool);
+                return;
+            }
+
             var y = ly0;
             var forward = true;
             while (true)
@@ -331,6 +364,20 @@ namespace SWWerkplaats.Configurator.Manufacturing
         {
             var p = Transform(placement, x, y);
             sb.AppendLine("G1 X" + F(p.X) + " Y" + F(p.Y) + " F" + F(tool.FeedRateMmMin));
+        }
+
+        private static double OpenPocketOvercutMm(SheetPocket pocket, SheetPart part, ToolDefinition tool)
+        {
+            if (pocket == null || part == null || tool == null) return 0;
+            if (pocket.Xmm <= 0.001 ||
+                pocket.Ymm <= 0.001 ||
+                pocket.Xmm + pocket.LengthMm >= part.LengthMm - 0.001 ||
+                pocket.Ymm + pocket.WidthMm >= part.WidthMm - 0.001)
+            {
+                return Math.Max(0, tool.RadiusMm);
+            }
+
+            return 0;
         }
 
         private static void DrillPeck(StringBuilder sb, ToolDefinition tool, MachineProfile machine, double depthMm)
@@ -471,6 +518,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         private static Point2 Transform(NestedSheetPlacement placement, double x, double y)
         {
+            if (placement.Part != null && placement.Part.MirrorInNestingX)
+            {
+                x = placement.Part.LengthMm - x;
+            }
+
             if (!placement.Rotated)
             {
                 return new Point2(placement.Xmm + x, placement.Ymm + y);

@@ -78,6 +78,40 @@ namespace SWWerkplaats.Configurator.Portal
             return sb.ToString();
         }
 
+        public string ExportUsedRailTemplatesSvg(WorkbenchModel model)
+        {
+            var usedIds = UsedRailTemplateIds(model);
+            var rails = new List<RailTemplate>();
+            foreach (var rail in LibraryCatalog.DrawerRails())
+            {
+                if (usedIds.Contains(rail.Id)) rails.Add(rail);
+            }
+
+            var width = 980.0;
+            var rowHeight = 150.0;
+            var height = Math.Max(220.0, 70.0 + rails.Count * rowHeight);
+            var sb = new StringBuilder();
+            sb.AppendLine("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + F(width) + "\" height=\"" + F(height) + "\" viewBox=\"0 0 " + F(width) + " " + F(height) + "\">");
+            sb.AppendLine("<style>text{font-family:Arial,sans-serif;fill:#111827}.title{font-size:24px;font-weight:700}.sub{font-size:13px;fill:#667085}.rail{fill:#eef2f7;stroke:#344054;stroke-width:1.4}.cab{fill:#dbeafe;stroke:#1d4ed8;stroke-width:1.2}.drawer{fill:#fee2e2;stroke:#b42318;stroke-width:1.2}.dim{font-size:12px;fill:#344054}.label{font-size:14px;font-weight:700}</style>");
+            sb.AppendLine("<rect x=\"0\" y=\"0\" width=\"" + F(width) + "\" height=\"" + F(height) + "\" fill=\"#fff\"/>");
+            sb.AppendLine("<text class=\"title\" x=\"32\" y=\"38\">Railtemplate controle</text>");
+            sb.AppendLine("<text class=\"sub\" x=\"32\" y=\"58\">Blauw = kastzijde gaten, rood = ladezijde gaten. X-posities komen uit de rail-library.</text>");
+            var y = 92.0;
+            foreach (var rail in rails)
+            {
+                DrawRailTemplate(sb, rail, 56, y, 850, 76);
+                y += rowHeight;
+            }
+
+            if (rails.Count == 0)
+            {
+                sb.AppendLine("<text class=\"sub\" x=\"32\" y=\"100\">Geen gebruikte railtemplates gevonden.</text>");
+            }
+
+            sb.AppendLine("</svg>");
+            return sb.ToString();
+        }
+
         public string ExportAssemblyControl(WorkbenchModel model, PortalQuoteRequest request)
         {
             var findings = Validate(model, request);
@@ -343,6 +377,28 @@ namespace SWWerkplaats.Configurator.Portal
             return string.Join(";", values.ToArray());
         }
 
+        private static void DrawRailTemplate(StringBuilder sb, RailTemplate rail, double x, double y, double maxWidth, double railHeight)
+        {
+            var scale = maxWidth / Math.Max(1.0, rail.LengthMm);
+            var w = rail.LengthMm * scale;
+            sb.AppendLine("<text class=\"label\" x=\"" + F(x) + "\" y=\"" + F(y - 14) + "\">" + Xml(rail.Name + " (" + F(rail.LengthMm) + " mm)") + "</text>");
+            sb.AppendLine("<rect class=\"rail\" x=\"" + F(x) + "\" y=\"" + F(y) + "\" width=\"" + F(w) + "\" height=\"" + F(railHeight) + "\" rx=\"3\"/>");
+            DrawRailHoleRow(sb, RailPositions(rail.CabinetHolePositionsMm, rail.CabinetHoleCount, rail.CabinetFirstHoleOffsetMm, rail.CabinetHoleSpacingMm), rail.CabinetHoleDiameterMm, rail.CabinetVerticalOffsetMm, x, y, scale, railHeight, "cab", "Kastzijde");
+            DrawRailHoleRow(sb, RailPositions(rail.DrawerHolePositionsMm, rail.DrawerHoleCount, rail.DrawerFirstHoleOffsetMm, rail.DrawerHoleSpacingMm), rail.DrawerHoleDiameterMm, rail.DrawerVerticalOffsetMm, x, y + railHeight + 18, scale, railHeight * 0.35, "drawer", "Ladezijde");
+            sb.AppendLine("<text class=\"dim\" x=\"" + F(x) + "\" y=\"" + F(y + railHeight + 104) + "\">Bevestiging: " + Xml(rail.FastenerName) + "</text>");
+        }
+
+        private static void DrawRailHoleRow(StringBuilder sb, List<double> positions, double diameter, double verticalOffset, double x, double y, double scale, double rowHeight, string cssClass, string label)
+        {
+            sb.AppendLine("<text class=\"dim\" x=\"" + F(x) + "\" y=\"" + F(y + rowHeight + 16) + "\">" + Xml(label + ": diameter " + F(diameter) + " mm, Y-offset " + F(verticalOffset) + " mm, X " + JoinPositions(positions)) + "</text>");
+            foreach (var position in positions)
+            {
+                var cx = x + position * scale;
+                var cy = y + Math.Max(8, Math.Min(rowHeight - 8, verticalOffset));
+                sb.AppendLine("<circle class=\"" + cssClass + "\" cx=\"" + F(cx) + "\" cy=\"" + F(cy) + "\" r=\"5\"><title>" + Xml(label + " X" + F(position) + " diameter " + F(diameter)) + "</title></circle>");
+            }
+        }
+
         private static bool StartsWith(string value, string prefix)
         {
             return value != null && value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
@@ -357,6 +413,12 @@ namespace SWWerkplaats.Configurator.Portal
         private static string F(double value)
         {
             return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string Xml(string value)
+        {
+            if (value == null) return "";
+            return value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
 
         private sealed class AssemblyFinding

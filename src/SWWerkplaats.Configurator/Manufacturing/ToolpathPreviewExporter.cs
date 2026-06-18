@@ -186,6 +186,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         private static Point2 Transform(NestedSheetPlacement placement, double x, double y)
         {
+            if (placement.Part != null && placement.Part.MirrorInNestingX)
+            {
+                x = placement.Part.LengthMm - x;
+            }
+
             if (!placement.Rotated)
             {
                 return new Point2(placement.Xmm + x, placement.Ymm + y);

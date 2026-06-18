@@ -14,7 +14,8 @@ namespace SWWerkplaats.Configurator.Drawing
                 LengthMm = Math.Round(length, 2),
                 WidthMm = Math.Round(width, 2),
                 Quantity = 1,
-                UseTabs = false
+                UseTabs = false,
+                MirrorInNestingX = false
             };
         }
 

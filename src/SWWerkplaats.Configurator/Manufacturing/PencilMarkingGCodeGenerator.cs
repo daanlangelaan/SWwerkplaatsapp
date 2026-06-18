@@ -102,6 +102,9 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine("(Druk pas op Cycle Start als potlood, houder en Z0 gecontroleerd zijn.)");
             sb.AppendLine("M0");
             sb.AppendLine("T" + options.ToolNumber + " M6");
+            sb.AppendLine("(Extra veiligheid na Cycle Start: Z opnieuw naar machine-home voordat XY naar de plaat beweegt)");
+            sb.AppendLine("G28 G91 Z0.");
+            sb.AppendLine("G90");
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
 
             foreach (var placement in stock.Placements)
@@ -235,6 +238,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         private static Point2 Transform(NestedSheetPlacement placement, double x, double y)
         {
+            if (placement.Part != null && placement.Part.MirrorInNestingX)
+            {
+                x = placement.Part.LengthMm - x;
+            }
+
             if (!placement.Rotated)
             {
                 return new Point2(placement.Xmm + x, placement.Ymm + y);

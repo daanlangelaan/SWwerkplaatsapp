@@ -45,6 +45,7 @@ namespace SWWerkplaats.Configurator.Domain
         public bool HasToeKickNotch { get; set; }
         public double ToeKickDepthMm { get; set; }
         public double ToeKickHeightMm { get; set; }
+        public bool MirrorInNestingX { get; set; }
         public List<SheetHole> Holes { get; private set; }
         public List<SheetPocket> Pockets { get; private set; }
 
