@@ -691,7 +691,7 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double DrawerGrooveBottomOffsetMm()
         {
-            return 2.0;
+            return 0.0;
         }
 
         private static double BlindOutsidePanelHoleDepthMm()
