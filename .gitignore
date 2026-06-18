@@ -1,9 +1,22 @@
-bin/
-obj/
+# Build output
+[Bb]in/
+[Oo]bj/
+src/**/[Bb]in/
+src/**/[Oo]bj/
+
+# IDE / local user state
 .vs/
+.vscode/
 *.user
 *.suo
+
+# Test and logs
 TestResults/
 *.log
+
+# Local generated production data
 backups/
+src/**/PortalData/
+
+# Machine-specific local settings
 config/app-settings.json

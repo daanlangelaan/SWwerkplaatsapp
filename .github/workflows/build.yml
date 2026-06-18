@@ -1,0 +1,16 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build configurator
+        run: dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj --configuration Debug
