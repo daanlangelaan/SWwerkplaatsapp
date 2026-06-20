@@ -447,6 +447,13 @@ namespace SWWerkplaats.Configurator.Engine
             return new HorizontalFit((partLeftX + partRightX) / 2.0, Math.Max(20, partRightX - partLeftX));
         }
 
+        private static double Clamp(double value, double min, double max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return value;
+        }
+
         private static void AddBottomReceivingGrooveToBackPanel(SheetPart backPanel, CabinetConfig config, double bodyHeight)
         {
             if (backPanel == null || config == null) return;
@@ -568,6 +575,8 @@ namespace SWWerkplaats.Configurator.Engine
             var diameter = AssemblyHoleDiameter(config);
             var unitWidth = config.WidthMm / config.UnitCount;
             var sideT = config.CarcassMaterial == null ? 18.0 : config.CarcassMaterial.ThicknessMm;
+            var grooveWidth = Math.Min(plinth.LengthMm - 2.0, sideT + AlignmentGrooveClearanceMm());
+            var grooveDepth = AlignmentGrooveDepthMm(plinth);
             var ys = PatternPositions(plinth.WidthMm, 35, 150, 2);
 
             for (var i = 0; i <= config.UnitCount; i++)
@@ -575,6 +584,17 @@ namespace SWWerkplaats.Configurator.Engine
                 var x = unitWidth * i;
                 if (i == 0) x = sideT / 2.0;
                 else if (i == config.UnitCount) x = config.WidthMm - sideT / 2.0;
+                AddPocket(
+                    plinth,
+                    "Plint staander-positioneergroef " + i.ToString(CultureInfo.InvariantCulture),
+                    Clamp(x - grooveWidth / 2.0, 0, Math.Max(0, plinth.LengthMm - grooveWidth)),
+                    0,
+                    grooveWidth,
+                    plinth.WidthMm,
+                    grooveDepth,
+                    OperationFace.PositiveZ,
+                    "3mm verdiepte groef aan achterzijde plint voor front-uitlijning van zijwand/tussenschot");
+
                 foreach (var y in ys)
                 {
                     AddUniqueCabinetHole(plinth, x, y, diameter, "plint naar staander " + i.ToString(CultureInfo.InvariantCulture));

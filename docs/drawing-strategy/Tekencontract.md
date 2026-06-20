@@ -65,6 +65,7 @@ Cabinet-bodemgroeven:
 - Tussenschotten krijgen geen bodemplaat-groef. Een tussenschot zou bij meerdere units anders aan twee kanten gefreesd moeten worden, en tweezijdig frezen is geen toegestane productieroute.
 - Middenbodems worden uitgelijnd via de achterwandgroef en rusten op de plintconstructie; montagegaten in tussenschotten mogen wel blijven.
 - Bodemplaten worden per unit op maat gezet: alleen aan een buitenwandzijde steekt de plaat in de groef, aan tussenschotzijden blijft de bodemplaat binnen de vrije opening.
+- De voorplint krijgt aan de achterzijde positioneergroeven voor linker zijwand, tussenschotten en rechter zijwand. De achterwand lijnt achter uit; de plint lijnt de voorkant uit.
 
 ## 3D preview contract
 
