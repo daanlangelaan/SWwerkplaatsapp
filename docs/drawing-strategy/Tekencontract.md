@@ -59,6 +59,12 @@ Gebruik deze taal in code en documentatie:
 
 Voor cabinet-zijwanden is dit belangrijk: linker zijwand, rechter zijwand en tussenschotten kunnen aan verschillende fysieke zijden railgaten of blinde gaten krijgen.
 
+Cabinet-bodemgroeven:
+
+- Alleen de buitenste zijwanden krijgen een gefreesde `Bodem positioneergroef`.
+- Tussenschotten krijgen geen bodemplaat-groef. Een tussenschot zou bij meerdere units anders aan twee kanten gefreesd moeten worden, en tweezijdig frezen is geen toegestane productieroute.
+- Middenbodems worden uitgelijnd via de achterwandgroef en rusten op de plintconstructie; montagegaten in tussenschotten mogen wel blijven.
+
 ## 3D preview contract
 
 De preview gebruikt dezelfde productiedata:

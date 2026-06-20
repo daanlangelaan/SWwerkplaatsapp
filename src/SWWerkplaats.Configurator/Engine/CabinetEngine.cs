@@ -397,6 +397,8 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddBottomReceivingGrooveToUpright(SheetPart upright, CabinetConfig config)
         {
             if (upright == null || config == null) return;
+            if (IsInternalDivider(upright)) return;
+
             var materialThickness = MaterialThickness(config.CarcassMaterial);
             var grooveHeight = Math.Min(upright.WidthMm - 2.0, materialThickness + AlignmentGrooveClearanceMm());
             if (grooveHeight <= 0) return;
@@ -417,6 +419,13 @@ namespace SWWerkplaats.Configurator.Engine
                 AlignmentGrooveDepthMm(upright),
                 InnerPocketFaceForVerticalZPanel(upright),
                 "3mm verdiepte groef zodat bodemplaat in staander valt en niet hoeft uit te lijnen");
+        }
+
+        private static bool IsInternalDivider(SheetPart panel)
+        {
+            return panel != null
+                && panel.Name != null
+                && panel.Name.StartsWith("Tussenschot ", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void AddBottomReceivingGrooveToBackPanel(SheetPart backPanel, CabinetConfig config, double bodyHeight)
