@@ -14,9 +14,9 @@ namespace SWWerkplaats.Configurator.Drawing.Products.CubbyCabinet
             return Math.Max(1, rows) * cellHeight + (Math.Max(1, rows) + 1) * materialThickness;
         }
 
-        public static double OuterDepth(double cellDepth, double materialThickness)
+        public static double OuterDepth(double cellDepth, double frontInset, double materialThickness)
         {
-            return Math.Max(1, cellDepth) + Math.Max(1, materialThickness);
+            return Math.Max(1, cellDepth) + Math.Max(0, frontInset) + Math.Max(1, materialThickness);
         }
 
         public static double CellWidthFromOuter(int columns, double outerWidth, double materialThickness)
@@ -31,9 +31,9 @@ namespace SWWerkplaats.Configurator.Drawing.Products.CubbyCabinet
             return Math.Max(40, (outerHeight - (count + 1) * materialThickness) / count);
         }
 
-        public static double CellDepthFromOuter(double outerDepth, double materialThickness)
+        public static double CellDepthFromOuter(double outerDepth, double frontInset, double materialThickness)
         {
-            return Math.Max(40, outerDepth - materialThickness);
+            return Math.Max(40, outerDepth - Math.Max(0, frontInset) - materialThickness);
         }
 
         public static double CombSlotDepth(double materialThickness)

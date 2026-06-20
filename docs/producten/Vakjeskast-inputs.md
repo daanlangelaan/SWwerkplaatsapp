@@ -12,6 +12,7 @@ De klant kiest:
 - vakhoogte;
 - vakken breedte;
 - vakken hoogte;
+- vakjes verdiept vanaf de voorkant;
 - achterwand ja/nee.
 
 De vakmaten plus de plaatdikte bepalen de buitenmaat van de kast. De klant stuurt dus primair op bruikbare binnenvakken, niet op totale kastmaat.
@@ -20,7 +21,9 @@ Voor gelijke vakken:
 
 - buitenbreedte = `vakkenBreedte * vakbreedte + (vakkenBreedte + 1) * plaatdikte`;
 - buitenhoogte = `vakkenHoogte * vakhoogte + (vakkenHoogte + 1) * plaatdikte`;
-- buitendiepte = `vakdiepte + plaatdikte`.
+- buitendiepte = `vakdiepte + vakjesVerdiept + plaatdikte`.
+
+`Vakjes verdiept mm` is de afstand vanaf de voorkant van de buitenkast tot de voorkant van het interne vakjesraster. Het is dus geen offset vanaf de achterwand. De ingevulde `vakdiepte` blijft de bruikbare diepte van het vak.
 
 Let op: `Vakken breedte` en `Vakken hoogte` tellen open vakken, niet het aantal losse kamplaten.
 
@@ -37,7 +40,7 @@ De vakjes worden als kamconstructie opgebouwd:
 - verticale staander-kammen en horizontale ligger-kammen schuiven in elkaar;
 - kamuitsparingen worden door-en-door gefreesd en in de 3D-view als open uitsparingen weergegeven;
 - voorbeeld: 4 vakken hoog en 3 vakken breed bestaat uit 2 interne staander-kammen en 3 interne ligger-kammen, plus de buitenkast;
-- de vakjesconstructie ligt verdiept ten opzichte van top, bodem en zijkanten van de buitenkast.
+- de vakjesconstructie ligt verdiept ten opzichte van de voorkant van top, bodem en zijkanten van de buitenkast.
 
 ## Achterwand
 
@@ -67,7 +70,7 @@ Assemblage-afspraak:
 
 Huidige basis:
 
-- vakjesconstructie krijgt een instelbare verdieping via `Vakjes verdiept mm`;
+- vakjesconstructie krijgt een instelbare frontverdieping via `Vakjes verdiept mm`;
 - kamuitsparingen krijgen clearance via productregels;
 - achterwandgroeven en montagegaten worden door de engine gezet;
 - nesting toont door-en-door kamuitsparingen als witte/cutout vlakken.

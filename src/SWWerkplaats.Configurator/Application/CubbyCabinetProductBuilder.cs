@@ -28,6 +28,7 @@ namespace SWWerkplaats.Configurator.Application
                         ProductDefaults.DefaultSheetThicknessMm),
                     DefaultDepthMm = CubbyCabinetDrawingRules.OuterDepth(
                         ProductDefaults.CubbyCabinetCellDepthMm,
+                        ProductDefaults.CubbyCabinetGridInsetMm,
                         ProductDefaults.DefaultSheetThicknessMm),
                     DefaultHeightMm = CubbyCabinetDrawingRules.OuterHeight(
                         ProductDefaults.CubbyCabinetRowCount,
@@ -61,6 +62,7 @@ namespace SWWerkplaats.Configurator.Application
             var materialThickness = carcass == null || carcass.ThicknessMm <= 0 ? ProductDefaults.DefaultSheetThicknessMm : carcass.ThicknessMm;
             var columnCount = Count(request.CubbyColumnCount, Count(request.UnitCount, ProductDefaults.CubbyCabinetColumnCount));
             var rowCount = Count(request.CubbyRowCount, Count(request.DefaultShelfCount, ProductDefaults.CubbyCabinetRowCount));
+            var gridInset = Dimension(request.CubbyGridInsetMm, ProductDefaults.CubbyCabinetGridInsetMm);
             var requestedOuterWidth = Dimension(request.WidthMm, 0);
             var requestedOuterDepth = Dimension(request.DepthMm, 0);
             var requestedOuterHeight = Dimension(request.HeightMm, 0);
@@ -69,13 +71,13 @@ namespace SWWerkplaats.Configurator.Application
                 requestedOuterWidth > 0 ? CubbyCabinetDrawingRules.CellWidthFromOuter(columnCount, requestedOuterWidth, materialThickness) : ProductDefaults.CubbyCabinetCellWidthMm);
             var cellDepth = Dimension(
                 request.CubbyCellDepthMm,
-                requestedOuterDepth > 0 ? CubbyCabinetDrawingRules.CellDepthFromOuter(requestedOuterDepth, materialThickness) : ProductDefaults.CubbyCabinetCellDepthMm);
+                requestedOuterDepth > 0 ? CubbyCabinetDrawingRules.CellDepthFromOuter(requestedOuterDepth, gridInset, materialThickness) : ProductDefaults.CubbyCabinetCellDepthMm);
             var cellHeight = Dimension(
                 request.CubbyCellHeightMm,
                 requestedOuterHeight > 0 ? CubbyCabinetDrawingRules.CellHeightFromOuter(rowCount, requestedOuterHeight, materialThickness) : ProductDefaults.CubbyCabinetCellHeightMm);
             var width = CubbyCabinetDrawingRules.OuterWidth(columnCount, cellWidth, materialThickness);
             var height = CubbyCabinetDrawingRules.OuterHeight(rowCount, cellHeight, materialThickness);
-            var depth = CubbyCabinetDrawingRules.OuterDepth(cellDepth, materialThickness);
+            var depth = CubbyCabinetDrawingRules.OuterDepth(cellDepth, gridInset, materialThickness);
 
             return new CubbyCabinetConfig
             {
@@ -88,7 +90,7 @@ namespace SWWerkplaats.Configurator.Application
                 CellHeightMm = cellHeight,
                 ColumnCount = columnCount,
                 RowCount = rowCount,
-                GridInsetMm = Dimension(request.CubbyGridInsetMm, ProductDefaults.CubbyCabinetGridInsetMm),
+                GridInsetMm = gridInset,
                 CombSlotClearanceMm = Dimension(request.CubbyCombSlotClearanceMm, ProductDefaults.CubbyCabinetCombSlotClearanceMm),
                 BackGrooveDepthMm = Dimension(request.CubbyBackGrooveDepthMm, ProductDefaults.CubbyCabinetBackGrooveDepthMm),
                 BackGrooveClearanceMm = ProductDefaults.CubbyCabinetBackGrooveClearanceMm,

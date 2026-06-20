@@ -67,6 +67,12 @@ Cabinet-bodemgroeven:
 - Bodemplaten worden per unit op maat gezet: alleen aan een buitenwandzijde steekt de plaat in de groef, aan tussenschotzijden blijft de bodemplaat binnen de vrije opening.
 - De voorplint krijgt aan de achterzijde positioneergroeven voor linker zijwand, tussenschotten en rechter zijwand. De achterwand lijnt achter uit; de plint lijnt de voorkant uit.
 
+Vakjeskast-frontverdieping:
+
+- `Vakjes verdiept mm` wordt gemeten vanaf de voorkant van de buitenkast, niet vanaf de achterwand.
+- De buitendiepte van de vakjeskast is `vakdiepte + vakjesVerdiept + plaatdikte`.
+- Het interne kamraster start op `voorkant buitenkast + vakjesVerdiept` en loopt daarna over de ingevulde vakdiepte richting achterwand.
+
 ## 3D preview contract
 
 De preview gebruikt dezelfde productiedata:
