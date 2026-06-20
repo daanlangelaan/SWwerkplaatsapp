@@ -29,8 +29,8 @@ namespace SWWerkplaats.Configurator.Engine
             var unitWidth = config.WidthMm / config.UnitCount;
             var innerDepth = config.DepthMm - t;
             var bayFitClearance = Math.Min(Math.Max(0, config.ShelfClearanceMm), 1.0);
-            var bayWidth = Math.Max(20, unitWidth - t - 2.0 * bayFitClearance);
             var clearBottomBayWidth = Math.Max(20, (config.WidthMm - (config.UnitCount + 1.0) * t) / config.UnitCount);
+            var bayWidth = Math.Max(20, clearBottomBayWidth - 2.0 * bayFitClearance);
             var frontZ = -config.DepthMm / 2.0;
             var backZ = config.DepthMm / 2.0;
             var backThickness = config.IncludeBackPanel ? back.ThicknessMm : 0;
