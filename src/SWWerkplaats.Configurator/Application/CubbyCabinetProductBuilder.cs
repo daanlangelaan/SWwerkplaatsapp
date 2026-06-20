@@ -26,7 +26,9 @@ namespace SWWerkplaats.Configurator.Application
                         ProductDefaults.CubbyCabinetColumnCount,
                         ProductDefaults.CubbyCabinetCellWidthMm,
                         ProductDefaults.DefaultSheetThicknessMm),
-                    DefaultDepthMm = ProductDefaults.CubbyCabinetCellDepthMm,
+                    DefaultDepthMm = CubbyCabinetDrawingRules.OuterDepth(
+                        ProductDefaults.CubbyCabinetCellDepthMm,
+                        ProductDefaults.DefaultSheetThicknessMm),
                     DefaultHeightMm = CubbyCabinetDrawingRules.OuterHeight(
                         ProductDefaults.CubbyCabinetRowCount,
                         ProductDefaults.CubbyCabinetCellHeightMm,
@@ -60,11 +62,14 @@ namespace SWWerkplaats.Configurator.Application
             var columnCount = Count(request.CubbyColumnCount, Count(request.UnitCount, ProductDefaults.CubbyCabinetColumnCount));
             var rowCount = Count(request.CubbyRowCount, Count(request.DefaultShelfCount, ProductDefaults.CubbyCabinetRowCount));
             var requestedOuterWidth = Dimension(request.WidthMm, 0);
+            var requestedOuterDepth = Dimension(request.DepthMm, 0);
             var requestedOuterHeight = Dimension(request.HeightMm, 0);
             var cellWidth = Dimension(
                 request.CubbyCellWidthMm,
                 requestedOuterWidth > 0 ? CubbyCabinetDrawingRules.CellWidthFromOuter(columnCount, requestedOuterWidth, materialThickness) : ProductDefaults.CubbyCabinetCellWidthMm);
-            var cellDepth = Dimension(request.CubbyCellDepthMm, Dimension(request.DepthMm, ProductDefaults.CubbyCabinetCellDepthMm));
+            var cellDepth = Dimension(
+                request.CubbyCellDepthMm,
+                requestedOuterDepth > 0 ? CubbyCabinetDrawingRules.CellDepthFromOuter(requestedOuterDepth, materialThickness) : ProductDefaults.CubbyCabinetCellDepthMm);
             var cellHeight = Dimension(
                 request.CubbyCellHeightMm,
                 requestedOuterHeight > 0 ? CubbyCabinetDrawingRules.CellHeightFromOuter(rowCount, requestedOuterHeight, materialThickness) : ProductDefaults.CubbyCabinetCellHeightMm);
