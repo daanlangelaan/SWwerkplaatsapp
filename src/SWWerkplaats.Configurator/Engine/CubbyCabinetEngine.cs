@@ -70,8 +70,8 @@ namespace SWWerkplaats.Configurator.Engine
                 }
 
                 AddBackEdgeFastenerHoles(panel, config, gridDepth, gridHeight);
-                var x = -gridWidth / 2.0 + column * (config.CellWidthMm + t);
-                AddSheet(model, panel, x, config.HeightMm / 2.0, -config.GridInsetMm / 2.0, AssemblyOrientation.SheetVerticalZ);
+                var x = -config.WidthMm / 2.0 + t + column * config.CellWidthMm + (column - 0.5) * t;
+                AddSheet(model, panel, x, config.HeightMm / 2.0, config.GridInsetMm / 2.0, AssemblyOrientation.SheetVerticalZ);
             }
         }
 
@@ -83,16 +83,25 @@ namespace SWWerkplaats.Configurator.Engine
                 for (var column = 1; column < config.ColumnCount; column++)
                 {
                     var x = column * config.CellWidthMm + (column - 0.5) * t - slotWidth / 2.0;
-                    AddPocket(panel, "Halfhout sleuf staander C" + column.ToString(CultureInfo.InvariantCulture), x, 0, slotWidth, Math.Max(10, gridDepth / 2.0), slotDepth, OperationFace.CenterPlane, "Sleuf voor verticale kam; definitieve doorsteekstrategie apart controleren.");
+                    AddPocket(panel, "Halfhout sleuf staander C" + column.ToString(CultureInfo.InvariantCulture), x, Math.Max(0, gridDepth / 2.0), slotWidth, Math.Max(10, gridDepth / 2.0), slotDepth, OperationFace.CenterPlane, "Sleuf voor verticale kam; grijpt vanaf tegengestelde zijde in de staander.");
                 }
 
                 var y = t + row * config.CellHeightMm + (row - 0.5) * t;
-                AddSheet(model, panel, 0, y, -config.GridInsetMm / 2.0, AssemblyOrientation.SheetHorizontal);
+                AddSheet(model, panel, 0, y, config.GridInsetMm / 2.0, AssemblyOrientation.SheetHorizontal);
             }
         }
 
         private static void AddBackPanelSegments(WorkbenchModel model, CubbyCabinetConfig config, Material backMaterial, double t, double slotWidth, double grooveDepth, double backT)
         {
+            if (FitsOnSingleSheet(backMaterial, config.WidthMm, config.HeightMm))
+            {
+                var back = Sheet("Vakjeskast achterwand", backMaterial, config.WidthMm, config.HeightMm);
+                AddBackPanelGrooves(back, config, t, slotWidth, grooveDepth);
+                AddBackPanelFasteners(back, config, t);
+                AddSheet(model, back, 0, config.HeightMm / 2.0, config.DepthMm / 2.0 + backT / 2.0, AssemblyOrientation.SheetVerticalX);
+                return;
+            }
+
             var segmentWidth = config.WidthMm / config.ColumnCount;
             for (var column = 0; column < config.ColumnCount; column++)
             {
@@ -101,6 +110,55 @@ namespace SWWerkplaats.Configurator.Engine
                 AddBackPanelSegmentFasteners(segment, config, column, t);
                 var x = -config.WidthMm / 2.0 + segmentWidth * (column + 0.5);
                 AddSheet(model, segment, x, config.HeightMm / 2.0, config.DepthMm / 2.0 + backT / 2.0, AssemblyOrientation.SheetVerticalX);
+            }
+        }
+
+        private static bool FitsOnSingleSheet(Material material, double length, double width)
+        {
+            if (material == null || material.SheetLengthMm <= 0 || material.SheetWidthMm <= 0) return true;
+            return (length <= material.SheetLengthMm && width <= material.SheetWidthMm)
+                || (width <= material.SheetLengthMm && length <= material.SheetWidthMm);
+        }
+
+        private static void AddBackPanelGrooves(SheetPart back, CubbyCabinetConfig config, double t, double slotWidth, double grooveDepth)
+        {
+            var grooveWidth = t + Math.Max(0, config.BackGrooveClearanceMm);
+            AddPocket(back, "Linker zijwandgroef", 0, 0, grooveWidth, back.WidthMm, grooveDepth, OperationFace.NegativeZ, "Verdiepte groef voor linker zijwand.");
+            AddPocket(back, "Rechter zijwandgroef", back.LengthMm - grooveWidth, 0, grooveWidth, back.WidthMm, grooveDepth, OperationFace.NegativeZ, "Verdiepte groef voor rechter zijwand.");
+            AddPocket(back, "Bodemgroef", 0, 0, back.LengthMm, grooveWidth, grooveDepth, OperationFace.NegativeZ, "Verdiepte groef voor bodemplaat.");
+            AddPocket(back, "Bovenplaatgroef", 0, back.WidthMm - grooveWidth, back.LengthMm, grooveWidth, grooveDepth, OperationFace.NegativeZ, "Verdiepte groef voor bovenplaat.");
+
+            for (var column = 1; column < config.ColumnCount; column++)
+            {
+                var x = t + column * config.CellWidthMm + (column - 0.5) * t - slotWidth / 2.0;
+                AddPocket(back, "Staander achterwandgroef " + column.ToString(CultureInfo.InvariantCulture), x, t, slotWidth, Math.Max(10, back.WidthMm - 2.0 * t), grooveDepth, OperationFace.NegativeZ, "Positioneergroef voor staander kam.");
+            }
+
+            for (var row = 1; row < config.RowCount; row++)
+            {
+                var y = t + row * config.CellHeightMm + (row - 0.5) * t - slotWidth / 2.0;
+                AddPocket(back, "Ligger achterwandgroef " + row.ToString(CultureInfo.InvariantCulture), t, y, Math.Max(10, back.LengthMm - 2.0 * t), slotWidth, grooveDepth, OperationFace.NegativeZ, "Positioneergroef voor ligger kam.");
+            }
+        }
+
+        private static void AddBackPanelFasteners(SheetPart back, CubbyCabinetConfig config, double t)
+        {
+            var diameter = AssemblyHoleDiameter(config);
+            AddMountingLine(back, 45, t / 2.0, back.LengthMm - 45, t / 2.0, diameter, config.BackFastenerMaxSpacingMm, "Achterwand naar bodemplaat");
+            AddMountingLine(back, 45, back.WidthMm - t / 2.0, back.LengthMm - 45, back.WidthMm - t / 2.0, diameter, config.BackFastenerMaxSpacingMm, "Achterwand naar bovenplaat");
+            AddMountingLine(back, t / 2.0, 45, t / 2.0, back.WidthMm - 45, diameter, config.BackFastenerMaxSpacingMm, "Achterwand naar linker zijwand");
+            AddMountingLine(back, back.LengthMm - t / 2.0, 45, back.LengthMm - t / 2.0, back.WidthMm - 45, diameter, config.BackFastenerMaxSpacingMm, "Achterwand naar rechter zijwand");
+
+            for (var column = 1; column < config.ColumnCount; column++)
+            {
+                var x = t + column * config.CellWidthMm + (column - 0.5) * t;
+                AddMountingLine(back, x, t + 45, x, back.WidthMm - t - 45, diameter, config.DividerBackFastenerMaxSpacingMm, "Achterwand naar staander " + column.ToString(CultureInfo.InvariantCulture));
+            }
+
+            for (var row = 1; row < config.RowCount; row++)
+            {
+                var y = t + row * config.CellHeightMm + (row - 0.5) * t;
+                AddMountingLine(back, t + 45, y, back.LengthMm - t - 45, y, diameter, config.DividerBackFastenerMaxSpacingMm, "Achterwand naar ligger " + row.ToString(CultureInfo.InvariantCulture));
             }
         }
 
