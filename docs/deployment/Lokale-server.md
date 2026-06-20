@@ -19,6 +19,20 @@ Voor lokaal ontwikkelen staan in de projectmap drie klikbare bestanden:
 
 Gebruik `rebuild` na codewijzigingen. Gebruik `stop` als je twijfelt of er nog een oude portal draait.
 
+Wanneer `dotnet build` faalt met een melding dat `SWWerkplaats.Configurator.exe` in gebruik is, draait de portal nog. Gebruik dan:
+
+```powershell
+.\Web configurator stoppen.cmd
+dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj
+.\Web configurator starten.cmd
+```
+
+Of korter:
+
+```powershell
+.\Web configurator rebuild.cmd
+```
+
 ## Tijdelijk starten via argumenten
 
 ```powershell
@@ -51,3 +65,12 @@ Gebruik deze endpoints om een lokale server snel te controleren:
 - `GET /api/health`
 - `GET /api/catalog`
 - `GET /api/workflow`
+
+Voor doorwerken op een andere laptop:
+
+```powershell
+git clone https://github.com/daanlangelaan/SWwerkplaatsapp.git
+cd SWwerkplaatsapp
+.\Web configurator rebuild.cmd
+Invoke-RestMethod http://localhost:8088/api/health
+```

@@ -1,6 +1,6 @@
 # Vakjeskast productafspraak
 
-Deze productfamilie staat als code-skelet klaar, maar is nog niet actief in de portal.
+Deze productfamilie is actief in de portal. De huidige implementatie rekent de buitenmaat uit op basis van vakmaten, plaatdikte, aantal vakken en de gekozen verdiepte positie van het raster.
 
 ## Klantparameters
 
@@ -10,25 +10,33 @@ De klant kiest:
 - vakdiepte;
 - vakbreedte;
 - vakhoogte;
-- aantal kolommen;
-- aantal rijen;
+- vakken breedte;
+- vakken hoogte;
 - achterwand ja/nee.
 
 De vakmaten plus de plaatdikte bepalen de buitenmaat van de kast. De klant stuurt dus primair op bruikbare binnenvakken, niet op totale kastmaat.
 
 Voor gelijke vakken:
 
-- buitenbreedte = `kolommen * vakbreedte + (kolommen + 1) * plaatdikte`;
-- buitenhoogte = `rijen * vakhoogte + (rijen + 1) * plaatdikte`;
-- buitendiepte = `vakdiepte`.
+- buitenbreedte = `vakkenBreedte * vakbreedte + (vakkenBreedte + 1) * plaatdikte`;
+- buitenhoogte = `vakkenHoogte * vakhoogte + (vakkenHoogte + 1) * plaatdikte`;
+- buitendiepte = `vakdiepte + plaatdikte`.
+
+Let op: `Vakken breedte` en `Vakken hoogte` tellen open vakken, niet het aantal losse kamplaten.
+
+Voorbeeld:
+
+- `3` vakken breedte geeft `2` interne staander-kammen;
+- `3` vakken hoogte geeft `2` interne ligger-kammen;
+- linker/rechter zijwand, bovenplaat en bodemplaat zijn aparte kastdelen.
 
 ## Constructie
 
 De vakjes worden als kamconstructie opgebouwd:
 
-- verticale kamdelen en horizontale kamdelen schuiven in elkaar;
-- sleuven worden op halve diepte gefreesd, met een kleine passing/clearance;
-- voorbeeld: 4 rijen en 3 kolommen bestaat uit verticale kamdelen plus horizontale kamdelen die in elkaar haken;
+- verticale staander-kammen en horizontale ligger-kammen schuiven in elkaar;
+- kamuitsparingen worden door-en-door gefreesd en in de 3D-view als open uitsparingen weergegeven;
+- voorbeeld: 4 vakken hoog en 3 vakken breed bestaat uit 2 interne staander-kammen en 3 interne ligger-kammen, plus de buitenkast;
 - de vakjesconstructie ligt verdiept ten opzichte van top, bodem en zijkanten van de buitenkast.
 
 ## Achterwand
@@ -43,34 +51,47 @@ Assemblage-afspraak:
 
 - voorboren gebeurt alleen in de achterwand;
 - in de kopse kanten van top, bodem, zijkanten en schotten wordt bij assemblage direct geschroefd.
+- achterwand wordt als een deel gemaakt als hij op de gekozen plaat past; anders wordt hij per segment gedeeld.
 
 ## Tekencontract aandachtspunten
 
 - Achterwand is `SheetVerticalX`.
 - Top/bodem zijn `SheetHorizontal`.
 - Zijkanten en verticale kamdelen zijn `SheetVerticalZ`.
-- Horizontale kamdelen zijn `SheetHorizontal` of product-specifiek te bepalen op basis van de freesstrategie.
+- Horizontale ligger-kammen zijn `SheetHorizontal`.
 - Alle sleuven/pockets moeten een expliciete fysieke zijde krijgen.
 - Schroefgaten in de achterwand worden lokale sheetcoordinaten op de achterwand.
+- Door-en-door kamuitsparingen gebruiken `OperationDepthMode.Through` en worden in de portal gemarkeerd als `IsThroughCutout`, zodat 3D geen dubbele pocketlijnen tekent.
 
-## Open keuzes
+## Huidige defaults en open keuzes
 
-Deze gegevens zijn nog nodig voordat de engine veilig gebouwd wordt:
+Huidige basis:
 
-- hoeveel mm verdiept de vakjesconstructie ligt ten opzichte van de voorkant/top/bodem/zijkanten;
-- gewenste passing van kam-sleuven, bijvoorbeeld `plaatdikte + 0.3 mm`;
-- sleufdiepte voor kamverbindingen, meestal halve plaatdikte;
-- diepte van de achterwand-sleuven;
-- maximale schroefafstand langs buitencontour;
-- maximale schroefafstand op interne schotlijnen;
-- diameter voor voorboorgaten in de achterwand;
-- minimale randafstand voor die gaten.
+- vakjesconstructie krijgt een instelbare verdieping via `Vakjes verdiept mm`;
+- kamuitsparingen krijgen clearance via productregels;
+- achterwandgroeven en montagegaten worden door de engine gezet;
+- nesting toont door-en-door kamuitsparingen als witte/cutout vlakken.
+
+Nog te bepalen voordat dit product naar echte productie mag:
+
+- definitieve passing per materiaalsoort;
+- definitieve achterwandgroefdiepte per materiaal;
+- bevestigingsgatdiameter en schroefafstand per productnorm;
+- of de UI ook een modus moet krijgen die direct aantal kam-schotten invoert in plaats van aantal open vakken.
 
 ## Eerste implementatievoorstel
 
-- Vakken zijn exact gelijk verdeeld.
-- Buitenmaat wordt afgeleid uit vakmaat, aantal rijen/kolommen en plaatdikte.
-- Kamdelen schuiven in elkaar met halve-dikte sleuven.
-- Achterwand heeft pockets/sleuven plus voorboorgaten.
-- Geen deuren/lades/bakken in versie 1.
-- Alle gaten en pockets lopen door de bestaande tekencontractvalidatie.
+De eerste implementatie is aanwezig:
+
+- vakken zijn exact gelijk verdeeld;
+- buitenmaat wordt afgeleid uit vakmaat, aantal vakken en plaatdikte;
+- kamdelen schuiven in elkaar met door-en-door kamuitsparingen;
+- achterwand heeft pockets/sleuven plus voorboorgaten;
+- geen deuren/lades/bakken in versie 1;
+- alle gaten en pockets lopen door de bestaande tekencontractvalidatie.
+
+Snelle controle:
+
+- `3 x 3` vakken geeft `2` staander-kammen en `2` ligger-kammen;
+- dezelfde test geeft `8` door-en-door kamuitsparingen;
+- er mogen geen halfhout-kamuitsparingen als gewone 3D-pocket worden gerenderd.
