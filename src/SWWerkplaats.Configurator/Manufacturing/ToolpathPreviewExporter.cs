@@ -22,11 +22,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var sb = new StringBuilder();
             sb.AppendLine("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + F(canvasWidth) + "\" height=\"" + F(canvasHeight) + "\" viewBox=\"0 0 " + F(canvasWidth) + " " + F(canvasHeight) + "\">");
             sb.AppendLine("<style>");
-            sb.AppendLine("text{font-family:Arial,sans-serif}.title{font-size:22px;font-weight:700;fill:#111827}.sub{font-size:12px;fill:#667085}.stock{fill:#f8fafc;stroke:#111827;stroke-width:1.4}.part{fill:rgba(226,232,240,.46);stroke:#94a3b8;stroke-width:1}.pocket{fill:none;stroke:#d97706;stroke-width:1.3;stroke-dasharray:5 4}.hole{fill:none;stroke:#2563eb;stroke-width:1.2}.drill{fill:#2563eb}.contour{fill:none;stroke:#dc2626;stroke-width:1.4}.tabbed{stroke:#b91c1c;stroke-width:2}.label{font-size:10px;fill:#344054}.legend{font-size:12px;fill:#344054}");
+            sb.AppendLine("text{font-family:Arial,sans-serif}.title{font-size:22px;font-weight:700;fill:#111827}.sub{font-size:12px;fill:#667085}.stock{fill:#f8fafc;stroke:#111827;stroke-width:1.4}.part{fill:rgba(226,232,240,.46);stroke:#94a3b8;stroke-width:1}.pocket{fill:none;stroke:#d97706;stroke-width:1.3;stroke-dasharray:5 4}.cutout{fill:#fff;stroke:#0f172a;stroke-width:1.2}.hole{fill:none;stroke:#2563eb;stroke-width:1.2}.drill{fill:#2563eb}.contour{fill:none;stroke:#dc2626;stroke-width:1.4}.tabbed{stroke:#b91c1c;stroke-width:2}.label{font-size:10px;fill:#344054}.legend{font-size:12px;fill:#344054}");
             sb.AppendLine("</style>");
             sb.AppendLine("<rect x=\"0\" y=\"0\" width=\"" + F(canvasWidth) + "\" height=\"" + F(canvasHeight) + "\" fill=\"#ffffff\"/>");
             sb.AppendLine("<text class=\"title\" x=\"28\" y=\"34\">" + Xml(stock.Name) + " toolpath preview</text>");
-            sb.AppendLine("<text class=\"sub\" x=\"28\" y=\"54\">Pockets oranje, gaten blauw, buitencontour rood. Tool " + Xml(tool.Name) + " diameter " + F(tool.DiameterMm) + " mm.</text>");
+            sb.AppendLine("<text class=\"sub\" x=\"28\" y=\"54\">Pockets oranje, door-uitsparingen wit, gaten blauw, buitencontour rood. Tool " + Xml(tool.Name) + " diameter " + F(tool.DiameterMm) + " mm.</text>");
             sb.AppendLine("<rect class=\"stock\" x=\"" + F(margin) + "\" y=\"" + F(margin) + "\" width=\"" + F(stock.StockLengthMm * scale) + "\" height=\"" + F(stock.StockWidthMm * scale) + "\"/>");
 
             foreach (var placement in stock.Placements)
@@ -63,6 +63,20 @@ namespace SWWerkplaats.Configurator.Manufacturing
         {
             foreach (var pocket in placement.Part.Pockets)
             {
+                if (pocket.DepthMode == OperationDepthMode.Through)
+                {
+                    var cutoutPoints = new List<Point2>
+                    {
+                        Transform(placement, pocket.Xmm, pocket.Ymm),
+                        Transform(placement, pocket.Xmm + pocket.LengthMm, pocket.Ymm),
+                        Transform(placement, pocket.Xmm + pocket.LengthMm, pocket.Ymm + pocket.WidthMm),
+                        Transform(placement, pocket.Xmm, pocket.Ymm + pocket.WidthMm),
+                        Transform(placement, pocket.Xmm, pocket.Ymm)
+                    };
+                    sb.AppendLine("<path class=\"cutout\" d=\"" + Path(cutoutPoints, stock, margin, scale) + " Z\"><title>" + Xml(placement.Part.Name + " - " + pocket.Name + " door-en-door") + "</title></path>");
+                    continue;
+                }
+
                 var inset = Math.Max(tool.RadiusMm, 0.1);
                 var x0 = pocket.Xmm + inset;
                 var y0 = pocket.Ymm + inset;

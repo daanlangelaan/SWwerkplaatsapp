@@ -54,6 +54,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine(".stock{fill:#f8fafc;stroke:#111;stroke-width:1.5}");
             sb.AppendLine(".part{fill:#dbeafe;stroke:#1d4ed8;stroke-width:1.2}");
             sb.AppendLine(".pocket{fill:rgba(251,191,36,.28);stroke:#b45309;stroke-width:1;stroke-dasharray:5 4}");
+            sb.AppendLine(".cutout{fill:#fff;stroke:#0f172a;stroke-width:1.1}");
             sb.AppendLine(".hole{fill:#fff;stroke:#0f172a;stroke-width:1.2}");
             sb.AppendLine(".label{font-size:14px;font-weight:700}");
             sb.AppendLine(".dim{font-size:12px}");
@@ -164,7 +165,8 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var minY = System.Math.Min(p0.Y, p1.Y);
             var maxY = System.Math.Max(p0.Y, p1.Y);
 
-            return "<rect class=\"pocket\" x=\"" + F(x + minX * scale) + "\" y=\"" + F(y + (placement.WidthMm - maxY) * scale) + "\" width=\"" + F((maxX - minX) * scale) + "\" height=\"" + F((maxY - minY) * scale) + "\"/>";
+            var cssClass = pocket.DepthMode == OperationDepthMode.Through ? "cutout" : "pocket";
+            return "<rect class=\"" + cssClass + "\" x=\"" + F(x + minX * scale) + "\" y=\"" + F(y + (placement.WidthMm - maxY) * scale) + "\" width=\"" + F((maxX - minX) * scale) + "\" height=\"" + F((maxY - minY) * scale) + "\"><title>" + Xml(pocket.Name) + "</title></rect>";
         }
 
         private static string HoleSvg(NestedSheetPlacement placement, SheetHole hole, double x, double y, double scale)

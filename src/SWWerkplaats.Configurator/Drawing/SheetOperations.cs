@@ -34,6 +34,30 @@ namespace SWWerkplaats.Configurator.Drawing
             });
         }
 
+        public static void AddThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
+        {
+            if (sheet == null || sheet.Material == null || length <= 0 || width <= 0) return;
+
+            var safeX = Math.Max(0, Math.Min(sheet.LengthMm, x));
+            var safeY = Math.Max(0, Math.Min(sheet.WidthMm, y));
+            var safeLength = Math.Max(0, Math.Min(length, sheet.LengthMm - safeX));
+            var safeWidth = Math.Max(0, Math.Min(width, sheet.WidthMm - safeY));
+            if (safeLength <= 0 || safeWidth <= 0) return;
+
+            sheet.Pockets.Add(new SheetPocket
+            {
+                Name = name,
+                Xmm = Math.Round(safeX, 3),
+                Ymm = Math.Round(safeY, 3),
+                LengthMm = Math.Round(safeLength, 3),
+                WidthMm = Math.Round(safeWidth, 3),
+                DepthMm = Math.Round(Math.Max(0.1, sheet.Material.ThicknessMm), 3),
+                Face = face,
+                DepthMode = OperationDepthMode.Through,
+                Note = note
+            });
+        }
+
         public static void AddUniqueThroughHole(SheetPart sheet, double x, double y, double diameter, string name, SheetHoleSupportKind supportKind, double edgeClampMm)
         {
             if (sheet == null) return;

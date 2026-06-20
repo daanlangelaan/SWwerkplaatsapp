@@ -66,7 +66,7 @@ namespace SWWerkplaats.Configurator.Engine
                 for (var row = 1; row < config.RowCount; row++)
                 {
                     var y = row * config.CellHeightMm + (row - 0.5) * t - slotWidth / 2.0;
-                    AddPocket(panel, "Halfhout sleuf ligger R" + row.ToString(CultureInfo.InvariantCulture), 0, y, Math.Max(10, gridDepth / 2.0), slotWidth, slotDepth, OperationFace.CenterPlane, "Sleuf voor horizontale kam; definitieve doorsteekstrategie apart controleren.");
+                    AddThroughCutout(panel, "Halfhout uitsparing ligger R" + row.ToString(CultureInfo.InvariantCulture), 0, y, Math.Max(10, gridDepth / 2.0), slotWidth, OperationFace.CenterPlane, "Door-en-door kamuitsparing voor horizontale ligger.");
                 }
 
                 AddBackEdgeFastenerHoles(panel, config, gridDepth, gridHeight);
@@ -83,7 +83,7 @@ namespace SWWerkplaats.Configurator.Engine
                 for (var column = 1; column < config.ColumnCount; column++)
                 {
                     var x = column * config.CellWidthMm + (column - 0.5) * t - slotWidth / 2.0;
-                    AddPocket(panel, "Halfhout sleuf staander C" + column.ToString(CultureInfo.InvariantCulture), x, Math.Max(0, gridDepth / 2.0), slotWidth, Math.Max(10, gridDepth / 2.0), slotDepth, OperationFace.CenterPlane, "Sleuf voor verticale kam; grijpt vanaf tegengestelde zijde in de staander.");
+                    AddThroughCutout(panel, "Halfhout uitsparing staander C" + column.ToString(CultureInfo.InvariantCulture), x, Math.Max(0, gridDepth / 2.0), slotWidth, Math.Max(10, gridDepth / 2.0), OperationFace.CenterPlane, "Door-en-door kamuitsparing voor verticale staander.");
                 }
 
                 var y = t + row * config.CellHeightMm + (row - 0.5) * t;
@@ -278,6 +278,11 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, OperationFace face, string note)
         {
             SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, face, note);
+        }
+
+        private static void AddThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
+        {
+            SheetOperations.AddThroughCutout(sheet, name, x, y, length, width, face, note);
         }
 
         private static void AddMountingLine(SheetPart sheet, double x1, double y1, double x2, double y2, double diameter, double maxSpacing, string name)

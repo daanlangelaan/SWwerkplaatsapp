@@ -292,7 +292,8 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var p2 = Transform(placement, lx1, ly1);
             var p3 = Transform(placement, lx0, ly1);
             sb.AppendLine();
-            sb.AppendLine("(" + placement.Label + " - " + pocket.Name + " pocket " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(pocket.DepthMm) + ")");
+            var operationName = pocket.DepthMode == OperationDepthMode.Through ? "door-uitsparing" : "pocket";
+            sb.AppendLine("(" + placement.Label + " - " + pocket.Name + " " + operationName + " " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(pocket.DepthMm) + ")");
             sb.AppendLine("G0 X" + F(p0.X) + " Y" + F(p0.Y));
             var depth = 0.0;
             while (depth > -pocket.DepthMm)
