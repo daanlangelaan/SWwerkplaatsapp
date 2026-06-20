@@ -83,15 +83,14 @@ namespace SWWerkplaats.Configurator.Engine
 
             for (var i = 0; i < config.UnitCount; i++)
             {
-                var unitCenterX = -config.WidthMm / 2.0 + unitWidth * (i + 0.5);
                 var bottomInsertDepth = ProductDrawingStrategy.GrooveDepthForMaterial(carcass);
-                var bottomWidth = ProductDrawingStrategy.PlateSizeWithOppositeGrooveInsertion(clearBottomBayWidth, bottomInsertDepth);
+                var bottomFit = BottomFitForUnit(config, i, t, bottomInsertDepth);
                 var bottomDepth = config.IncludeBackPanel
                     ? ProductDrawingStrategy.PlateSizeWithSingleGrooveInsertion(config.DepthMm, bottomInsertDepth)
                     : config.DepthMm;
                 var bottomCenterZ = config.IncludeBackPanel ? ProductDrawingStrategy.CenterOffsetForSingleGrooveInsertion(bottomInsertDepth) : 0;
-                var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bottomWidth, bottomDepth);
-                AddSheet(model, bottom, unitCenterX, config.PlinthHeightMm + t / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
+                var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bottomFit.WidthMm, bottomDepth);
+                AddSheet(model, bottom, bottomFit.CenterXmm, config.PlinthHeightMm + t / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
             }
 
             if (config.IncludeBackPanel)
@@ -426,6 +425,26 @@ namespace SWWerkplaats.Configurator.Engine
             return panel != null
                 && panel.Name != null
                 && panel.Name.StartsWith("Tussenschot ", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static HorizontalFit BottomFitForUnit(CabinetConfig config, int unitIndex, double materialThickness, double grooveInsertDepth)
+        {
+            var unitCount = Math.Max(1, config.UnitCount);
+            var unitWidth = config.WidthMm / unitCount;
+            var leftPanelCenterX = unitIndex == 0
+                ? -config.WidthMm / 2.0 + materialThickness / 2.0
+                : -config.WidthMm / 2.0 + unitWidth * unitIndex;
+            var rightPanelCenterX = unitIndex == unitCount - 1
+                ? config.WidthMm / 2.0 - materialThickness / 2.0
+                : -config.WidthMm / 2.0 + unitWidth * (unitIndex + 1);
+
+            var clearLeftX = leftPanelCenterX + materialThickness / 2.0;
+            var clearRightX = rightPanelCenterX - materialThickness / 2.0;
+            var leftInsert = unitIndex == 0 ? Math.Max(0, grooveInsertDepth) : 0;
+            var rightInsert = unitIndex == unitCount - 1 ? Math.Max(0, grooveInsertDepth) : 0;
+            var partLeftX = clearLeftX - leftInsert;
+            var partRightX = clearRightX + rightInsert;
+            return new HorizontalFit((partLeftX + partRightX) / 2.0, Math.Max(20, partRightX - partLeftX));
         }
 
         private static void AddBottomReceivingGrooveToBackPanel(SheetPart backPanel, CabinetConfig config, double bodyHeight)
@@ -1231,6 +1250,18 @@ namespace SWWerkplaats.Configurator.Engine
             }
 
             return count;
+        }
+
+        private readonly struct HorizontalFit
+        {
+            public HorizontalFit(double centerXmm, double widthMm)
+            {
+                CenterXmm = centerXmm;
+                WidthMm = widthMm;
+            }
+
+            public double CenterXmm { get; }
+            public double WidthMm { get; }
         }
 
         private static void Validate(CabinetConfig config)
