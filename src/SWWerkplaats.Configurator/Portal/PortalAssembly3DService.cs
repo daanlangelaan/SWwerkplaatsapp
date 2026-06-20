@@ -244,9 +244,26 @@ namespace SWWerkplaats.Configurator.Portal
         private static void AddOppositeThroughHoleFace(PortalAssemblyPart part, AssemblyPlacement placement, SheetHole source, PortalAssemblyHole visibleHole, double thickness)
         {
             if (part == null || placement == null || source == null || visibleHole == null) return;
+            if (source.DepthMode != OperationDepthMode.Through || source.Face != OperationFace.CenterPlane) return;
+
+            if (placement.Orientation == AssemblyOrientation.SheetVerticalX)
+            {
+                var oppositeZ = new PortalAssemblyHole
+                {
+                    Xmm = visibleHole.Xmm,
+                    Ymm = visibleHole.Ymm,
+                    Zmm = placement.Zmm + (visibleHole.Zmm >= placement.Zmm ? -thickness / 2.0 - 0.8 : thickness / 2.0 + 0.8),
+                    DiameterMm = visibleHole.DiameterMm,
+                    DepthMm = visibleHole.DepthMm,
+                    Plane = visibleHole.Plane
+                };
+
+                if (IsInsidePartBounds(part, oppositeZ)) part.Holes.Add(oppositeZ);
+                return;
+            }
+
             if (placement.Orientation != AssemblyOrientation.SheetVerticalZ) return;
             if (!StartsWith(placement.PartName, "Tussenschot ")) return;
-            if (source.DepthMode != OperationDepthMode.Through || source.Face != OperationFace.CenterPlane) return;
 
             var opposite = new PortalAssemblyHole
             {
