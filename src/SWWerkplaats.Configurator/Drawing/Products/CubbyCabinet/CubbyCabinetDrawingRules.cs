@@ -14,6 +14,23 @@ namespace SWWerkplaats.Configurator.Drawing.Products.CubbyCabinet
             return Math.Max(1, rows) * cellHeight + (Math.Max(1, rows) + 1) * materialThickness;
         }
 
+        public static double OuterDepth(double cellDepth, double materialThickness)
+        {
+            return Math.Max(1, cellDepth) + Math.Max(1, materialThickness);
+        }
+
+        public static double CellWidthFromOuter(int columns, double outerWidth, double materialThickness)
+        {
+            var count = Math.Max(1, columns);
+            return Math.Max(40, (outerWidth - (count + 1) * materialThickness) / count);
+        }
+
+        public static double CellHeightFromOuter(int rows, double outerHeight, double materialThickness)
+        {
+            var count = Math.Max(1, rows);
+            return Math.Max(40, (outerHeight - (count + 1) * materialThickness) / count);
+        }
+
         public static double CombSlotDepth(double materialThickness)
         {
             return Math.Max(0, materialThickness / 2.0);

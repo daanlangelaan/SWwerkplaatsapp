@@ -42,7 +42,7 @@ namespace SWWerkplaats.Configurator.Portal
   <section class=""start"" id=""start"">
     <div class=""hero"">
       <h2>Kies wat je wilt configureren.</h2>
-      <p>Begin met een werktafel of cabinet. Daarna zie je direct een prijsindicatie, nette visualisatie en de interne werkplaatsflow.</p>
+      <p>Begin met een werktafel, cabinet of vakjeskast. Daarna zie je direct een prijsindicatie, nette visualisatie en de interne werkplaatsflow.</p>
     </div>
     <div class=""choices"">
       <button class=""choice"" type=""button"" onclick=""chooseProduct('werktafel')"">
@@ -62,6 +62,15 @@ namespace SWWerkplaats.Configurator.Portal
         <h3>Cabinet / kast</h3>
         <p>Units, lades, deuren, legplanken, nesting en ordervrijgave voor productie.</p>
         <span>Configureer cabinet</span>
+      </button>
+      <button class=""choice"" type=""button"" onclick=""chooseProduct('vakjeskast')"">
+        <div class=""choiceArt"">
+          <img src=""/images/product-cabinet.png"" alt=""Voorbeeld vakjeskast"">
+        </div>
+        <div class=""choiceImageLabel"">Vakjeskast</div>
+        <h3>Vakjeskast</h3>
+        <p>Grid met kamdelen, achterwandsegmenten, positioneergroeven en nesting per plaatmateriaal.</p>
+        <span>Configureer vakjeskast</span>
       </button>
     </div>
   </section>
@@ -189,7 +198,7 @@ namespace SWWerkplaats.Configurator.Portal
     function productMeta(product){return catalogData&&catalogData.products?(catalogData.products.find(x=>x.Product===product)||null):null;}
     function chooseProduct(product){document.body.classList.add('appOn');$('product').value=product;$('quantity').value=1;const meta=productMeta(product);if(meta){$('widthMm').value=meta.DefaultWidthMm;$('depthMm').value=meta.DefaultDepthMm;$('heightMm').value=meta.DefaultHeightMm;$('unitCount').value=meta.DefaultUnitCount;$('defaultShelfCount').value=meta.DefaultShelfCount;$('defaultDrawerCount').value=meta.DefaultDrawerCount;$('shelfStartMode').value=meta.DefaultShelfStartMode||'bottom';}else if(product==='werktafel'){$('widthMm').value=1500;$('depthMm').value=750;$('heightMm').value=900;$('unitCount').value=1;$('defaultShelfCount').value=0;$('defaultDrawerCount').value=0;}else{$('widthMm').value=2400;$('depthMm').value=600;$('heightMm').value=900;$('unitCount').value=4;$('defaultShelfCount').value=3;$('shelfStartMode').value='top';$('defaultDrawerCount').value=1;}syncProductUi();quote();}
     function backToStart(){document.body.classList.remove('appOn');}
-    function syncProductUi(){const isWorkbench=$('product').value==='werktafel';document.body.classList.toggle('isWorkbench',isWorkbench);$('generateBtn').textContent=isWorkbench?'Genereer tafel':'Genereer kast';markDirty();}
+    function syncProductUi(){const product=$('product').value,isWorkbench=product==='werktafel',isCubby=product==='vakjeskast';document.body.classList.toggle('isWorkbench',isWorkbench);document.body.classList.toggle('isCubby',isCubby);$('generateBtn').textContent=isWorkbench?'Genereer tafel':(isCubby?'Genereer vakjeskast':'Genereer kast');markDirty();}
     function markDirty(){if($('orderBtn'))$('orderBtn').disabled=true;if($('mailQuoteBtn'))$('mailQuoteBtn').disabled=true;lastQuote=null;if($('dirtyNote'))$('dirtyNote').textContent='Instellingen gewijzigd. Genereer opnieuw voor actuele prijs en 3D assembly.';}
     function request(){return{product:$('product').value,widthMm:+$('widthMm').value,depthMm:+$('depthMm').value,heightMm:+$('heightMm').value,quantity:Math.max(1,+$('quantity').value||1),unitCount:+$('unitCount').value,sheetMaterialId:$('sheetMaterialId').value,drawerMaterialId:$('drawerMaterialId').value,backMaterialId:$('backMaterialId').value,profileMaterialId:$('profileMaterialId').value,includeBackPanel:$('includeBackPanel').checked,includeTopDrawer:$('includeTopDrawer').checked,includeAdjustableShelfHoles:$('includeAdjustableShelfHoles').checked,defaultShelfCount:+$('defaultShelfCount').value,shelfStartMode:$('shelfStartMode').value,defaultDrawerCount:+$('defaultDrawerCount').value,doorMode:$('doorMode').value,customerName:$('customerName').value,customerEmail:$('customerEmail').value,customerPhone:$('customerPhone').value,notes:$('notes').value,includeLowerShelf:$('includeLowerShelf').checked,includeMiddleShelf:$('includeMiddleShelf').checked,lowerShelfHeightMm:+$('lowerShelfHeightMm').value,middleShelfHeightMm:+$('middleShelfHeightMm').value};}
     async function loadCatalog(){const c=await api('/api/catalog');catalogData=c;if(c.products&&c.products.length){$('product').innerHTML=c.products.map(x=>`<option value=""${x.Product}"">${x.Name}</option>`).join('');}const sheetOptions=c.sheets.map(x=>`<option value=""${x.Id}"">${x.Name}</option>`).join('');$('sheetMaterialId').innerHTML=sheetOptions;$('drawerMaterialId').innerHTML=sheetOptions;$('backMaterialId').innerHTML=sheetOptions;$('profileMaterialId').innerHTML=c.profiles.map(x=>`<option value=""${x.Id}"">${x.Name}</option>`).join('');$('sheetMaterialId').value='betonplex_18';$('drawerMaterialId').value='multiplex_15';$('backMaterialId').value='multiplex_15';$('profileMaterialId').value='alu_profile_40x40';}

@@ -46,22 +46,31 @@ namespace SWWerkplaats.Configurator.Application
 
         public WorkbenchModel Build(PortalConfigurationFactory factory, PortalQuoteRequest request)
         {
-            throw new NotSupportedException("Vakjeskast is voorbereid als productfamilie, maar nog niet actief. Vul eerst de grid- en constructieparameters in.");
+            return new CubbyCabinetEngine().Build(BuildConfig(factory, request));
         }
 
         public CubbyCabinetConfig BuildConfig(PortalConfigurationFactory factory, PortalQuoteRequest request)
         {
             if (factory == null) throw new ArgumentNullException("factory");
             request = request ?? new PortalQuoteRequest();
-            var columnCount = Count(request.CubbyColumnCount, ProductDefaults.CubbyCabinetColumnCount);
-            var rowCount = Count(request.CubbyRowCount, ProductDefaults.CubbyCabinetRowCount);
-            var cellWidth = Dimension(request.CubbyCellWidthMm, ProductDefaults.CubbyCabinetCellWidthMm);
-            var cellDepth = Dimension(request.CubbyCellDepthMm, ProductDefaults.CubbyCabinetCellDepthMm);
-            var cellHeight = Dimension(request.CubbyCellHeightMm, ProductDefaults.CubbyCabinetCellHeightMm);
-            var materialThickness = ProductDefaults.DefaultSheetThicknessMm;
+            var materialSource = factory.BuildCabinet(request);
+            var carcass = materialSource.CarcassMaterial;
+            var back = materialSource.BackMaterial ?? carcass;
+            var materialThickness = carcass == null || carcass.ThicknessMm <= 0 ? ProductDefaults.DefaultSheetThicknessMm : carcass.ThicknessMm;
+            var columnCount = Count(request.CubbyColumnCount, Count(request.UnitCount, ProductDefaults.CubbyCabinetColumnCount));
+            var rowCount = Count(request.CubbyRowCount, Count(request.DefaultShelfCount, ProductDefaults.CubbyCabinetRowCount));
+            var requestedOuterWidth = Dimension(request.WidthMm, 0);
+            var requestedOuterHeight = Dimension(request.HeightMm, 0);
+            var cellWidth = Dimension(
+                request.CubbyCellWidthMm,
+                requestedOuterWidth > 0 ? CubbyCabinetDrawingRules.CellWidthFromOuter(columnCount, requestedOuterWidth, materialThickness) : ProductDefaults.CubbyCabinetCellWidthMm);
+            var cellDepth = Dimension(request.CubbyCellDepthMm, Dimension(request.DepthMm, ProductDefaults.CubbyCabinetCellDepthMm));
+            var cellHeight = Dimension(
+                request.CubbyCellHeightMm,
+                requestedOuterHeight > 0 ? CubbyCabinetDrawingRules.CellHeightFromOuter(rowCount, requestedOuterHeight, materialThickness) : ProductDefaults.CubbyCabinetCellHeightMm);
             var width = CubbyCabinetDrawingRules.OuterWidth(columnCount, cellWidth, materialThickness);
             var height = CubbyCabinetDrawingRules.OuterHeight(rowCount, cellHeight, materialThickness);
-            var depth = cellDepth;
+            var depth = CubbyCabinetDrawingRules.OuterDepth(cellDepth, materialThickness);
 
             return new CubbyCabinetConfig
             {
@@ -84,6 +93,10 @@ namespace SWWerkplaats.Configurator.Application
                 PlinthDepthMm = ProductDefaults.CubbyCabinetPlinthDepthMm,
                 IncludeBackPanel = request.IncludeBackPanel,
                 IncludeAdjustableShelfHoles = false,
+                CarcassMaterial = carcass,
+                BackMaterial = back,
+                SheetFastener = materialSource.SheetFastener,
+                ShelfSupport = materialSource.ShelfSupport,
                 AutoTabs = true,
                 SmallPartAreaThresholdMm2 = 300 * 300,
                 TabWidthMm = 8,

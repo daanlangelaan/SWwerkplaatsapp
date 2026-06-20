@@ -83,6 +83,7 @@
     <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
     <Compile Include="Engine\CabinetEngine.cs" />
+    <Compile Include="Engine\CubbyCabinetEngine.cs" />
     <Compile Include="Manufacturing\CsvExporter.cs" />
     <Compile Include="Manufacturing\CamJobOptions.cs" />
     <Compile Include="Manufacturing\Mach3GCodeGenerator.cs" />

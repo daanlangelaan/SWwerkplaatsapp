@@ -8,14 +8,14 @@ namespace SWWerkplaats.Configurator.Application
         private readonly IProductBuilder[] builders;
 
         public ProductRegistry()
-            : this(new IProductBuilder[] { new CabinetProductBuilder(), new WorkbenchProductBuilder() })
+            : this(new IProductBuilder[] { new CabinetProductBuilder(), new WorkbenchProductBuilder(), new CubbyCabinetProductBuilder() })
         {
         }
 
         public ProductRegistry(IProductBuilder[] builders)
         {
             this.builders = builders == null || builders.Length == 0
-                ? new IProductBuilder[] { new CabinetProductBuilder(), new WorkbenchProductBuilder() }
+                ? new IProductBuilder[] { new CabinetProductBuilder(), new WorkbenchProductBuilder(), new CubbyCabinetProductBuilder() }
                 : builders;
         }
 

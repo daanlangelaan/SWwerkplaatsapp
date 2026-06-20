@@ -67,6 +67,7 @@ namespace SWWerkplaats.Configurator.Application
         private static string ProductName(PortalQuoteRequest request)
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
+            if (request != null && string.Equals(request.Product, "vakjeskast", StringComparison.OrdinalIgnoreCase)) return "Vakjeskast";
             return "Cabinet";
         }
 
