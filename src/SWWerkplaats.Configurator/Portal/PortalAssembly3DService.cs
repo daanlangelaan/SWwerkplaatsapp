@@ -63,6 +63,7 @@ namespace SWWerkplaats.Configurator.Portal
                     SizeYmm = Math.Max(2, sy),
                     SizeZmm = Math.Max(2, sz)
                 };
+                ApplyHiddenDrawerInsertTrims(part);
                 AddHoles(part, placement, sheet, thickness);
                 AddPockets(part, placement, sheet, thickness);
                 parts.Add(part);
@@ -124,6 +125,53 @@ namespace SWWerkplaats.Configurator.Portal
             parts.Add(center);
             parts.Add(left);
             parts.Add(right);
+        }
+
+        private static void ApplyHiddenDrawerInsertTrims(PortalAssemblyPart part)
+        {
+            if (part == null || string.IsNullOrWhiteSpace(part.Name)) return;
+            var insert = ProductDrawingStrategy.DefaultDrawerGrooveDepthMm;
+            if (insert <= 0) return;
+
+            if (StartsWith(part.Name, "Ladezijde") || StartsWith(part.Name, "Bovenlade zijde"))
+            {
+                TrimFromNegativeZ(part, insert);
+                return;
+            }
+
+            if (StartsWith(part.Name, "Ladebodem") || StartsWith(part.Name, "Bovenlade bodem"))
+            {
+                TrimCenteredX(part, insert * 2.0);
+                TrimCenteredZ(part, insert * 2.0);
+                return;
+            }
+
+            if (StartsWith(part.Name, "Ladeachter") || StartsWith(part.Name, "Bovenlade achter"))
+            {
+                TrimCenteredX(part, insert * 2.0);
+            }
+        }
+
+        private static void TrimFromNegativeZ(PortalAssemblyPart part, double amount)
+        {
+            var trim = Math.Min(Math.Max(0, amount), Math.Max(0, part.SizeZmm - 2));
+            if (trim <= 0) return;
+            part.Zmm += trim / 2.0;
+            part.SizeZmm -= trim;
+        }
+
+        private static void TrimCenteredX(PortalAssemblyPart part, double amount)
+        {
+            var trim = Math.Min(Math.Max(0, amount), Math.Max(0, part.SizeXmm - 2));
+            if (trim <= 0) return;
+            part.SizeXmm -= trim;
+        }
+
+        private static void TrimCenteredZ(PortalAssemblyPart part, double amount)
+        {
+            var trim = Math.Min(Math.Max(0, amount), Math.Max(0, part.SizeZmm - 2));
+            if (trim <= 0) return;
+            part.SizeZmm -= trim;
         }
 
         private static void AddNotchedVerticalZPanel(List<PortalAssemblyPart> parts, AssemblyPlacement placement, SheetPart sheet, double thickness)
@@ -230,7 +278,7 @@ namespace SWWerkplaats.Configurator.Portal
                 {
                     assemblyPocket.Xmm = placement.Xmm + localCenterX;
                     assemblyPocket.Ymm = placement.Ymm + localCenterY;
-                    assemblyPocket.Zmm = placement.Zmm + VerticalXPocketFaceOffset(placement.PartName, thickness, pocket.DepthMm);
+                    assemblyPocket.Zmm = placement.Zmm + VerticalXPocketFaceOffset(placement.PartName, pocket, thickness);
                     assemblyPocket.SizeXmm = pocket.LengthMm;
                     assemblyPocket.SizeYmm = pocket.WidthMm;
                     assemblyPocket.SizeZmm = Math.Max(0.4, pocket.DepthMm);
@@ -238,7 +286,7 @@ namespace SWWerkplaats.Configurator.Portal
                 }
                 else if (placement.Orientation == AssemblyOrientation.SheetVerticalZ)
                 {
-                    assemblyPocket.Xmm = placement.Xmm + VerticalZPocketFaceOffset(placement.PartName, thickness, pocket.DepthMm);
+                    assemblyPocket.Xmm = placement.Xmm + VerticalZPocketFaceOffset(placement.PartName, pocket, thickness);
                     assemblyPocket.Ymm = placement.Ymm + localCenterY;
                     assemblyPocket.Zmm = placement.Zmm + localCenterX;
                     assemblyPocket.SizeXmm = Math.Max(0.4, pocket.DepthMm);
@@ -336,6 +384,12 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static double HorizontalPocketFaceOffset(SheetPart sheet, SheetPocket pocket, double thickness, double visualDepth)
         {
+            if (pocket != null)
+            {
+                var explicitOffset = ExplicitPocketFaceOffset(pocket.Face, OperationFace.PositiveY, OperationFace.NegativeY, thickness, pocket.DepthMm);
+                if (explicitOffset.HasValue) return explicitOffset.Value;
+            }
+
             if (sheet != null && pocket != null && StartsWith(sheet.Name, "Werkblad"))
             {
                 return -thickness / 2.0 + Math.Max(0.4, Math.Min(2.2, pocket.DepthMm)) / 2.0;
@@ -344,8 +398,15 @@ namespace SWWerkplaats.Configurator.Portal
             return thickness / 2.0 + visualDepth;
         }
 
-        private static double VerticalXPocketFaceOffset(string partName, double thickness, double depth)
+        private static double VerticalXPocketFaceOffset(string partName, SheetPocket pocket, double thickness)
         {
+            var depth = pocket == null ? 0.4 : pocket.DepthMm;
+            if (pocket != null)
+            {
+                var explicitOffset = ExplicitPocketFaceOffset(pocket.Face, OperationFace.PositiveZ, OperationFace.NegativeZ, thickness, depth);
+                if (explicitOffset.HasValue) return explicitOffset.Value;
+            }
+
             var d = Math.Max(0.4, depth);
             if (StartsWith(partName, "Ladefront") || StartsWith(partName, "Bovenlade front"))
             {
@@ -360,8 +421,15 @@ namespace SWWerkplaats.Configurator.Portal
             return -thickness / 2.0 - d / 2.0;
         }
 
-        private static double VerticalZPocketFaceOffset(string partName, double thickness, double depth)
+        private static double VerticalZPocketFaceOffset(string partName, SheetPocket pocket, double thickness)
         {
+            var depth = pocket == null ? 0.4 : pocket.DepthMm;
+            if (pocket != null)
+            {
+                var explicitOffset = ExplicitPocketFaceOffset(pocket.Face, OperationFace.PositiveX, OperationFace.NegativeX, thickness, depth);
+                if (explicitOffset.HasValue) return explicitOffset.Value;
+            }
+
             var d = Math.Max(0.4, depth);
             if (StartsWith(partName, "Ladezijde links") || StartsWith(partName, "Bovenlade zijde links"))
             {
@@ -374,6 +442,14 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             return -thickness / 2.0 - d / 2.0;
+        }
+
+        private static double? ExplicitPocketFaceOffset(OperationFace face, OperationFace positiveFace, OperationFace negativeFace, double thickness, double depth)
+        {
+            var d = Math.Max(0.4, depth);
+            if (face == positiveFace) return thickness / 2.0 - d / 2.0;
+            if (face == negativeFace) return -thickness / 2.0 + d / 2.0;
+            return null;
         }
 
         private static double VerticalZFaceOffset(string partName, string holeName, double thickness, double lift)

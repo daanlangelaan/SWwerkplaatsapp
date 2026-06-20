@@ -182,7 +182,8 @@ namespace SWWerkplaats.Configurator.Engine
                     AddDrawerAssemblyHoles(config, drawerFront, drawerBottom, drawerSideLeft, drawerSideRight, drawerBack, boxWidth, drawerT);
                     AddDrawerRailHoles(drawerSideLeft, config);
                     AddDrawerRailHoles(drawerSideRight, config);
-                    AddSheet(model, drawerBottom, centerX, bottomY + DrawerGrooveBottomOffsetMm() + drawerT / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
+                    var drawerBottomCenterY = centerY - frontHeight / 2.0 + DrawerGrooveBottomOffsetMm() + drawerT / 2.0;
+                    AddSheet(model, drawerBottom, centerX, drawerBottomCenterY, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
                     AddSheet(model, drawerSideLeft, centerX - boxWidth / 2.0 + drawerT / 2.0, centerY, boxCenterZ, AssemblyOrientation.SheetVerticalZ);
                     AddSheet(model, drawerSideRight, centerX + boxWidth / 2.0 - drawerT / 2.0, centerY, boxCenterZ, AssemblyOrientation.SheetVerticalZ);
                     AddSheet(model, drawerBack, centerX, centerY, backCenterZ, AssemblyOrientation.SheetVerticalX);
@@ -266,7 +267,8 @@ namespace SWWerkplaats.Configurator.Engine
             AddDrawerAssemblyHoles(config, drawerFront, drawerBottom, drawerSideLeft, drawerSideRight, drawerBack, boxWidth, drawerT);
             AddDrawerRailHoles(drawerSideLeft, config);
             AddDrawerRailHoles(drawerSideRight, config);
-            AddSheet(model, drawerBottom, centerX, bottomY + DrawerGrooveBottomOffsetMm() + drawerT / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
+            var drawerBottomCenterY = centerY - frontHeight / 2.0 + DrawerGrooveBottomOffsetMm() + drawerT / 2.0;
+            AddSheet(model, drawerBottom, centerX, drawerBottomCenterY, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
             AddSheet(model, drawerSideLeft, centerX - boxWidth / 2.0 + drawerT / 2.0, centerY, boxCenterZ, AssemblyOrientation.SheetVerticalZ);
             AddSheet(model, drawerSideRight, centerX + boxWidth / 2.0 - drawerT / 2.0, centerY, boxCenterZ, AssemblyOrientation.SheetVerticalZ);
             AddSheet(model, drawerBack, centerX, centerY, backCenterZ, AssemblyOrientation.SheetVerticalX);
@@ -413,6 +415,7 @@ namespace SWWerkplaats.Configurator.Engine
                 upright.LengthMm,
                 grooveHeight,
                 AlignmentGrooveDepthMm(upright),
+                InnerPocketFaceForVerticalZPanel(upright),
                 "3mm verdiepte groef zodat bodemplaat in staander valt en niet hoeft uit te lijnen");
         }
 
@@ -435,6 +438,7 @@ namespace SWWerkplaats.Configurator.Engine
                 backPanel.LengthMm,
                 grooveHeight,
                 AlignmentGrooveDepthMm(backPanel),
+                OperationFace.NegativeZ,
                 "3mm verdiepte groef zodat achterzijde bodemplaten in achterwand valt");
         }
 
@@ -451,6 +455,7 @@ namespace SWWerkplaats.Configurator.Engine
                 panel.LengthMm,
                 grooveHeight,
                 DrawerGrooveDepthMm(),
+                DrawerPocketFace(panel),
                 "3mm verdiepte groef zodat ladebodem in zij-/achterplaat valt");
         }
 
@@ -467,6 +472,7 @@ namespace SWWerkplaats.Configurator.Engine
                 grooveWidth,
                 sidePanel.WidthMm,
                 DrawerGrooveDepthMm(),
+                DrawerPocketFace(sidePanel),
                 "3mm verdiept rabat zodat ladeachter in de zijplaat valt");
         }
 
@@ -486,6 +492,7 @@ namespace SWWerkplaats.Configurator.Engine
                 grooveWidth,
                 verticalHeight,
                 DrawerGrooveDepthMm(),
+                OperationFace.PositiveZ,
                 "3mm verdiept rabat voor linker ladezijde in binnenkant front");
             AddPocket(
                 front,
@@ -495,6 +502,7 @@ namespace SWWerkplaats.Configurator.Engine
                 grooveWidth,
                 verticalHeight,
                 DrawerGrooveDepthMm(),
+                OperationFace.PositiveZ,
                 "3mm verdiept rabat voor rechter ladezijde in binnenkant front");
             AddPocket(
                 front,
@@ -504,6 +512,7 @@ namespace SWWerkplaats.Configurator.Engine
                 Math.Max(10, front.LengthMm - 2.0 * sideInset),
                 grooveHeight,
                 DrawerGrooveDepthMm(),
+                OperationFace.PositiveZ,
                 "3mm verdiept rabat voor ladebodem in binnenkant front");
         }
 
@@ -662,6 +671,33 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, string note)
         {
             SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, note);
+        }
+
+        private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, OperationFace face, string note)
+        {
+            SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, face, note);
+        }
+
+        private static OperationFace InnerPocketFaceForVerticalZPanel(SheetPart panel)
+        {
+            if (panel == null || panel.Name == null) return OperationFace.CenterPlane;
+            if (panel.Name.StartsWith("Zijwand links", StringComparison.OrdinalIgnoreCase)) return OperationFace.PositiveX;
+            if (panel.Name.StartsWith("Zijwand rechts", StringComparison.OrdinalIgnoreCase)) return OperationFace.NegativeX;
+            return OperationFace.CenterPlane;
+        }
+
+        private static OperationFace DrawerPocketFace(SheetPart panel)
+        {
+            if (panel == null || panel.Name == null) return OperationFace.CenterPlane;
+            if (panel.Name.StartsWith("Ladezijde links", StringComparison.OrdinalIgnoreCase) ||
+                panel.Name.StartsWith("Bovenlade zijde links", StringComparison.OrdinalIgnoreCase)) return OperationFace.PositiveX;
+            if (panel.Name.StartsWith("Ladezijde rechts", StringComparison.OrdinalIgnoreCase) ||
+                panel.Name.StartsWith("Bovenlade zijde rechts", StringComparison.OrdinalIgnoreCase)) return OperationFace.NegativeX;
+            if (panel.Name.StartsWith("Ladeachter", StringComparison.OrdinalIgnoreCase) ||
+                panel.Name.StartsWith("Bovenlade achter", StringComparison.OrdinalIgnoreCase)) return OperationFace.NegativeZ;
+            if (panel.Name.StartsWith("Ladefront", StringComparison.OrdinalIgnoreCase) ||
+                panel.Name.StartsWith("Bovenlade front", StringComparison.OrdinalIgnoreCase)) return OperationFace.PositiveZ;
+            return OperationFace.CenterPlane;
         }
 
         private static double AlignmentGrooveDepthMm(SheetPart sheet)
