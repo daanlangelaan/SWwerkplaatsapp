@@ -26,6 +26,7 @@ namespace SWWerkplaats.Configurator.Portal
     .checks{display:grid;gap:6px;margin-top:10px}.checks label{display:flex;gap:9px;align-items:center;color:var(--ink);font-size:14px;margin:0}.checks input{width:auto;accent-color:var(--accent)}
     button{border:0;border-radius:14px;padding:12px 15px;font-weight:760;cursor:pointer;background:var(--accent);color:#fff;box-shadow:0 7px 18px rgba(0,113,227,.20)}button.secondary{background:#2f3641;box-shadow:none}button.warn{background:var(--warn);box-shadow:0 7px 18px rgba(191,91,0,.18)}button.ghost{background:#eef0f4;color:#1d1d1f;box-shadow:none}button:disabled{opacity:.52;cursor:not-allowed}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
     .generateBar{position:sticky;bottom:16px;margin-top:18px;padding:12px;border-radius:20px;background:rgba(255,255,255,.86);border:1px solid rgba(0,0,0,.08);box-shadow:0 14px 38px rgba(20,24,33,.12);backdrop-filter:blur(18px)}.generateBar button{width:100%;font-size:16px;padding:14px 16px}.dirtyNote{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+    .calcNote{font-size:12px;color:var(--muted);margin-top:8px}
     .pricePanel{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}.price{font-size:42px;font-weight:820;margin:4px 0 6px;line-height:1}.priceBreakdown{display:grid;grid-template-columns:repeat(6,minmax(105px,1fr));gap:8px;margin:10px 0 6px;max-width:1040px}.priceBreakdown span{display:block;border-radius:12px;background:#f5f6f8;padding:8px 10px;font-size:12px;color:var(--muted)}.priceBreakdown strong{display:block;color:var(--ink);font-size:15px;margin-top:2px}.muted{color:var(--muted)}.error{color:var(--danger);font-weight:760}.summaryLine{font-size:15px;color:var(--muted)}.lead{font-size:14px;color:var(--muted)}
     .previewGrid{display:grid;grid-template-columns:1.45fr .9fr;gap:18px}.sidePreviews{display:grid;gap:18px}.svgbox,.canvasbox,.orthobox{border:1px solid rgba(0,0,0,.08);border-radius:20px;background:linear-gradient(180deg,#fff,#fafbfc);overflow:hidden;min-height:260px}.svgbox svg{width:100%;height:auto;display:block}.canvasbox{position:relative;min-height:520px}.canvasbox canvas{position:absolute;inset:0;width:100%;height:100%;min-height:520px;display:block;cursor:grab}.orthobox{position:relative;min-height:330px}.orthobox canvas{width:100%;height:100%;min-height:330px;display:block}.canvasbox canvas:active{cursor:grabbing}.webglOn #assemblyFallbackCanvas{display:none}.webglOn #assemblyCanvas{display:block}#assemblyCanvas{display:none}.viewerHint{position:absolute;left:18px;bottom:18px;right:18px;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.78);backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(20,24,33,.08);font-size:13px;color:var(--muted)}.viewerHint input{padding:0;background:transparent;box-shadow:none;border:0;accent-color:var(--accent)}.sectionHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:#eef7f3;color:#1d7f5f;font-size:12px;font-weight:760}.viewActions{display:flex;align-items:center;gap:10px}.viewActions button{padding:8px 11px;border-radius:11px;font-size:12px;background:#eef0f4;color:#1d1d1f;box-shadow:none}.modal{display:none;position:fixed;inset:0;z-index:30;background:rgba(245,245,247,.72);backdrop-filter:blur(18px);padding:28px}.modalOn .modal{display:grid}.modalPanel{background:#fff;border-radius:26px;box-shadow:0 24px 80px rgba(20,24,33,.22);display:grid;grid-template-rows:auto 1fr;min-height:0;max-height:calc(100vh - 56px);overflow:hidden}.modalHead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid rgba(0,0,0,.08)}.modalBody{padding:18px;min-height:0;overflow:auto}.modalBody .canvasbox,.modalBody .orthobox{height:calc(100vh - 150px);min-height:520px}.modalBody .svgbox{max-height:none;overflow:visible}.modalBody .svgbox svg{max-width:none}.modalBody .nestingZoomHost{height:calc(100vh - 150px);overflow:auto;cursor:zoom-in}.modalBody .nestingZoomHost svg{max-width:none}.modalBody canvas{min-height:100%}
     table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 6px;vertical-align:top}th{color:var(--muted);font-weight:760}.pill{display:inline-block;border-radius:999px;padding:5px 9px;background:#eef0f4;color:#344054;font-weight:720;font-size:12px}.orderTools button{padding:8px 10px;border-radius:10px}
@@ -100,12 +101,13 @@ namespace SWWerkplaats.Configurator.Portal
           </div>
           <div class=""row"">
             <div><label>Vak hoogte mm</label><input id=""cubbyCellHeightMm"" type=""number"" value=""350"" min=""40""></div>
-            <div><label>Aantal kolommen</label><input id=""cubbyColumnCount"" type=""number"" value=""3"" min=""1"" max=""12""></div>
+            <div><label>Vakken breedte</label><input id=""cubbyColumnCount"" type=""number"" value=""3"" min=""1"" max=""12""></div>
           </div>
           <div class=""row"">
-            <div><label>Aantal rijen</label><input id=""cubbyRowCount"" type=""number"" value=""4"" min=""1"" max=""12""></div>
+            <div><label>Vakken hoogte</label><input id=""cubbyRowCount"" type=""number"" value=""4"" min=""1"" max=""12""></div>
             <div><label>Vakjes verdiept mm</label><input id=""cubbyGridInsetMm"" type=""number"" value=""20"" min=""0""></div>
           </div>
+          <div id=""cubbyCombCount"" class=""calcNote""></div>
         </div>
         <label>Plaatmateriaal</label><select id=""sheetMaterialId""></select>
         <div class=""row productOnlyCabinetOrCubby"">
@@ -214,7 +216,7 @@ namespace SWWerkplaats.Configurator.Portal
     function selectedSheetThickness(){const id=$('sheetMaterialId')?$('sheetMaterialId').value:null,item=catalogData&&catalogData.sheets?catalogData.sheets.find(x=>x.Id===id):null;return item&&item.ThicknessMm>0?item.ThicknessMm:18;}
     function roundMm(value){return Math.round(value*10)/10;}
     function setCubbyDefaults(meta){const t=selectedSheetThickness(),cols=Math.max(1,+(meta&&meta.DefaultUnitCount||3)),rows=Math.max(1,+(meta&&meta.DefaultShelfCount||4));$('cubbyColumnCount').value=cols;$('cubbyRowCount').value=rows;$('cubbyCellWidthMm').value=roundMm(((meta&&meta.DefaultWidthMm?meta.DefaultWidthMm:1272)-(cols+1)*t)/cols);$('cubbyCellDepthMm').value=350;$('cubbyCellHeightMm').value=roundMm(((meta&&meta.DefaultHeightMm?meta.DefaultHeightMm:1490)-(rows+1)*t)/rows);$('cubbyGridInsetMm').value=20;}
-    function syncCubbyDimensions(){if($('product').value!=='vakjeskast')return;const t=selectedSheetThickness(),cols=Math.max(1,+$('cubbyColumnCount').value||1),rows=Math.max(1,+$('cubbyRowCount').value||1),cellW=Math.max(40,+$('cubbyCellWidthMm').value||400),cellD=Math.max(40,+$('cubbyCellDepthMm').value||350),cellH=Math.max(40,+$('cubbyCellHeightMm').value||350);$('widthMm').value=roundMm(cols*cellW+(cols+1)*t);$('depthMm').value=roundMm(cellD+t);$('heightMm').value=roundMm(rows*cellH+(rows+1)*t);$('unitCount').value=cols;$('defaultShelfCount').value=rows;}
+    function syncCubbyDimensions(){if($('product').value!=='vakjeskast')return;const t=selectedSheetThickness(),cols=Math.max(1,+$('cubbyColumnCount').value||1),rows=Math.max(1,+$('cubbyRowCount').value||1),cellW=Math.max(40,+$('cubbyCellWidthMm').value||400),cellD=Math.max(40,+$('cubbyCellDepthMm').value||350),cellH=Math.max(40,+$('cubbyCellHeightMm').value||350);$('widthMm').value=roundMm(cols*cellW+(cols+1)*t);$('depthMm').value=roundMm(cellD+t);$('heightMm').value=roundMm(rows*cellH+(rows+1)*t);$('unitCount').value=cols;$('defaultShelfCount').value=rows;if($('cubbyCombCount'))$('cubbyCombCount').textContent='Interne kamdelen: '+Math.max(0,cols-1)+' staander-kammen, '+Math.max(0,rows-1)+' ligger-kammen. Buitenwanden en boven/bodem zijn aparte kastdelen.';}
     function chooseProduct(product){document.body.classList.add('appOn');$('product').value=product;$('quantity').value=1;const meta=productMeta(product);if(meta){$('widthMm').value=meta.DefaultWidthMm;$('depthMm').value=meta.DefaultDepthMm;$('heightMm').value=meta.DefaultHeightMm;$('unitCount').value=meta.DefaultUnitCount;$('defaultShelfCount').value=meta.DefaultShelfCount;$('defaultDrawerCount').value=meta.DefaultDrawerCount;$('shelfStartMode').value=meta.DefaultShelfStartMode||'bottom';if(product==='vakjeskast')setCubbyDefaults(meta);}else if(product==='werktafel'){$('widthMm').value=1500;$('depthMm').value=750;$('heightMm').value=900;$('unitCount').value=1;$('defaultShelfCount').value=0;$('defaultDrawerCount').value=0;}else if(product==='vakjeskast'){setCubbyDefaults(null);}else{$('widthMm').value=2400;$('depthMm').value=600;$('heightMm').value=900;$('unitCount').value=4;$('defaultShelfCount').value=3;$('shelfStartMode').value='top';$('defaultDrawerCount').value=1;}syncProductUi();quote();}
     function backToStart(){document.body.classList.remove('appOn');}
     function syncProductUi(){const product=$('product').value,isWorkbench=product==='werktafel',isCubby=product==='vakjeskast';document.body.classList.toggle('isWorkbench',isWorkbench);document.body.classList.toggle('isCubby',isCubby);$('widthLabel').textContent=isCubby?'Buitenbreedte mm':'Breedte mm';$('depthLabel').textContent=isCubby?'Buitendiepte mm':'Diepte mm';$('heightLabel').textContent=isCubby?'Buitenhoogte mm':'Hoogte mm';$('widthMm').readOnly=isCubby;$('depthMm').readOnly=isCubby;$('heightMm').readOnly=isCubby;if(isCubby)syncCubbyDimensions();$('generateBtn').textContent=isWorkbench?'Genereer tafel':(isCubby?'Genereer vakjeskast':'Genereer kast');markDirty();}
@@ -300,7 +302,7 @@ namespace SWWerkplaats.Configurator.Portal
     function renderThreeAssembly(){
       const {THREE,OrbitControls}=threeApi,c=$('assemblyCanvas'),box=c.getBoundingClientRect(),w=Math.max(520,box.width),h=Math.max(420,box.height);
       if(!threeState){const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.setClearColor(0xf8fafc,1);const scene=new THREE.Scene();const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10000);const controls=new OrbitControls(camera,c);controls.enableDamping=true;controls.dampingFactor=.08;controls.enablePan=false;controls.enableZoom=true;controls.zoomSpeed=1.15;controls.minZoom=.06;controls.maxZoom=9;scene.add(new THREE.HemisphereLight(0xffffff,0x9aa6b2,2.2));const key=new THREE.DirectionalLight(0xffffff,2.8);key.position.set(3,5,4);scene.add(key);threeState={renderer,scene,camera,controls,group:new THREE.Group(),lastKey:''};scene.add(threeState.group);controls.addEventListener('change',()=>threeState.renderer.render(threeState.scene,threeState.camera));c.addEventListener('wheel',e=>e.preventDefault(),{passive:false});}
-      const key=JSON.stringify(assemblyParts.map(p=>[p.Name,p.Kind,p.Xmm,p.Ymm,p.Zmm,p.SizeXmm,p.SizeYmm,p.SizeZmm,(p.Pockets||[]).map(g=>[g.Xmm,g.Ymm,g.Zmm,g.SizeXmm,g.SizeYmm,g.SizeZmm,g.Plane]),(p.Holes||[]).map(h=>[h.Xmm,h.Ymm,h.Zmm,h.DiameterMm,h.DepthMm,h.Plane])]));
+      const key=JSON.stringify(assemblyParts.map(p=>[p.Name,p.Kind,p.Xmm,p.Ymm,p.Zmm,p.SizeXmm,p.SizeYmm,p.SizeZmm,(p.Pockets||[]).map(g=>[g.Xmm,g.Ymm,g.Zmm,g.SizeXmm,g.SizeYmm,g.SizeZmm,g.Plane,g.IsThroughCutout]),(p.Holes||[]).map(h=>[h.Xmm,h.Ymm,h.Zmm,h.DiameterMm,h.DepthMm,h.Plane])]));
       threeState.renderer.setSize(w,h,false);threeState.camera.left=-w/2;threeState.camera.right=w/2;threeState.camera.top=h/2;threeState.camera.bottom=-h/2;threeState.camera.updateProjectionMatrix();
       if(threeState.lastKey!==key){threeState.group.clear();buildThreeParts(THREE,threeState.group);fitThreeCamera(THREE,threeState.camera,threeState.controls);threeState.lastKey=key;}
       threeState.group.rotation.y=rotationDeg*Math.PI/180;threeState.controls.update();threeState.renderer.render(threeState.scene,threeState.camera);
@@ -308,12 +310,15 @@ namespace SWWerkplaats.Configurator.Portal
     function buildThreeParts(THREE,group){
       assemblyParts.forEach(p=>{
         const material=new THREE.MeshStandardMaterial({color:p.Kind==='pocket'?0x6f6658:(p.Kind==='sheet'?0xeadcc7:0xcad4e0),roughness:.62,metalness:p.Kind==='profile'?0.18:0,transparent:p.Kind==='pocket'||p.Kind==='profile',opacity:p.Kind==='pocket'?0.62:(p.Kind==='profile'?0.9:1),side:THREE.DoubleSide});
-        const realPocketSheet=p.Kind==='sheet'&&(p.Pockets||[]).some(g=>g.Plane==='y'&&g.SizeYmm>1.5&&g.SizeXmm<p.SizeXmm*.2);
-        const realPocketZ=p.Kind==='sheet'&&!realPocketSheet&&(p.Pockets||[]).some(g=>g.Plane==='z'&&g.SizeZmm>1.5);
-        const realPocketX=p.Kind==='sheet'&&!realPocketSheet&&!realPocketZ&&(p.Pockets||[]).some(g=>g.Plane==='x'&&g.SizeXmm>1.5);
+        const through=(p.Pockets||[]).filter(g=>g.IsThroughCutout);
+        const pockets=(p.Pockets||[]).filter(g=>!g.IsThroughCutout);
+        if(through.length){const geo=buildThroughCutoutGeometry(THREE,p,through);const mesh=new THREE.Mesh(geo,material);mesh.position.set(p.Xmm,p.Ymm,p.Zmm);group.add(mesh);const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x667085,transparent:true,opacity:.38}));edges.position.copy(mesh.position);group.add(edges);addThreeHoles(THREE,group,p);return;}
+        const realPocketSheet=p.Kind==='sheet'&&pockets.some(g=>g.Plane==='y'&&g.SizeYmm>1.5&&g.SizeXmm<p.SizeXmm*.2);
+        const realPocketZ=p.Kind==='sheet'&&!realPocketSheet&&pockets.some(g=>g.Plane==='z'&&g.SizeZmm>1.5);
+        const realPocketX=p.Kind==='sheet'&&!realPocketSheet&&!realPocketZ&&pockets.some(g=>g.Plane==='x'&&g.SizeXmm>1.5);
         if(realPocketZ){addPocketedVerticalXPart(THREE,group,p,material);return;}
         if(realPocketX){addPocketedVerticalZPart(THREE,group,p,material);return;}
-        const geo=realPocketSheet?buildPocketedSheetGeometry(THREE,p):new THREE.BoxGeometry(p.SizeXmm,p.SizeYmm,p.SizeZmm);
+        const geo=realPocketSheet?buildPocketedSheetGeometry(THREE,{...p,Pockets:pockets}):new THREE.BoxGeometry(p.SizeXmm,p.SizeYmm,p.SizeZmm);
         const mesh=new THREE.Mesh(geo,material);mesh.position.set(p.Xmm,p.Ymm,p.Zmm);group.add(mesh);
         const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:p.Kind==='pocket'?0x3f3a33:0x667085,transparent:true,opacity:p.Kind==='pocket'?.62:.48}));edges.position.copy(mesh.position);group.add(edges);
         addThreeHoles(THREE,group,p);
@@ -322,6 +327,35 @@ namespace SWWerkplaats.Configurator.Portal
     }
     function addThreeHoles(THREE,group,p){
       (p.Holes||[]).forEach(h=>{const hg=new THREE.CircleGeometry(Math.max(3,h.DiameterMm/2),18),hm=new THREE.MeshBasicMaterial({color:0x344054,transparent:true,opacity:.72,side:THREE.DoubleSide}),hole=new THREE.Mesh(hg,hm);hole.position.set(h.Xmm,h.Ymm,h.Zmm);if(h.Plane==='x')hole.rotation.y=Math.PI/2;else if(h.Plane==='y')hole.rotation.x=-Math.PI/2;group.add(hole);});
+    }
+    function buildThroughCutoutGeometry(THREE,p,cutouts){
+      const plane=(cutouts[0]&&cutouts[0].Plane)||'y';
+      let uMin,uMax,vMin,vMax,thick;
+      if(plane==='x'){uMin=-p.SizeZmm/2;uMax=p.SizeZmm/2;vMin=-p.SizeYmm/2;vMax=p.SizeYmm/2;thick=p.SizeXmm;}
+      else if(plane==='z'){uMin=-p.SizeXmm/2;uMax=p.SizeXmm/2;vMin=-p.SizeYmm/2;vMax=p.SizeYmm/2;thick=p.SizeZmm;}
+      else{uMin=-p.SizeXmm/2;uMax=p.SizeXmm/2;vMin=-p.SizeZmm/2;vMax=p.SizeZmm/2;thick=p.SizeYmm;}
+      const shape=new THREE.Shape([new THREE.Vector2(uMin,vMin),new THREE.Vector2(uMax,vMin),new THREE.Vector2(uMax,vMax),new THREE.Vector2(uMin,vMax)]);
+      cutouts.filter(g=>g.Plane===plane).forEach(g=>{
+        let u,uw,v,vh;
+        if(plane==='x'){u=g.Zmm-p.Zmm;uw=g.SizeZmm;v=g.Ymm-p.Ymm;vh=g.SizeYmm;}
+        else if(plane==='z'){u=g.Xmm-p.Xmm;uw=g.SizeXmm;v=g.Ymm-p.Ymm;vh=g.SizeYmm;}
+        else{u=g.Xmm-p.Xmm;uw=g.SizeXmm;v=g.Zmm-p.Zmm;vh=g.SizeZmm;}
+        const u0=Math.max(uMin,u-uw/2),u1=Math.min(uMax,u+uw/2),v0=Math.max(vMin,v-vh/2),v1=Math.min(vMax,v+vh/2);
+        if(u1-u0<.2||v1-v0<.2)return;
+        const hole=new THREE.Path();
+        hole.moveTo(u0,v0);hole.lineTo(u0,v1);hole.lineTo(u1,v1);hole.lineTo(u1,v0);hole.lineTo(u0,v0);
+        shape.holes.push(hole);
+      });
+      const geo=new THREE.ExtrudeGeometry(shape,{depth:thick,bevelEnabled:false});
+      geo.translate(0,0,-thick/2);
+      const pos=geo.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const u=pos.getX(i),v=pos.getY(i),w=pos.getZ(i);
+        if(plane==='x'){pos.setXYZ(i,w,v,u);}
+        else if(plane==='z'){pos.setXYZ(i,u,v,w);}
+        else{pos.setXYZ(i,u,w,v);}
+      }
+      pos.needsUpdate=true;geo.computeVertexNormals();return geo;
     }
     function rectCells(THREE,p,pockets,uSize,vSize,uName,vName,uSizeName,vSizeName){
       const us=[-uSize/2,uSize/2],vs=[-vSize/2,vSize/2];

@@ -107,6 +107,7 @@ namespace SWWerkplaats.Configurator.Portal
         public double SizeYmm { get; set; }
         public double SizeZmm { get; set; }
         public string Plane { get; set; }
+        public bool IsThroughCutout { get; set; }
     }
 
     public sealed class PortalOrderRecord

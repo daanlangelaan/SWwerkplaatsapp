@@ -298,36 +298,37 @@ namespace SWWerkplaats.Configurator.Portal
                 var localCenterY = pocket.Ymm + pocket.WidthMm / 2.0 - sheet.WidthMm / 2.0;
                 var assemblyPocket = new PortalAssemblyPocket
                 {
-                    Name = pocket.Name
+                    Name = pocket.Name,
+                    IsThroughCutout = pocket.DepthMode == OperationDepthMode.Through
                 };
 
                 if (placement.Orientation == AssemblyOrientation.SheetHorizontal)
                 {
                     assemblyPocket.Xmm = placement.Xmm + localCenterX;
-                    assemblyPocket.Ymm = placement.Ymm + HorizontalPocketFaceOffset(sheet, pocket, thickness, 1.2);
+                    assemblyPocket.Ymm = assemblyPocket.IsThroughCutout ? placement.Ymm : placement.Ymm + HorizontalPocketFaceOffset(sheet, pocket, thickness, 1.2);
                     assemblyPocket.Zmm = placement.Zmm + localCenterY;
                     assemblyPocket.SizeXmm = pocket.LengthMm;
-                    assemblyPocket.SizeYmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.SizeYmm = assemblyPocket.IsThroughCutout ? thickness : Math.Max(0.4, pocket.DepthMm);
                     assemblyPocket.SizeZmm = pocket.WidthMm;
                     assemblyPocket.Plane = "y";
-                    AddHorizontalPocketEdgeReveals(part, placement, sheet, pocket, localCenterX, thickness);
+                    if (!assemblyPocket.IsThroughCutout) AddHorizontalPocketEdgeReveals(part, placement, sheet, pocket, localCenterX, thickness);
                 }
                 else if (placement.Orientation == AssemblyOrientation.SheetVerticalX)
                 {
                     assemblyPocket.Xmm = placement.Xmm + localCenterX;
                     assemblyPocket.Ymm = placement.Ymm + localCenterY;
-                    assemblyPocket.Zmm = placement.Zmm + VerticalXPocketFaceOffset(placement.PartName, pocket, thickness);
+                    assemblyPocket.Zmm = assemblyPocket.IsThroughCutout ? placement.Zmm : placement.Zmm + VerticalXPocketFaceOffset(placement.PartName, pocket, thickness);
                     assemblyPocket.SizeXmm = pocket.LengthMm;
                     assemblyPocket.SizeYmm = pocket.WidthMm;
-                    assemblyPocket.SizeZmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.SizeZmm = assemblyPocket.IsThroughCutout ? thickness : Math.Max(0.4, pocket.DepthMm);
                     assemblyPocket.Plane = "z";
                 }
                 else if (placement.Orientation == AssemblyOrientation.SheetVerticalZ)
                 {
-                    assemblyPocket.Xmm = placement.Xmm + VerticalZPocketFaceOffset(placement.PartName, pocket, thickness);
+                    assemblyPocket.Xmm = assemblyPocket.IsThroughCutout ? placement.Xmm : placement.Xmm + VerticalZPocketFaceOffset(placement.PartName, pocket, thickness);
                     assemblyPocket.Ymm = placement.Ymm + localCenterY;
                     assemblyPocket.Zmm = placement.Zmm + localCenterX;
-                    assemblyPocket.SizeXmm = Math.Max(0.4, pocket.DepthMm);
+                    assemblyPocket.SizeXmm = assemblyPocket.IsThroughCutout ? thickness : Math.Max(0.4, pocket.DepthMm);
                     assemblyPocket.SizeYmm = pocket.WidthMm;
                     assemblyPocket.SizeZmm = pocket.LengthMm;
                     assemblyPocket.Plane = "x";
