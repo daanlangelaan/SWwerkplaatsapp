@@ -33,6 +33,12 @@ Start de webportal:
 .\Web configurator starten.cmd
 ```
 
+Start of rebuild de desktop configurator:
+
+```powershell
+.\SW configurator rebuild.cmd
+```
+
 Rebuild na codewijzigingen:
 
 ```powershell
@@ -74,6 +80,7 @@ Invoke-RestMethod http://localhost:8088/api/health
 4. Open daarna `http://localhost:8088`.
 
 Gebruik `.\Web configurator stoppen.cmd` als de app oud lijkt of als een build faalt omdat `SWWerkplaats.Configurator.exe` nog draait. Gebruik daarna `rebuild`.
+Gebruik `.\SW configurator rebuild.cmd` voor de desktop tabs zoals `Library`, `CAM` en `Output`; dit werkt de root-map `bin\SWWerkplaats.Configurator.exe` bij.
 
 ## Build check
 

@@ -34,6 +34,10 @@ $sources = Get-ChildItem -Path $project -Recurse -Filter *.cs | Select-Object -E
     /reference:System.Xml.dll `
     $sources
 
+if ($LASTEXITCODE -ne 0) {
+    throw "Build mislukt. Controleer de compilerfouten hierboven."
+}
+
 $portalVendor = Join-Path $project "Portal\vendor"
 $portalAssets = Join-Path $outDir "PortalAssets\vendor"
 if (Test-Path $portalVendor) {
