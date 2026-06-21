@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Engine;
 using SWWerkplaats.Configurator.Manufacturing;
@@ -139,8 +140,9 @@ namespace SWWerkplaats.Configurator.UI
             cabinetDrawerMaterial = MaterialCombo(LibraryCatalog.Sheets(), 3);
             cabinetFrontMaterial = MaterialCombo(LibraryCatalog.Sheets(), 2);
             cabinetBackMaterial = MaterialCombo(LibraryCatalog.Sheets(), 3);
-            var railPresets = LibraryCatalog.DrawerRails();
-            var shelfSupportPresets = LibraryCatalog.ShelfSupports();
+            var catalog = new LibraryCatalogRepository();
+            var railPresets = catalog.DrawerRails();
+            var shelfSupportPresets = catalog.ShelfSupports();
             railLibrary = BuildRailLibraryGrid(railPresets);
             shelfSupportLibrary = BuildShelfSupportLibraryGrid(shelfSupportPresets);
             cabinetRailTemplate = RailCombo(railPresets, 1);
@@ -276,6 +278,8 @@ namespace SWWerkplaats.Configurator.UI
             var addRail = new Button { Text = "Nieuwe rail", Width = 120, Height = 30 };
             var applySupports = new Button { Text = "Dragers toepassen op cabinet-keuze", Width = 250, Height = 30 };
             var addSupport = new Button { Text = "Nieuwe drager", Width = 130, Height = 30 };
+            var saveLibrary = new Button { Text = "Library opslaan", Width = 140, Height = 30 };
+            var reloadLibrary = new Button { Text = "Library herladen", Width = 140, Height = 30 };
             applyRails.Click += delegate { ReloadRailTemplateCombo(); };
             addRail.Click += delegate
             {
@@ -290,10 +294,14 @@ namespace SWWerkplaats.Configurator.UI
                 shelfSupportLibrary.Rows.Add("support_" + index, "Nieuwe legplankdrager " + index, "5", "12", "5", "32", "50", "50", "160");
                 ReloadShelfSupportCombo();
             };
+            saveLibrary.Click += delegate { SaveHardwareLibrary(); };
+            reloadLibrary.Click += delegate { ReloadHardwareLibrary(); };
             buttons.Controls.Add(applyRails);
             buttons.Controls.Add(addRail);
             buttons.Controls.Add(applySupports);
             buttons.Controls.Add(addSupport);
+            buttons.Controls.Add(saveLibrary);
+            buttons.Controls.Add(reloadLibrary);
 
             layout.Controls.Add(buttons);
             layout.Controls.Add(railLibrary);
@@ -899,6 +907,27 @@ namespace SWWerkplaats.Configurator.UI
             cabinetRailTemplate.SelectedIndex = selectedIndex;
         }
 
+        private void SaveHardwareLibrary()
+        {
+            ReloadRailTemplateCombo();
+            ReloadShelfSupportCombo();
+            var path = HardwareLibraryRepository.Save(RailsFromLibraryGrid(), ShelfSupportsFromLibraryGrid());
+            MessageBox.Show(this,
+                string.IsNullOrEmpty(path) ? "Library kon niet worden opgeslagen." : "Library opgeslagen:\n" + path,
+                "Library",
+                MessageBoxButtons.OK,
+                string.IsNullOrEmpty(path) ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+        }
+
+        private void ReloadHardwareLibrary()
+        {
+            var catalog = new LibraryCatalogRepository();
+            FillRailLibraryGrid(railLibrary, catalog.DrawerRails());
+            FillShelfSupportLibraryGrid(shelfSupportLibrary, catalog.ShelfSupports());
+            ReloadRailTemplateCombo();
+            ReloadShelfSupportCombo();
+        }
+
         private RailTemplate[] RailsFromLibraryGrid()
         {
             var rails = new System.Collections.Generic.List<RailTemplate>();
@@ -932,6 +961,32 @@ namespace SWWerkplaats.Configurator.UI
             }
 
             return rails.ToArray();
+        }
+
+        private static void FillRailLibraryGrid(DataGridView grid, RailTemplate[] rails)
+        {
+            grid.Rows.Clear();
+            foreach (var rail in rails ?? new RailTemplate[0])
+            {
+                grid.Rows.Add(
+                    rail.Id,
+                    rail.Name,
+                    rail.LengthMm.ToString("0.##"),
+                    rail.ThicknessMm.ToString("0.##"),
+                    rail.CabinetHoleCount.ToString(),
+                    rail.CabinetFirstHoleOffsetMm.ToString("0.##"),
+                    rail.CabinetHoleSpacingMm.ToString("0.##"),
+                    rail.CabinetHolePositionsMm,
+                    rail.CabinetVerticalOffsetMm.ToString("0.##"),
+                    rail.CabinetHoleDiameterMm.ToString("0.##"),
+                    rail.DrawerHoleCount.ToString(),
+                    rail.DrawerFirstHoleOffsetMm.ToString("0.##"),
+                    rail.DrawerHoleSpacingMm.ToString("0.##"),
+                    rail.DrawerHolePositionsMm,
+                    rail.DrawerVerticalOffsetMm.ToString("0.##"),
+                    rail.DrawerHoleDiameterMm.ToString("0.##"),
+                    rail.FastenerName);
+            }
         }
 
         private void ReloadShelfSupportCombo()
@@ -982,6 +1037,24 @@ namespace SWWerkplaats.Configurator.UI
             }
 
             return supports.ToArray();
+        }
+
+        private static void FillShelfSupportLibraryGrid(DataGridView grid, ShelfSupportTemplate[] supports)
+        {
+            grid.Rows.Clear();
+            foreach (var support in supports ?? new ShelfSupportTemplate[0])
+            {
+                grid.Rows.Add(
+                    support.Id,
+                    support.Name,
+                    support.ThicknessMm.ToString("0.##"),
+                    support.HeightMm.ToString("0.##"),
+                    support.HoleDiameterMm.ToString("0.##"),
+                    support.HoleSpacingMm.ToString("0.##"),
+                    support.FrontInsetMm.ToString("0.##"),
+                    support.BackInsetMm.ToString("0.##"),
+                    support.FirstHoleHeightMm.ToString("0.##"));
+            }
         }
 
         private static FastenerDefinition CloneFastener(FastenerDefinition fastener)

@@ -1,0 +1,85 @@
+{
+  "rails": [
+    {
+      "Id": "generic_350",
+      "Name": "AliExpress ladegeleider 350mm basis",
+      "LengthMm": 350,
+      "ThicknessMm": 12.7,
+      "CabinetHoleCount": 4,
+      "CabinetFirstHoleOffsetMm": 37,
+      "CabinetHoleSpacingMm": 96,
+      "CabinetHolePositionsMm": "",
+      "CabinetVerticalOffsetMm": 32,
+      "CabinetHoleDiameterMm": 6.5,
+      "DrawerHoleCount": 4,
+      "DrawerFirstHoleOffsetMm": 37,
+      "DrawerHoleSpacingMm": 96,
+      "DrawerHolePositionsMm": "",
+      "DrawerVerticalOffsetMm": 32,
+      "DrawerHoleDiameterMm": 4.5,
+      "FastenerName": "4x16 bolkopschroef"
+    },
+    {
+      "Id": "generic_450",
+      "Name": "AliExpress ladegeleider 450mm basis",
+      "LengthMm": 450,
+      "ThicknessMm": 12.7,
+      "CabinetHoleCount": 5,
+      "CabinetFirstHoleOffsetMm": 37,
+      "CabinetHoleSpacingMm": 96,
+      "CabinetHolePositionsMm": "",
+      "CabinetVerticalOffsetMm": 32,
+      "CabinetHoleDiameterMm": 6.5,
+      "DrawerHoleCount": 5,
+      "DrawerFirstHoleOffsetMm": 37,
+      "DrawerHoleSpacingMm": 96,
+      "DrawerHolePositionsMm": "",
+      "DrawerVerticalOffsetMm": 32,
+      "DrawerHoleDiameterMm": 4.5,
+      "FastenerName": "4x16 bolkopschroef"
+    },
+    {
+      "Id": "measured_500",
+      "Name": "Gemeten ladegeleider 500mm",
+      "LengthMm": 500,
+      "ThicknessMm": 13,
+      "CabinetHoleCount": 5,
+      "CabinetFirstHoleOffsetMm": 34,
+      "CabinetHoleSpacingMm": 0,
+      "CabinetHolePositionsMm": "34;98;226;354;418",
+      "CabinetVerticalOffsetMm": 21,
+      "CabinetHoleDiameterMm": 5,
+      "DrawerHoleCount": 3,
+      "DrawerFirstHoleOffsetMm": 29,
+      "DrawerHoleSpacingMm": 0,
+      "DrawerHolePositionsMm": "29;220;453",
+      "DrawerVerticalOffsetMm": 21,
+      "DrawerHoleDiameterMm": 4.5,
+      "FastenerName": "4x16 bolkopschroef"
+    }
+  ],
+  "shelfSupports": [
+    {
+      "Id": "shelf_pin_5mm_32",
+      "Name": "Legplankdrager pin 5mm, systeem 32",
+      "ThicknessMm": 5,
+      "HeightMm": 12,
+      "HoleDiameterMm": 5,
+      "HoleSpacingMm": 32,
+      "FrontInsetMm": 50,
+      "BackInsetMm": 50,
+      "FirstHoleHeightMm": 160
+    },
+    {
+      "Id": "shelf_pin_5mm_64",
+      "Name": "Legplankdrager pin 5mm, grove stap 64",
+      "ThicknessMm": 5,
+      "HeightMm": 12,
+      "HoleDiameterMm": 5,
+      "HoleSpacingMm": 64,
+      "FrontInsetMm": 50,
+      "BackInsetMm": 50,
+      "FirstHoleHeightMm": 160
+    }
+  ]
+}

@@ -31,12 +31,12 @@ namespace SWWerkplaats.Configurator.Application
 
         public RailTemplate[] DrawerRails()
         {
-            return LibraryCatalog.DrawerRails();
+            return HardwareLibraryRepository.DrawerRails();
         }
 
         public ShelfSupportTemplate[] ShelfSupports()
         {
-            return LibraryCatalog.ShelfSupports();
+            return HardwareLibraryRepository.ShelfSupports();
         }
 
         public ToolDefinition DefaultEndMill(double diameterMm, double passDepthMm)

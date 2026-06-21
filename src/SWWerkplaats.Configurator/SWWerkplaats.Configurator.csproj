@@ -42,6 +42,7 @@
     <Compile Include="Application\CubbyCabinetProductBuilder.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\HealthApplicationService.cs" />
+    <Compile Include="Application\HardwareLibraryRepository.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
     <Compile Include="Application\IProductBuilder.cs" />
     <Compile Include="Application\IOrderRepository.cs" />

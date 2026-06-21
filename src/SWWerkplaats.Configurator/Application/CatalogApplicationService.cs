@@ -6,6 +6,8 @@ namespace SWWerkplaats.Configurator.Application
     {
         public Material[] Sheets { get; set; }
         public Material[] Profiles { get; set; }
+        public RailTemplate[] Rails { get; set; }
+        public ShelfSupportTemplate[] ShelfSupports { get; set; }
         public string[] Statuses { get; set; }
         public ProductCatalogItem[] Products { get; set; }
     }
@@ -30,6 +32,8 @@ namespace SWWerkplaats.Configurator.Application
             {
                 Sheets = catalog.Sheets(),
                 Profiles = catalog.Profiles(),
+                Rails = catalog.DrawerRails(),
+                ShelfSupports = catalog.ShelfSupports(),
                 Statuses = OrderWorkflowStatus.All(),
                 Products = new ProductCatalogApplicationService().ListProducts()
             };

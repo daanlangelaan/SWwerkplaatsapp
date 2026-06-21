@@ -160,6 +160,16 @@ git push
 
 Niet alles hoeft in git. Lokale orderdata, gegenereerde freesbestanden en losse referentiebestanden blijven lokaal tenzij je ze bewust toevoegt.
 
+## Library-data
+
+Rails en legplankdragers staan in:
+
+```text
+config\hardware-library.json
+```
+
+In de desktop configurator kun je deze aanpassen via tab `Library` en daarna `Library opslaan`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
+
 ## Huidige technische afspraken
 
 - De vakjeskast is actief in de portal.

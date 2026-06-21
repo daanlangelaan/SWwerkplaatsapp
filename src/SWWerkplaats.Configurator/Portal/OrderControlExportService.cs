@@ -57,7 +57,7 @@ namespace SWWerkplaats.Configurator.Portal
             var usedIds = UsedRailTemplateIds(model);
             var sb = new StringBuilder();
             sb.AppendLine("TemplateId;Naam;Lengte_mm;Dikte_mm;Kast_gaten;Kast_Xposities_mm;Kast_Yoffset_mm;Kast_gatdiameter_mm;Lade_gaten;Lade_Xposities_mm;Lade_Yoffset_mm;Lade_gatdiameter_mm;Bevestiging");
-            foreach (var rail in LibraryCatalog.DrawerRails())
+            foreach (var rail in HardwareLibraryRepository.DrawerRails())
             {
                 if (!usedIds.Contains(rail.Id)) continue;
                 sb.Append(E(rail.Id)).Append(';');
@@ -82,7 +82,7 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var usedIds = UsedRailTemplateIds(model);
             var rails = new List<RailTemplate>();
-            foreach (var rail in LibraryCatalog.DrawerRails())
+            foreach (var rail in HardwareLibraryRepository.DrawerRails())
             {
                 if (usedIds.Contains(rail.Id)) rails.Add(rail);
             }
@@ -314,7 +314,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (model == null) return ids;
             foreach (var hardware in model.Hardware)
             {
-                foreach (var rail in LibraryCatalog.DrawerRails())
+                foreach (var rail in HardwareLibraryRepository.DrawerRails())
                 {
                     if (string.Equals(hardware.ArticleNumber, rail.Id, StringComparison.OrdinalIgnoreCase))
                     {
