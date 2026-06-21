@@ -69,7 +69,7 @@ namespace SWWerkplaats.Configurator.Portal
             var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
             var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId));
             var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
-            var rail = CloneRail(catalog.DrawerRails()[ProductDefaults.DefaultDrawerRailIndex]);
+            var rail = CloneRail(DefaultRail(catalog.DrawerRails()));
 
             var config = new CabinetConfig
             {
@@ -125,6 +125,24 @@ namespace SWWerkplaats.Configurator.Portal
         public ToolDefinition DefaultTool()
         {
             return catalog.DefaultEndMill(ProductDefaults.DefaultToolDiameterMm, ProductDefaults.DefaultToolPassDepthMm);
+        }
+
+        private static RailTemplate DefaultRail(RailTemplate[] rails)
+        {
+            if (rails == null || rails.Length == 0) throw new InvalidOperationException("Geen railtemplates gevonden.");
+
+            foreach (var rail in rails)
+            {
+                if (rail != null && string.Equals(rail.Id, ProductDefaults.DefaultDrawerRailId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return rail;
+                }
+            }
+
+            var index = ProductDefaults.DefaultDrawerRailIndex >= 0 && ProductDefaults.DefaultDrawerRailIndex < rails.Length
+                ? ProductDefaults.DefaultDrawerRailIndex
+                : 0;
+            return rails[index];
         }
 
         public MachineProfile DefaultMachine()

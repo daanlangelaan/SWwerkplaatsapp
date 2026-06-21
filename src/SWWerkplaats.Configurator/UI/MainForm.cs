@@ -145,7 +145,7 @@ namespace SWWerkplaats.Configurator.UI
             var shelfSupportPresets = catalog.ShelfSupports();
             railLibrary = BuildRailLibraryGrid(railPresets);
             shelfSupportLibrary = BuildShelfSupportLibraryGrid(shelfSupportPresets);
-            cabinetRailTemplate = RailCombo(railPresets, 1);
+            cabinetRailTemplate = RailCombo(railPresets, DefaultRailIndex(railPresets));
             cabinetShelfSupportTemplate = ShelfSupportCombo(shelfSupportPresets, 0);
             lowerFrame = new CheckBox { Text = "Onderframe", Checked = false, AutoSize = true };
             lowerShelf = new CheckBox { Text = "Blad op onderframe met hoekuitsparingen", Checked = false, AutoSize = true };
@@ -691,6 +691,22 @@ namespace SWWerkplaats.Configurator.UI
             combo.Items.AddRange(rails);
             combo.SelectedIndex = selectedIndex;
             return combo;
+        }
+
+        private static int DefaultRailIndex(RailTemplate[] rails)
+        {
+            if (rails == null || rails.Length == 0) return 0;
+            for (var i = 0; i < rails.Length; i++)
+            {
+                if (rails[i] != null && string.Equals(rails[i].Id, ProductDefaults.DefaultDrawerRailId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return ProductDefaults.DefaultDrawerRailIndex >= 0 && ProductDefaults.DefaultDrawerRailIndex < rails.Length
+                ? ProductDefaults.DefaultDrawerRailIndex
+                : 0;
         }
 
         private static ComboBox ShelfSupportCombo(ShelfSupportTemplate[] supports, int selectedIndex)

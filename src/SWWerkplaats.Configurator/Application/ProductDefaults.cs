@@ -36,7 +36,8 @@ namespace SWWerkplaats.Configurator.Application
         public const int DefaultSheetIndex = 2;
         public const int DefaultProfileIndex = 1;
         public const int DefaultFastenerIndex = 0;
-        public const int DefaultDrawerRailIndex = 1;
+        public const int DefaultDrawerRailIndex = 2;
+        public const string DefaultDrawerRailId = "measured_500";
         public const int DefaultShelfSupportIndex = 0;
         public const double DefaultSheetThicknessMm = 18;
 
