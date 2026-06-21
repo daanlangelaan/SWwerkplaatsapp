@@ -126,6 +126,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>PortalAssets\images\product-cabinet.png</Link>
     </Content>
+    <Content Include="Portal\images\product-cubby.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\images\product-cubby.png</Link>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

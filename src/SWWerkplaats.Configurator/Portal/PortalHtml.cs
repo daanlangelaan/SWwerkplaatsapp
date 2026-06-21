@@ -66,7 +66,7 @@ namespace SWWerkplaats.Configurator.Portal
       </button>
       <button class=""choice"" type=""button"" onclick=""chooseProduct('vakjeskast')"">
         <div class=""choiceArt"">
-          <img src=""/images/product-cabinet.png"" alt=""Voorbeeld vakjeskast"">
+          <img src=""/images/product-cubby.png"" alt=""Voorbeeld vakjeskast"">
         </div>
         <div class=""choiceImageLabel"">Vakjeskast</div>
         <h3>Vakjeskast</h3>
