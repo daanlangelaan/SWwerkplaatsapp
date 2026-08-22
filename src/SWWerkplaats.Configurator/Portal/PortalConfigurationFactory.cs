@@ -26,7 +26,7 @@ namespace SWWerkplaats.Configurator.Portal
             var topSheet = CloneMaterial(FindSheet(request.SheetMaterialId));
             topSheet.ThicknessMm = topSheet.ThicknessMm <= 0 ? 18 : topSheet.ThicknessMm;
 
-            var fastener = CloneFastener(catalog.SheetFasteners()[ProductDefaults.DefaultFastenerIndex]);
+            var fastener = ProductFastener(request.Product, "werktafel", false);
             return new WorkbenchConfig
             {
                 ProjectName = "Werktafel_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
@@ -56,12 +56,182 @@ namespace SWWerkplaats.Configurator.Portal
                 AutoTabs = true,
                 SmallPartAreaThresholdMm2 = 300 * 300,
                 TabWidthMm = 8,
-                TabHeightMm = 1.5
+                TabHeightMm = 1.5,
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
             };
+        }
+
+        public MachineBaseConfig BuildMachineBase(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 1000, 6000, ProductDefaults.MachineBaseWidthMm);
+            var depth = Clamp(request.DepthMm, 600, 2000, ProductDefaults.MachineBaseDepthMm);
+            var height = Clamp(request.HeightMm, 1000, 2300, ProductDefaults.MachineBaseHeightMm);
+            var worktopHeight = Clamp(request.MachineBaseWorktopHeightMm, 600, 1000, ProductDefaults.MachineBaseWorktopHeightMm);
+            if (height < worktopHeight + 80) height = Math.Min(2300, worktopHeight + 80);
+            var worktopMaterialId = string.Equals(request.MachineBaseWorktopMaterialId, "hpl_12_machinebase", StringComparison.OrdinalIgnoreCase)
+                ? "hpl_12_machinebase"
+                : "hpl_10_lex";
+            var worktopMaterial = CloneMaterial(FindSheet(worktopMaterialId));
+            return new MachineBaseConfig
+            {
+                ProjectName = "MACHINEBASIS_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                HeightMm = height,
+                WorktopHeightMm = worktopHeight,
+                ReservedWorktopThicknessMm = worktopMaterial.ThicknessMm,
+                WorktopMaterial = worktopMaterial,
+                UprightProfile = CloneMaterial(FindProfile("alu_system_80x40")),
+                LowerBeamProfile = CloneMaterial(FindProfile(NormalizeMachineBaseBeamProfile(request.MachineBaseLowerBeamProfileId, false))),
+                WorktopBeamProfile = CloneMaterial(FindProfile("alu_system_80x40")),
+                WorktopIntermediateBeamMaxSpacingMm = Clamp(request.MachineBaseWorktopIntermediateBeamMaxSpacingMm, 300, 1000, ProductDefaults.MachineBaseWorktopIntermediateBeamMaxSpacingMm),
+                TopBeamProfile = CloneMaterial(FindProfile("alu_system_40x40")),
+                LowerPanelMaterial = CloneMaterial(FindSheet("hpl_6_lex_stabilizer")),
+                UpperPanelMaterial = CloneMaterial(FindSheet("acrylic_clear_6")),
+                FrontProtectionMode = string.Equals(request.MachineBaseFrontProtectionMode, "lightcurtain", StringComparison.OrdinalIgnoreCase) ? "lightcurtain" : "doors",
+                ControlCabinetWidthMm = Clamp(request.MachineBaseControlCabinetWidthMm, 300, width - 160, ProductDefaults.MachineBaseControlCabinetWidthMm),
+                ControlCabinetDepthMm = Clamp(request.MachineBaseControlCabinetDepthMm, 200, depth - 120, ProductDefaults.MachineBaseControlCabinetDepthMm),
+                ControlCabinetHeightMm = Clamp(request.MachineBaseControlCabinetHeightMm, 300, worktopHeight - 180, ProductDefaults.MachineBaseControlCabinetHeightMm),
+                ControlCabinetPosition = string.Equals(request.MachineBaseControlCabinetPosition, "right", StringComparison.OrdinalIgnoreCase) ? "right" : "left",
+                ControlCabinetDoorCount = request.MachineBaseControlCabinetDoorCount == 1 ? 1 : 2,
+                ControlCabinetHingeSide = string.Equals(request.MachineBaseControlCabinetHingeSide, "right", StringComparison.OrdinalIgnoreCase) ? "right" : "left",
+                FrontDoorCount = request.MachineBaseFrontDoorCount == 1 ? 1 : 2,
+                FrontSingleDoorHingeSide = string.Equals(request.MachineBaseFrontSingleDoorHingeSide, "right", StringComparison.OrdinalIgnoreCase) ? "right" : "left",
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+        }
+
+        public RobotCellConfig BuildRobotCell(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 600, 6000, ProductDefaults.RobotCellWidthMm);
+            var depth = Clamp(request.DepthMm, 500, 2000, ProductDefaults.RobotCellDepthMm);
+            var worktopHeight = Clamp(request.HeightMm, 650, 1200, ProductDefaults.RobotCellWorktopHeightMm);
+            return new RobotCellConfig
+            {
+                ProjectName = "ROBOTCEL_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + worktopHeight.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                WorktopHeightMm = worktopHeight,
+                IntermediateBeamMaxSpacingMm = Clamp(request.RobotCellIntermediateBeamMaxSpacingMm, 300, 1000, ProductDefaults.RobotCellIntermediateBeamMaxSpacingMm),
+                UprightProfile = CloneMaterial(FindProfile("alu_system_80x80")),
+                FrameBeamProfile = CloneMaterial(FindProfile("alu_system_80x40")),
+                RearRailProfile = CloneMaterial(FindProfile("alu_system_160x40")),
+                WorktopMaterial = CloneMaterial(FindSheet("hpl_10_lex")),
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+        }
+
+        public ShippingBoxConfig BuildShippingBox(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var internalWidth = Clamp(request.WidthMm, 200, 6000, ProductDefaults.ShippingBoxInternalWidthMm);
+            var internalDepth = Clamp(request.DepthMm, 200, 3000, ProductDefaults.ShippingBoxInternalDepthMm);
+            var internalHeight = Clamp(request.HeightMm, 200, 3000, ProductDefaults.ShippingBoxInternalHeightMm);
+            var materialId = string.IsNullOrWhiteSpace(request.SheetMaterialId) ? ProductDefaults.ShippingBoxDefaultMaterialId : request.SheetMaterialId;
+            var material = CloneMaterial(FindSheet(materialId));
+            return new ShippingBoxConfig
+            {
+                ProjectName = "Shipping_box_" + internalWidth.ToString("0") + "x" + internalDepth.ToString("0") + "x" + internalHeight.ToString("0") + "_binnen",
+                InternalWidthMm = internalWidth,
+                InternalDepthMm = internalDepth,
+                InternalHeightMm = internalHeight,
+                PanelMaterial = material,
+                Clip = ProductDefaults.ShippingBoxCrateClip(),
+                JointMode = string.Equals(request.ShippingBoxJointMode, "localized_tabs", StringComparison.OrdinalIgnoreCase) ? "localized_tabs" : "rabbet",
+                IncludeHandles = request.ShippingBoxIncludeHandles,
+                HandleLengthMm = 140,
+                HandleHeightMm = 40,
+                HandleCenterHeightRatio = 0.68,
+                RabbetClearanceMm = 0.4,
+                RabbetDepthFactor = 0.5
+            };
+        }
+
+        private static string NormalizeMachineBaseBeamProfile(string value, bool defaultTo80x40)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return defaultTo80x40 ? "alu_system_80x40" : "alu_system_40x40";
+            return string.Equals(value, "alu_system_80x40", StringComparison.OrdinalIgnoreCase)
+                ? "alu_system_80x40"
+                : "alu_system_40x40";
+        }
+
+        public LexWorkbenchConfig BuildLexWorkbench(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 1200, 2200, ProductDefaults.LexWorkbenchWidthMm);
+            var depth = Clamp(request.DepthMm, 700, 1400, ProductDefaults.LexWorkbenchDepthMm);
+            var height = Clamp(request.HeightMm, ProductDefaults.LexWorkbenchHeightMm, ProductDefaults.LexWorkbenchHeightMm + 400, ProductDefaults.LexWorkbenchHeightMm);
+            var config = new LexWorkbenchConfig
+            {
+                ProductVariant = "lex_standard",
+                ProjectName = "WORKSTATION_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                HeightMm = height,
+                ColumnCenterDistanceMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm,
+                ColumnBaseHeightMm = 75,
+                StabilizationPlateWidthMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm + ProductDefaults.LexHte2LiftColumn().BodyDepthMm,
+                StabilizationPlateHeightMm = 240,
+                RailCenterDistanceMm = 700,
+                WorktopCenterSupportOffsetMm = 70,
+                FixedRailFrameWidthMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm + 80,
+                FixedRailFrameDepthMm = 780,
+                CarriageCenterDistanceMm = 600,
+                CarriageAdapterLengthMm = 80,
+                CarriageAdapterWidthMm = 80,
+                CarriageAdapterThicknessMm = 10,
+                CarriageAdapterClearanceHoleDiameterMm = 4.5,
+                CarriageAdapterSlotLengthMm = 20,
+                CarriageAdapterSlotWidthMm = 9,
+                CarriageAdapterSlotPitchMm = 40,
+                CarriageAdapterProfileGrooveOffsetMm = 20,
+                BallTransferHoleDiameterMm = 30.1,
+                BallTransferBodyDiameterMm = 30.01,
+                BallTransferFlangeDiameterMm = 31.95,
+                BallTransferFlangeThicknessMm = 1.2,
+                BallTransferFlangeRecessDiameterMm = 32.1,
+                BallTransferFlangeRecessDepthMm = 1.2,
+                BallTransferInsertionLengthMm = 17,
+                BallTransferBallDiameterMm = 19.05,
+                BallTransferWorkingHeightMm = 2,
+                SawingMode = ParseSawingMode(request.ProfileSawingMode),
+                Profile80x40 = CloneMaterial(FindProfile("alu_system_80x40")),
+                Profile80x80 = CloneMaterial(FindProfile("alu_system_80x80")),
+                Profile40x40 = CloneMaterial(FindProfile("alu_system_40x40")),
+                TopSheet = CloneMaterial(FindSheet("hpl_10_lex")),
+                StabilizationSheet = CloneMaterial(FindSheet("hpl_6_lex_stabilizer")),
+                CarriageAdapterSheet = CloneMaterial(FindSheet("alu_6082_10_adapter")),
+                LinearGuide = ProductDefaults.LexHsr15LinearGuide(),
+                LiftColumn = ProductDefaults.LexHte2LiftColumn(),
+                LevelingFootCornerAdapter = ProductDefaults.LexLevelingFootCornerAdapter(),
+                LevelingFoot = ProductDefaults.LexLevelingFoot()
+            };
+            config.DesignNotes.Add("Basisontwerp v0.1: rollenbaan vervallen; een afzonderlijk eigen maakdeel in HPL 6 mm vervangt het eerdere 240 mm verbindingsprofiel. Deze tussenplaat is niet inbegrepen bij de HTE2-hefset.");
+            config.DesignNotes.Add("HSR15 is als systeemcode vastgelegd: rail 15x15, steek 60, 25 gaten op 1500 mm met 30 mm eindafstand en HSR15R-wagen 34x56,6x28.");
+            config.DesignNotes.Add("Kogelpot voorlopig op QB310-envelope: huis Ø30,01, flens Ø31,95x1,2, insteeklengte 17 en hoofdkogel Ø19,05. Verzonken montage in Ø30,1 doorvoer met vlakke flenszitting Ø32,1x1,2 mm; kraag draagt mechanisch op de HPL-schouder. Gewenste kogeltop 2 mm boven het afgewerkte HPL. Definitief inkooptype, passing en eventuele transportborging met een proefexemplaar vrijgeven.");
+            config.DesignNotes.Add("De verticale stabilisatieplaat ligt tegen de achterste kopse zijde van de 160 mm diepe, 90 graden gedraaide HTE2-kolommen en loopt over 955 mm door tot de beide buitenzijden van de 65 mm brede kolommen.");
+            config.DesignNotes.Add("HSR15-rails zijn ondersteboven tegen de onderzijde van twee raildragers in het bewegende werkbladframe gemonteerd; railgaten liggen op de profielgroef en gebruiken M4-inschuifmoeren.");
+            config.DesignNotes.Add("Vier aluminium adapterplaten 80x80x10 koppelen de omgekeerde HSR15R-wagens aan het vaste 80x80-frame: wagenpatroon 26x26 en twee sleufgaten in de profielgroeven op 20 en 60 mm, dus 40 mm hartafstand.");
+            config.DesignNotes.Add("De bewegende werkbladhouder behoudt een gesloten rechthoekige buitencontour van 80x40-profielen. Binnen die contour liggen drie 1570 mm lange 80x40-liggers tussen de linker- en rechterzijprofielen op Z=-350, +70 en +350 mm; de buitenste twee zijn tevens raildrager. De middenligger ligt daarmee tussen de kogelpotrijen op Z=0 en Z=+140 mm, zodat de circa 8,2 mm uitstekende kogelpotbehuizingen vrij blijven. Alleen de drie eerdere losse dwarsliggers langs Z vervallen.");
+            config.DesignNotes.Add("Alle werkelijk blootliggende profielkoppen krijgen zwarte PA-GF serie-8 afdekkappen: 4x 80x80 op het vaste railframe en 4x 80x40 op het bewegende buitenframe. De vier voetprofielkoppen worden volledig afgedekt door de ZI-1744 hoekadapters en krijgen daarom geen losse kap.");
+            config.DesignNotes.Add("Vier Maunsystem ZI-1744 hoekadapters met M16-opname dragen ZI-1415-S stelvoeten D80/M16x130. De voetprofielen worden tussen de adapters ingekort; adapter, voet en blad blijven samen exact binnen de diepte-envelope van " + depth.ToString("0.##") + " mm.");
+            return config;
+        }
+
+        public LexWorkbenchConfig BuildLexRevolutionWorkbench(PortalQuoteRequest request)
+        {
+            var config = BuildLexWorkbench(request);
+            config.ProductVariant = "lex_revolution";
+            config.ProjectName = config.ProjectName.Replace("WORKSTATION_", "WORKSTATION_ONTWIKKELVARIANT_");
+            config.DesignNotes.Insert(0, "LEX Revolution ontwikkelvariant: zelfstandige productroute op basis van de offerbare LEX-revisie. De startgeometrie, stuklijst en calculatie zijn bij aanmaak bewust gelijk; nieuwe slimme oplossingen worden alleen in deze variant doorontwikkeld.");
+            return config;
         }
 
         public CabinetConfig BuildCabinet(PortalQuoteRequest request)
         {
+            request = request ?? new PortalQuoteRequest();
             var width = Clamp(request.WidthMm, 300, 3020, ProductDefaults.CabinetWidthMm);
             var depth = Clamp(request.DepthMm, 250, 1520, ProductDefaults.CabinetDepthMm);
             var height = Clamp(request.HeightMm, 300, 2400, ProductDefaults.CabinetHeightMm);
@@ -69,7 +239,19 @@ namespace SWWerkplaats.Configurator.Portal
             var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
             var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId));
             var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
+            var slidingDoor = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.SlidingDoorMaterialId) ? ProductDefaults.DefaultSlidingDoorMaterialId : request.SlidingDoorMaterialId));
             var rail = CloneRail(DefaultRail(catalog.DrawerRails()));
+            var sheetFastener = ProductFastener(request.Product, "cabinet", true);
+            sheetFastener.LengthMm = FastenerSelectionService.SelectWoodToWoodEdgeLength(sheetFastener, carcass.ThicknessMm, Math.Max(depth, height));
+            var sliding = string.Equals(request.DoorMode, "sliding", StringComparison.OrdinalIgnoreCase);
+            var slidingStart = (int)Clamp(request.SlidingDoorStartUnit, 1, units, 1);
+            var slidingEnd = (int)Clamp(request.SlidingDoorEndUnit, 1, units, units);
+            if (slidingEnd < slidingStart)
+            {
+                var tmp = slidingStart;
+                slidingStart = slidingEnd;
+                slidingEnd = tmp;
+            }
 
             var config = new CabinetConfig
             {
@@ -85,11 +267,13 @@ namespace SWWerkplaats.Configurator.Portal
                 WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
                 DrawerMaterial = drawer,
                 FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                SlidingDoorMaterial = slidingDoor,
                 BackMaterial = back,
-                SheetFastener = CloneFastener(catalog.SheetFasteners()[ProductDefaults.DefaultFastenerIndex]),
+                SheetFastener = sheetFastener,
                 DrawerRail = rail,
                 ShelfSupport = CloneShelfSupport(catalog.ShelfSupports()[ProductDefaults.DefaultShelfSupportIndex]),
                 IncludeFullWidthTopDrawer = request.IncludeTopDrawer,
+                IncludeDrawerPullCutouts = request.IncludeDrawerPullCutouts,
                 FullWidthTopDrawerHeightMm = ProductDefaults.FullWidthTopDrawerHeightMm,
                 ShelfStartMode = NormalizeShelfStartMode(request.ShelfStartMode),
                 IncludeAdjustableShelfHoles = request.IncludeAdjustableShelfHoles,
@@ -99,13 +283,25 @@ namespace SWWerkplaats.Configurator.Portal
                 TabWidthMm = 8,
                 TabHeightMm = 1.5,
                 ShelfClearanceMm = ProductDefaults.ShelfClearanceMm,
+                ShelfFrontInsetMm = Clamp(request.ShelfFrontInsetMm, 0, Math.Max(0, depth - 160), ProductDefaults.CabinetShelfFrontInsetMm),
                 DrawerSideClearanceMm = Math.Max(13, rail.ThicknessMm),
                 DrawerBackClearanceMm = ProductDefaults.DrawerBackClearanceMm,
-                DoorGapMm = ProductDefaults.DoorGapMm
+                DoorGapMm = ProductDefaults.DoorGapMm,
+                SlidingDoorStartUnit = slidingStart,
+                SlidingDoorEndUnit = slidingEnd,
+                SlidingDoorOverlapMm = Clamp(request.SlidingDoorOverlapMm, 0, 120, ProductDefaults.CabinetSlidingDoorOverlapMm),
+                SlidingDoorFreeSpaceBehindMm = ProductDefaults.CabinetSlidingDoorFreeSpaceBehindMm,
+                SlidingDoorTrackCenterSpacingMm = ProductDefaults.CabinetSlidingDoorTrackCenterSpacingMm,
+                SlidingDoorTopProfileHeightMm = ProductDefaults.CabinetSlidingDoorTopProfileHeightMm,
+                SlidingDoorBottomProfileHeightMm = ProductDefaults.CabinetSlidingDoorBottomProfileHeightMm,
+                SlidingDoorTapeThicknessMm = ProductDefaults.CabinetSlidingDoorTapeThicknessMm,
+                SlidingDoorTopProfileDepthMm = ProductDefaults.CabinetSlidingDoorTopProfileDepthMm,
+                SlidingDoorBottomProfileDepthMm = ProductDefaults.CabinetSlidingDoorBottomProfileDepthMm
             };
 
             for (var i = 1; i <= units; i++)
             {
+                var unitHasSlidingDoor = sliding && i >= slidingStart && i <= slidingEnd;
                 config.Units.Add(new CabinetUnitConfig
                 {
                     UnitNumber = i,
@@ -113,12 +309,103 @@ namespace SWWerkplaats.Configurator.Portal
                     ShelfHeightsMm = "",
                     DrawerCount = Math.Max(0, request.DefaultDrawerCount),
                     DrawerHeightMm = 160,
-                    Door = ParseDoor(request.DoorMode),
-                    SlidingDoors = string.Equals(request.DoorMode, "sliding", StringComparison.OrdinalIgnoreCase),
+                    Door = unitHasSlidingDoor ? CabinetDoorHand.Geen : ParseDoor(request.DoorMode),
+                    SlidingDoors = unitHasSlidingDoor,
                     SlidingDoorMaxWidthMm = 600
                 });
             }
 
+            return config;
+        }
+
+        public WorkbenchCabinetConfig BuildWorkbenchCabinet(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 600, 3020, ProductDefaults.WorkbenchCabinetWidthMm);
+            var depth = Clamp(request.DepthMm, 300, 1520, ProductDefaults.WorkbenchCabinetDepthMm);
+            var height = Clamp(request.HeightMm, 500, 2400, ProductDefaults.WorkbenchCabinetHeightMm);
+            var units = (int)Clamp(request.UnitCount, 1, 12, ProductDefaults.WorkbenchCabinetUnitCount);
+            var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
+            var rail = CloneRail(DefaultRail(catalog.DrawerRails()));
+            var shelfSupport = CloneShelfSupport(catalog.ShelfSupports()[ProductDefaults.DefaultShelfSupportIndex]);
+            var backMaterial = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
+            var backThickness = request.IncludeBackPanel ? backMaterial.ThicknessMm : 0.0;
+            var maxShelfFrontInset = Math.Max(0, depth - backThickness - shelfSupport.BackInsetMm - shelfSupport.FrontInsetMm - 6.0);
+            var shelfFrontInset = Math.Max(0, Math.Min(maxShelfFrontInset, request.ShelfFrontInsetMm));
+            var adjustableFoot = ProductDefaults.WorkbenchCabinetAdjustableFoot();
+            var sheetFastener = ProductFastener(request.Product, "werkbankkast", true);
+            sheetFastener.LengthMm = FastenerSelectionService.SelectWoodToWoodEdgeLength(sheetFastener, carcass.ThicknessMm, Math.Max(depth, height));
+            var minimumFootInset = Math.Max(
+                adjustableFoot.FootDiameterMm / 2.0 + 1.0,
+                adjustableFoot.MountingBlockWidthMm / 2.0 + 1.0);
+
+            var config = new WorkbenchCabinetConfig
+            {
+                ProjectName = "Werkbankkast_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                WorktopHeightMm = height,
+                UnitCount = units,
+                PlinthHeightMm = Clamp(request.WorkbenchCabinetPlinthHeightMm, adjustableFoot.MinHeightMm, Math.Min(adjustableFoot.MaxHeightMm, Math.Max(adjustableFoot.MinHeightMm, height - 300)), adjustableFoot.NominalHeightMm),
+                PlinthSetbackMm = Clamp(request.WorkbenchCabinetPlinthSetbackMm, 0, Math.Max(0, depth / 2.0 - 1), ProductDefaults.WorkbenchCabinetPlinthSetbackMm),
+                PlinthFloorClearanceMm = ProductDefaults.WorkbenchCabinetPlinthFloorClearanceMm,
+                IncludeLeftSidePlinth = request.WorkbenchCabinetIncludeLeftSidePlinth,
+                IncludeRightSidePlinth = request.WorkbenchCabinetIncludeRightSidePlinth,
+                AdjustableFoot = adjustableFoot,
+                AdjustableFootInsetMm = Clamp(request.WorkbenchCabinetFootInsetMm, minimumFootInset, Math.Max(minimumFootInset, Math.Min(width, depth) / 2.0 - 1), ProductDefaults.WorkbenchCabinetFootInsetMm),
+                PlinthClipCenterBehindBackFaceMm = Clamp(
+                    request.WorkbenchCabinetPlinthClipCenterBehindBackFaceMm,
+                    5,
+                    Math.Max(5, depth / 2.0 - carcass.ThicknessMm - 1),
+                    ProductDefaults.WorkbenchCabinetPlinthClipCenterBehindBackFaceMm),
+                DoorStopWidthMm = Clamp(request.WorkbenchCabinetDoorStopWidthMm, carcass.ThicknessMm + 4, 240, ProductDefaults.WorkbenchCabinetDoorStopWidthMm),
+                DoorGapMm = ProductDefaults.WorkbenchCabinetDoorGapMm,
+                DoorToCarcassClearanceMm = ProductDefaults.WorkbenchCabinetDoorToCarcassClearanceMm,
+                FrontPanelCornerRadiusMm = request.WorkbenchCabinetFrontPanelCornerRadiusMm.HasValue
+                    ? Math.Max(0, Math.Min(25, request.WorkbenchCabinetFrontPanelCornerRadiusMm.Value))
+                    : ProductDefaults.WorkbenchCabinetFrontPanelCornerRadiusMm,
+                ShelfCountPerUnit = Math.Max(0, Math.Min(20, request.DefaultShelfCount)),
+                ShelfStartMode = NormalizeShelfStartMode(string.IsNullOrWhiteSpace(request.ShelfStartMode) ? ProductDefaults.WorkbenchCabinetDefaultShelfStartMode : request.ShelfStartMode),
+                ShelfClearanceMm = ProductDefaults.WorkbenchCabinetShelfClearanceMm,
+                ShelfFrontInsetMm = shelfFrontInset,
+                AdjustableShelfHoleEndMarginMm = ProductDefaults.WorkbenchCabinetAdjustableShelfHoleEndMarginMm,
+                AdjustableShelfPositionCount = Math.Max(
+                    Math.Max(0, Math.Min(20, request.DefaultShelfCount)),
+                    request.AdjustableShelfPositionCount > 0
+                        ? Math.Min(20, request.AdjustableShelfPositionCount)
+                        : ProductDefaults.WorkbenchCabinetAdjustableShelfPositionCount),
+                IncludeAdjustableShelfHoles = request.IncludeAdjustableShelfHoles,
+                IncludeTopDrawer = request.IncludeTopDrawer,
+                IncludeDrawerPullCutouts = request.IncludeDrawerPullCutouts,
+                TopDrawerHeightMm = Clamp(request.WorkbenchCabinetTopDrawerHeightMm, 100, 320, ProductDefaults.WorkbenchCabinetTopDrawerHeightMm),
+                DrawerSideClearanceMm = Math.Max(13, rail.ThicknessMm),
+                DrawerBackClearanceMm = ProductDefaults.WorkbenchCabinetDrawerBackClearanceMm,
+                IncludeBackPanel = request.IncludeBackPanel,
+                CarcassMaterial = carcass,
+                WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                DrawerMaterial = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId)),
+                BackMaterial = backMaterial,
+                SheetFastener = sheetFastener,
+                ShelfSupport = shelfSupport,
+                DrawerRail = rail
+            };
+            config.AdjustableFoot.CentralFastenerLengthMm = FastenerSelectionService.SelectComponentToWoodFaceLength(
+                sheetFastener,
+                2.0,
+                carcass.ThicknessMm);
+            var adapter = config.AdjustableFoot == null ? null : config.AdjustableFoot.PlinthClipAdapter;
+            if (adapter != null)
+            {
+                adapter.FrontScrewLengthMm = FastenerSelectionService.SelectComponentToWoodFaceLength(
+                    sheetFastener,
+                    ProductDefaults.WorkbenchCabinetFrontAdapterStandOffMm(config),
+                    carcass.ThicknessMm);
+                adapter.SideScrewLengthMm = FastenerSelectionService.SelectComponentToWoodFaceLength(
+                    sheetFastener,
+                    ProductDefaults.WorkbenchCabinetSideAdapterStandOffMm(config),
+                    carcass.ThicknessMm);
+            }
             return config;
         }
 
@@ -165,6 +452,40 @@ namespace SWWerkplaats.Configurator.Portal
             return "bottom";
         }
 
+        private static ProfileSawingMode ParseSawingMode(string value)
+        {
+            value = (value ?? "").Trim().ToLowerInvariant();
+            return value == "inhouse" || value == "werkplaats" || value == "zelf_zagen"
+                ? ProfileSawingMode.InHouse
+                : ProfileSawingMode.SupplierCutToLength;
+        }
+
+        private static Material ProfileMaterial(string id, string name, double width, double height)
+        {
+            return new Material
+            {
+                Id = id,
+                Name = name,
+                Kind = MaterialKind.Profile,
+                WidthMm = width,
+                HeightMm = height,
+                StockLengthMm = 6000
+            };
+        }
+
+        private static Material SheetMaterial(string id, string name, double thickness)
+        {
+            return new Material
+            {
+                Id = id,
+                Name = name,
+                Kind = MaterialKind.Sheet,
+                ThicknessMm = thickness,
+                SheetLengthMm = 3050,
+                SheetWidthMm = 1300
+            };
+        }
+
         private static double Clamp(double value, double min, double max, double fallback)
         {
             if (value <= 0) value = fallback;
@@ -195,6 +516,20 @@ namespace SWWerkplaats.Configurator.Portal
             return fallback;
         }
 
+        private FastenerDefinition ProductFastener(string requestedProductId, string fallbackProductId, bool woodToWood)
+        {
+            var productId = string.IsNullOrWhiteSpace(requestedProductId) ? fallbackProductId : requestedProductId;
+            var standard = ProductFastenerStandards.Resolve(productId);
+            var fastenerId = woodToWood ? standard.WoodToWoodFastenerId : standard.StructuralFastenerId;
+            if (string.IsNullOrWhiteSpace(fastenerId))
+                throw new InvalidOperationException("Producttype " + productId + " heeft geen passende bevestigerstandaard.");
+            foreach (var fastener in catalog.SheetFasteners())
+            {
+                if (string.Equals(fastener.Id, fastenerId, StringComparison.OrdinalIgnoreCase)) return CloneFastener(fastener);
+            }
+            throw new InvalidOperationException("Bevestiger " + fastenerId + " uit productstandaard " + productId + " ontbreekt in de componentbibliotheek.");
+        }
+
         public static Material CloneMaterial(Material material)
         {
             return new Material
@@ -220,10 +555,16 @@ namespace SWWerkplaats.Configurator.Portal
                 Standard = fastener.Standard,
                 NominalDiameterMm = fastener.NominalDiameterMm,
                 ClearanceHoleDiameterMm = fastener.ClearanceHoleDiameterMm,
+                ReceivingPilotHoleDiameterMm = fastener.ReceivingPilotHoleDiameterMm,
                 HeadKind = fastener.HeadKind,
                 HeadDiameterMm = fastener.HeadDiameterMm,
                 HeadHeightMm = fastener.HeadHeightMm,
-                HeadClearanceMm = fastener.HeadClearanceMm
+                HeadClearanceMm = fastener.HeadClearanceMm,
+                UsageKind = fastener.UsageKind,
+                LengthMm = fastener.LengthMm,
+                AvailableLengthsMm = fastener.AvailableLengthsMm == null ? null : (double[])fastener.AvailableLengthsMm.Clone(),
+                MinimumEdgePenetrationMm = fastener.MinimumEdgePenetrationMm,
+                MinimumTipClearanceMm = fastener.MinimumTipClearanceMm
             };
         }
 
@@ -239,6 +580,7 @@ namespace SWWerkplaats.Configurator.Portal
                 CabinetFirstHoleOffsetMm = rail.CabinetFirstHoleOffsetMm,
                 CabinetHoleSpacingMm = rail.CabinetHoleSpacingMm,
                 CabinetHolePositionsMm = rail.CabinetHolePositionsMm,
+                CabinetOppositeHolePositionsMm = rail.CabinetOppositeHolePositionsMm,
                 CabinetVerticalOffsetMm = rail.CabinetVerticalOffsetMm,
                 CabinetHoleDiameterMm = rail.CabinetHoleDiameterMm,
                 DrawerHoleCount = rail.DrawerHoleCount,
@@ -247,7 +589,13 @@ namespace SWWerkplaats.Configurator.Portal
                 DrawerHolePositionsMm = rail.DrawerHolePositionsMm,
                 DrawerVerticalOffsetMm = rail.DrawerVerticalOffsetMm,
                 DrawerHoleDiameterMm = rail.DrawerHoleDiameterMm,
-                FastenerName = rail.FastenerName
+                DrawerFrontInsertionCompensationMm = rail.DrawerFrontInsertionCompensationMm,
+                FastenerName = rail.FastenerName,
+                CabinetFastenerDiameterMm = rail.CabinetFastenerDiameterMm,
+                CabinetFastenerLengthMm = rail.CabinetFastenerLengthMm,
+                CabinetFastenerPassingStackMm = rail.CabinetFastenerPassingStackMm,
+                CabinetFastenerHeadStyle = rail.CabinetFastenerHeadStyle,
+                CabinetOpposingFitVerificationSignature = rail.CabinetOpposingFitVerificationSignature
             };
         }
 

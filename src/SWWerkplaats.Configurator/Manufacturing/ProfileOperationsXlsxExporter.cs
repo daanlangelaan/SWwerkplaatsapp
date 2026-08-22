@@ -30,7 +30,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var headers = new[]
             {
                 "ProfielId", "Onderdeel", "Aantal", "Materiaal", "Profielmaat mm", "Lengte mm", "Volgorde",
-                "Bewerking", "Nulpunt", "Zijde", "Positie mm", "Diameter mm", "Doorlopend", "MachineHint", "Opmerking"
+                "Bewerking", "Nulpunt", "Zijde", "Positie mm", "Diameter mm", "Doorlopend", "Uitvoerder", "MachineHint", "Opmerking"
             };
 
             rows.Append(Row(1, headers, 1));
@@ -49,10 +49,10 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 "<cols>" +
                 Col(1, 1, 24) + Col(2, 2, 25) + Col(3, 3, 9) + Col(4, 4, 19) + Col(5, 5, 16) +
                 Col(6, 6, 12) + Col(7, 7, 10) + Col(8, 8, 16) + Col(9, 9, 12) + Col(10, 10, 18) +
-                Col(11, 11, 18) + Col(12, 12, 14) + Col(13, 13, 12) + Col(14, 14, 16) + Col(15, 15, 58) +
+                Col(11, 11, 18) + Col(12, 12, 14) + Col(13, 13, 12) + Col(14, 14, 20) + Col(15, 15, 16) + Col(16, 16, 58) +
                 "</cols>" +
                 "<sheetData>" + rows + "</sheetData>" +
-                "<autoFilter ref=\"A1:O" + (rowIndex - 1).ToString(CultureInfo.InvariantCulture) + "\"/>" +
+                "<autoFilter ref=\"A1:P" + (rowIndex - 1).ToString(CultureInfo.InvariantCulture) + "\"/>" +
                 "</worksheet>";
         }
 
@@ -73,6 +73,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 PositionText(operation),
                 operation.DiameterMm > 0 ? F(operation.DiameterMm) : "",
                 operation.DiameterMm > 0 ? (operation.ThroughHole ? "ja" : "nee") : "",
+                operation.ExecutionParty,
                 operation.MachineHint,
                 operation.Note
             };

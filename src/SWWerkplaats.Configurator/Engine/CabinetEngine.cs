@@ -8,6 +8,16 @@ namespace SWWerkplaats.Configurator.Engine
 {
     public sealed class CabinetEngine
     {
+        private const double DefaultSlidingDoorOverlapMm = 25.0;
+        private const double DefaultSlidingDoorFreeSpaceBehindMm = 10.0;
+        private const double DefaultSlidingDoorTrackCenterSpacingMm = 18.0;
+        private const double DefaultSlidingDoorTopProfileHeightMm = 25.0;
+        private const double DefaultSlidingDoorBottomProfileHeightMm = 18.0;
+        private const double DefaultSlidingDoorTapeThicknessMm = 1.0;
+        private const double DefaultSlidingDoorTopProfileDepthMm = 15.0;
+        private const double DefaultSlidingDoorBottomProfileDepthMm = 18.0;
+        private const double DefaultSlidingDoorProfileWallThicknessMm = 2.0;
+
         public WorkbenchModel Build(CabinetConfig config)
         {
             Validate(config);
@@ -29,8 +39,6 @@ namespace SWWerkplaats.Configurator.Engine
             var unitWidth = config.WidthMm / config.UnitCount;
             var innerDepth = config.DepthMm - t;
             var bayFitClearance = Math.Min(Math.Max(0, config.ShelfClearanceMm), 1.0);
-            var clearBottomBayWidth = Math.Max(20, (config.WidthMm - (config.UnitCount + 1.0) * t) / config.UnitCount);
-            var bayWidth = Math.Max(20, clearBottomBayWidth - 2.0 * bayFitClearance);
             var frontZ = -config.DepthMm / 2.0;
             var backZ = config.DepthMm / 2.0;
             var backThickness = config.IncludeBackPanel ? back.ThicknessMm : 0;
@@ -49,22 +57,29 @@ namespace SWWerkplaats.Configurator.Engine
             AddPlinthToUprightHoles(plinth, config);
             AddSheet(model, plinth, 0, config.PlinthHeightMm / 2.0, frontZ + config.PlinthDepthMm + t / 2.0, AssemblyOrientation.SheetVerticalX);
 
-            var leftSide = SidePanel("Zijwand links", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
+            var sideDepth = config.IncludeBackPanel
+                ? ProductDrawingStrategy.PlateSizeWithSingleGrooveInsertion(config.DepthMm, backAlignmentDepth)
+                : config.DepthMm;
+            var sideCenterZ = config.IncludeBackPanel
+                ? ProductDrawingStrategy.CenterOffsetForSingleGrooveInsertion(backAlignmentDepth)
+                : 0;
+
+            var leftSide = SidePanel("Zijwand links", carcass, sideDepth, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
             AddBottomReceivingGrooveToUpright(leftSide, config);
             AddRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddTopDrawerRailHolesForPanel(leftSide, config, 0, bodyHeight);
             AddAdjustableShelfHolesForPanel(leftSide, config, 0, bodyHeight, shelfZoneTop);
             AddBottomToUprightHoles(leftSide, config, 1);
-            AddSheet(model, leftSide, -config.WidthMm / 2.0 + t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
+            AddSheet(model, leftSide, -config.WidthMm / 2.0 + t / 2.0, bodyHeight / 2.0, sideCenterZ, AssemblyOrientation.SheetVerticalZ);
 
-            var rightSide = SidePanel("Zijwand rechts", carcass, config.DepthMm, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
+            var rightSide = SidePanel("Zijwand rechts", carcass, sideDepth, bodyHeight, plinthNotchDepth, config.PlinthHeightMm);
             rightSide.MirrorInNestingX = true;
             AddBottomReceivingGrooveToUpright(rightSide, config);
             AddRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddTopDrawerRailHolesForPanel(rightSide, config, config.UnitCount, bodyHeight);
             AddAdjustableShelfHolesForPanel(rightSide, config, config.UnitCount, bodyHeight, shelfZoneTop);
             AddBottomToUprightHoles(rightSide, config, config.UnitCount);
-            AddSheet(model, rightSide, config.WidthMm / 2.0 - t / 2.0, bodyHeight / 2.0, 0, AssemblyOrientation.SheetVerticalZ);
+            AddSheet(model, rightSide, config.WidthMm / 2.0 - t / 2.0, bodyHeight / 2.0, sideCenterZ, AssemblyOrientation.SheetVerticalZ);
 
             for (var i = 1; i < config.UnitCount; i++)
             {
@@ -73,6 +88,7 @@ namespace SWWerkplaats.Configurator.Engine
                 var dividerDepth = config.DepthMm + backAlignmentDepth;
                 var divider = SidePanel("Tussenschot " + i.ToString(CultureInfo.InvariantCulture), carcass, dividerDepth, dividerHeight, plinthNotchDepth, config.PlinthHeightMm);
                 AddBottomReceivingGrooveToUpright(divider, config);
+                AddSlidingDoorPassThroughToDivider(divider, config, i, bodyHeight, shelfZoneTop);
                 AddRailHolesForPanel(divider, config, i, bodyHeight);
                 AddTopDrawerRailHolesForPanel(divider, config, i, bodyHeight);
                 AddAdjustableShelfHolesForPanel(divider, config, i, bodyHeight, shelfZoneTop);
@@ -90,12 +106,14 @@ namespace SWWerkplaats.Configurator.Engine
                     : config.DepthMm;
                 var bottomCenterZ = config.IncludeBackPanel ? ProductDrawingStrategy.CenterOffsetForSingleGrooveInsertion(bottomInsertDepth) : 0;
                 var bottom = Sheet("Bodem U" + (i + 1).ToString(CultureInfo.InvariantCulture), carcass, bottomFit.WidthMm, bottomDepth);
+                AddBottomToPlinthHoles(bottom, config, i + 1);
                 AddSheet(model, bottom, bottomFit.CenterXmm, config.PlinthHeightMm + t / 2.0, bottomCenterZ, AssemblyOrientation.SheetHorizontal);
             }
 
             if (config.IncludeBackPanel)
             {
                 var backPanel = Sheet("Achterwand", back, config.WidthMm, bodyHeight);
+                AddSideReceivingGroovesToBackPanel(backPanel, config, bodyHeight);
                 AddDividerGroovesToBackPanel(backPanel, config, bodyHeight);
                 AddBottomReceivingGrooveToBackPanel(backPanel, config, bodyHeight);
                 AddBackPanelMountingHoles(backPanel, config, bodyHeight);
@@ -105,8 +123,9 @@ namespace SWWerkplaats.Configurator.Engine
             for (var i = 0; i < config.UnitCount; i++)
             {
                 var unit = GetUnit(config, i + 1);
-                var unitCenterX = -config.WidthMm / 2.0 + unitWidth * (i + 0.5);
-                var clearWidth = bayWidth;
+                var bayFit = BottomFitForUnit(config, i, t, 0);
+                var unitCenterX = bayFit.CenterXmm;
+                var clearWidth = Math.Max(20, bayFit.WidthMm - 2.0 * bayFitClearance);
                 if (topDrawerHeight > 0)
                 {
                     BuildTopDrawerForUnit(model, config, i + 1, unitCenterX, clearWidth, innerDepth, bodyHeight, topDrawerHeight, frontZ, drawer, front, carcass);
@@ -115,6 +134,7 @@ namespace SWWerkplaats.Configurator.Engine
                 BuildUnit(model, config, unit, i + 1, unitCenterX, clearWidth, innerDepth, bodyHeight, shelfZoneTop, frontZ, drawer, front, carcass);
             }
 
+            BuildSlidingDoorRanges(model, config, innerDepth, bodyHeight, shelfZoneTop, frontZ, carcass);
             AddHardware(model, config);
             return model;
         }
@@ -136,10 +156,14 @@ namespace SWWerkplaats.Configurator.Engine
         {
             var t = carcassMaterial.ThicknessMm;
             var shelfZone = ShelfZoneForUnit(unit, config, shelfZoneTop);
+            var shelfFrontInset = ShelfFrontInset(config, unit, innerDepth);
+            var shelfDepth = Math.Max(80, innerDepth - shelfFrontInset);
+            var shelfCenterZ = shelfFrontInset / 2.0;
             foreach (var shelfHeight in ShelfHeights(unit, config, shelfZone.MinMm, shelfZone.MaxMm, unit.DrawerCount > 0))
             {
-                var shelf = Sheet("Legplank U" + unitNumber + " H" + shelfHeight.ToString("0", CultureInfo.InvariantCulture), carcassMaterial, clearWidth, innerDepth);
-                AddSheet(model, shelf, centerX, shelfHeight, 0, AssemblyOrientation.SheetHorizontal);
+                var shelf = Sheet("Legplank U" + unitNumber + " H" + shelfHeight.ToString("0", CultureInfo.InvariantCulture), carcassMaterial, clearWidth, shelfDepth);
+                AddShelfBracketMountingHoles(shelf, config);
+                AddSheet(model, shelf, centerX, shelfHeight, shelfCenterZ, AssemblyOrientation.SheetHorizontal);
             }
 
             if (unit.DrawerCount > 0)
@@ -167,6 +191,7 @@ namespace SWWerkplaats.Configurator.Engine
 
                     var drawerFront = Sheet("Ladefront U" + unitNumber + "-" + (drawerIndex + 1), frontMaterial, frontWidth, frontHeight);
                     AddDrawerFrontGrooves(drawerFront, boxWidth, drawerMaterial);
+                    AddDrawerPullCutout(drawerFront, config);
                     AddSheet(model, drawerFront, centerX, centerY, FlushFrontCenterZ(frontZ, frontMaterial), AssemblyOrientation.SheetVerticalX);
                     var drawerBottom = Sheet("Ladebodem U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, bottomWidth, bottomDepth);
                     var drawerSideLeft = Sheet("Ladezijde links U" + unitNumber + "-" + (drawerIndex + 1), drawerMaterial, sideLength, frontHeight);
@@ -192,28 +217,16 @@ namespace SWWerkplaats.Configurator.Engine
 
             if (unit.Door != CabinetDoorHand.Geen)
             {
-                var height = bodyHeight - config.PlinthHeightMm - 2.0 * config.DoorGapMm;
-                var door = Sheet("Draaideur " + unit.Door + " U" + unitNumber, frontMaterial, clearWidth - config.DoorGapMm, height);
-                AddDoorHingeHoles(door, config, unit.Door);
-                AddSheet(model, door, centerX, config.PlinthHeightMm + config.DoorGapMm + height / 2.0, frontZ - frontMaterial.ThicknessMm / 2.0, AssemblyOrientation.SheetVerticalX);
-                model.Hardware.Add(new HardwareItem { Name = "Scharnieren " + unit.Door, ArticleNumber = "HINGE_TEMPLATE", Quantity = 2, Unit = "st", Note = "Voor draaideur unit " + unitNumber });
-            }
-
-            if (unit.SlidingDoors)
-            {
-                var maxWidth = unit.SlidingDoorMaxWidthMm > 0 ? unit.SlidingDoorMaxWidthMm : clearWidth / 2.0;
-                var panels = Math.Max(2, (int)Math.Ceiling(clearWidth / maxWidth));
-                var panelWidth = clearWidth / panels + 25;
-                var panelHeight = bodyHeight - config.PlinthHeightMm - 2.0 * config.DoorGapMm;
-                for (var p = 0; p < panels; p++)
+                var doorZone = DoorPanelZone(unit, config, shelfZoneTop);
+                if (doorZone.HeightMm >= 80)
                 {
-                    var x = centerX - clearWidth / 2.0 + (p + 0.5) * clearWidth / panels;
-                    var z = frontZ - frontMaterial.ThicknessMm / 2.0 - p % 2 * 8;
-                    AddSheet(model, Sheet("Schuifdeur U" + unitNumber + "-" + (p + 1), frontMaterial, panelWidth, panelHeight), x, config.PlinthHeightMm + config.DoorGapMm + panelHeight / 2.0, z, AssemblyOrientation.SheetVerticalX);
+                    var door = Sheet("Draaideur " + unit.Door + " U" + unitNumber, frontMaterial, clearWidth - config.DoorGapMm, doorZone.HeightMm);
+                    AddDoorHingeHoles(door, config, unit.Door);
+                    AddSheet(model, door, centerX, doorZone.CenterYmm, frontZ - frontMaterial.ThicknessMm / 2.0, AssemblyOrientation.SheetVerticalX);
+                    model.Hardware.Add(new HardwareItem { Name = "Scharnieren " + unit.Door, ArticleNumber = "HINGE_TEMPLATE", Quantity = 2, Unit = "st", Note = "Voor draaideur unit " + unitNumber });
                 }
-
-                model.Hardware.Add(new HardwareItem { Name = "Schuifdeurrail set", ArticleNumber = "SLIDING_TRACK_TEMPLATE", Quantity = 1, Unit = "set", Note = "Unit " + unitNumber + ", max paneelbreedte " + maxWidth.ToString("0") + " mm" });
             }
+
         }
 
         private static void BuildTopDrawerForUnit(
@@ -252,6 +265,7 @@ namespace SWWerkplaats.Configurator.Engine
 
             var drawerFront = Sheet("Bovenlade front U" + unitNumber, frontMaterial, frontWidth, frontHeight);
             AddDrawerFrontGrooves(drawerFront, boxWidth, drawerMaterial);
+            AddDrawerPullCutout(drawerFront, config);
             AddSheet(model, drawerFront, centerX, centerY, FlushFrontCenterZ(frontZ, frontMaterial), AssemblyOrientation.SheetVerticalX);
             var drawerBottom = Sheet("Bovenlade bodem U" + unitNumber, drawerMaterial, bottomWidth, bottomDepth);
             var drawerSideLeft = Sheet("Bovenlade zijde links U" + unitNumber, drawerMaterial, sideLength, frontHeight);
@@ -284,6 +298,362 @@ namespace SWWerkplaats.Configurator.Engine
             return Math.Max(120, innerDepth - config.DrawerBackClearanceMm);
         }
 
+        private static double ShelfFrontInset(CabinetConfig config, CabinetUnitConfig unit, double innerDepth)
+        {
+            if (config == null) return 0;
+            var requested = Clamp(config.ShelfFrontInsetMm, 0, Math.Max(0, innerDepth - 80));
+            if (unit != null && unit.SlidingDoors)
+            {
+                requested = Math.Max(requested, SlidingDoorRequiredShelfInset(config));
+            }
+
+            return Clamp(requested, 0, Math.Max(0, innerDepth - 80));
+        }
+
+        private static double SlidingDoorRequiredShelfInset(CabinetConfig config)
+        {
+            if (config == null) return 0;
+            var doorThickness = MaterialThickness(config.SlidingDoorMaterial ?? config.FrontMaterial ?? config.CarcassMaterial);
+            var rearTrackCenter = SlidingDoorTrackCenterFromFront(config, 1, doorThickness);
+            var profileDepth = SlidingDoorBottomProfileDepth(config);
+            var freeSpace = SlidingDoorFreeSpaceBehind(config);
+            return rearTrackCenter + profileDepth / 2.0 + freeSpace;
+        }
+
+        private static void BuildSlidingDoorRanges(
+            WorkbenchModel model,
+            CabinetConfig config,
+            double innerDepth,
+            double bodyHeight,
+            double shelfZoneTop,
+            double frontZ,
+            Material carcassMaterial)
+        {
+            if (model == null || config == null || !HasSlidingDoors(config)) return;
+
+            foreach (var range in SlidingDoorRanges(config))
+            {
+                BuildSlidingDoorRange(model, config, range, innerDepth, bodyHeight, shelfZoneTop, frontZ, carcassMaterial);
+            }
+        }
+
+        private static void BuildSlidingDoorRange(
+            WorkbenchModel model,
+            CabinetConfig config,
+            UnitRange range,
+            double innerDepth,
+            double bodyHeight,
+            double shelfZoneTop,
+            double frontZ,
+            Material carcassMaterial)
+        {
+            var doorMaterial = config.SlidingDoorMaterial ?? config.FrontMaterial ?? config.CarcassMaterial;
+            var t = MaterialThickness(carcassMaterial);
+            var doorThickness = MaterialThickness(doorMaterial);
+            var overlap = SlidingDoorOverlap(config);
+            var trackSpacing = SlidingDoorTrackCenterSpacing(config);
+            var bottomProfileDepth = SlidingDoorBottomProfileDepth(config);
+            var bottomProfileHeight = SlidingDoorBottomProfileHeight(config);
+            var topProfileHeight = SlidingDoorTopProfileHeight(config);
+            var tape = SlidingDoorTapeThickness(config);
+            var latDepth = SlidingDoorTopLatDepthMm(config);
+            var trackClearance = SlidingDoorTrackClearance(config, doorThickness);
+            var profileWallThickness = SlidingDoorProfileWallThickness(config);
+            var rangeLeft = UnitClearLeftX(config, range.Start, t);
+            var rangeRight = UnitClearRightX(config, range.End, t);
+            var rangeWidth = Math.Max(80, rangeRight - rangeLeft);
+            var rangeCenterX = (rangeLeft + rangeRight) / 2.0;
+            var zone = SlidingDoorOpeningZone(config, range, shelfZoneTop);
+            if (zone.HeightMm < 140) return;
+
+            var latTop = zone.CenterYmm + zone.HeightMm / 2.0;
+            var latUnderside = latTop - t;
+            var bottomPlateTop = config.PlinthHeightMm + t;
+            var bottomGuideBottom = bottomPlateTop + tape;
+            var bottomGuideTop = bottomGuideBottom + bottomProfileHeight;
+            var doorBottom = Math.Max(bottomGuideBottom, bottomGuideTop - 8.0);
+            var doorTop = Math.Max(doorBottom + 80, latUnderside - tape + 8.0);
+            var doorHeight = Math.Min(zone.HeightMm, doorTop - doorBottom);
+            var doorCenterY = doorBottom + doorHeight / 2.0;
+
+            var lat = Sheet("Schuifdeur bovenlat U" + range.Start.ToString(CultureInfo.InvariantCulture) + "-" + range.End.ToString(CultureInfo.InvariantCulture), carcassMaterial, rangeWidth, latDepth);
+            AddSlidingDoorTopLatHoles(lat, config, range, rangeLeft, t);
+            AddSheet(model, lat, rangeCenterX, latTop - t / 2.0, frontZ + latDepth / 2.0, AssemblyOrientation.SheetHorizontal);
+
+            for (var unitNumber = range.Start; unitNumber <= range.End; unitNumber++)
+            {
+                var fit = BottomFitForUnit(config, unitNumber - 1, t, 0);
+                var leftExtra = unitNumber == range.Start ? 0 : overlap / 2.0;
+                var rightExtra = unitNumber == range.End ? 0 : overlap / 2.0;
+                var panelWidth = Math.Max(80, fit.WidthMm - 2.0 * config.DoorGapMm + leftExtra + rightExtra);
+                var panelCenterX = fit.CenterXmm + (rightExtra - leftExtra) / 2.0;
+                var trackIndex = (unitNumber - range.Start) % 2;
+                var trackCenterFromFront = SlidingDoorTrackCenterFromFront(config, trackIndex, doorThickness);
+                var panelCenterZ = frontZ + trackCenterFromFront;
+
+                AddSheet(
+                    model,
+                    Sheet("Schuifdeur U" + unitNumber.ToString(CultureInfo.InvariantCulture), doorMaterial, panelWidth, doorHeight),
+                    panelCenterX,
+                    doorCenterY,
+                    panelCenterZ,
+                    AssemblyOrientation.SheetVerticalX);
+            }
+
+            AddSlidingDoorProfileVisual(model, "Schuifdeur onderprofiel voor U" + range.Start + "-" + range.End, rangeCenterX, bottomGuideBottom + bottomProfileHeight / 2.0, frontZ + SlidingDoorTrackCenterFromFront(config, 0, doorThickness), rangeWidth, bottomProfileDepth, bottomProfileHeight);
+            AddSlidingDoorProfileVisual(model, "Schuifdeur onderprofiel achter U" + range.Start + "-" + range.End, rangeCenterX, bottomGuideBottom + bottomProfileHeight / 2.0, frontZ + SlidingDoorTrackCenterFromFront(config, 1, doorThickness), rangeWidth, bottomProfileDepth, bottomProfileHeight);
+            AddSlidingDoorProfileVisual(model, "Schuifdeur bovenprofiel voor U" + range.Start + "-" + range.End, rangeCenterX, latUnderside - tape - topProfileHeight / 2.0, frontZ + profileWallThickness / 2.0, rangeWidth, profileWallThickness, topProfileHeight);
+            AddSlidingDoorProfileVisual(model, "Schuifdeur bovenprofiel midden U" + range.Start + "-" + range.End, rangeCenterX, latUnderside - tape - topProfileHeight / 2.0, frontZ + profileWallThickness + trackClearance + profileWallThickness / 2.0, rangeWidth, profileWallThickness, topProfileHeight);
+            AddSlidingDoorProfileVisual(model, "Schuifdeur bovenprofiel achter U" + range.Start + "-" + range.End, rangeCenterX, latUnderside - tape - topProfileHeight / 2.0, frontZ + 2.0 * profileWallThickness + 2.0 * trackClearance + profileWallThickness / 2.0, rangeWidth, profileWallThickness, topProfileHeight);
+
+            model.Hardware.Add(new HardwareItem
+            {
+                Name = "Aluminium U-profiel onder 18x18x18x2 + tape",
+                ArticleNumber = "SLIDING_BOTTOM_U_18",
+                Quantity = 2,
+                Unit = "st",
+                Note = "Lengte " + rangeWidth.ToString("0", CultureInfo.InvariantCulture) + " mm voor schuifdeuren U" + range.Start + "-" + range.End + "; tape 1mm onder profiel"
+            });
+            model.Hardware.Add(new HardwareItem
+            {
+                Name = "Aluminium hoekprofiel boven 25x15x2 + tape",
+                ArticleNumber = "SLIDING_TOP_L_25X15",
+                Quantity = 3,
+                Unit = "st",
+                Note = "Lengte " + rangeWidth.ToString("0", CultureInfo.InvariantCulture) + " mm voor schuifdeuren U" + range.Start + "-" + range.End + "; tape 1mm boven profiel"
+            });
+        }
+
+        private static void AddSlidingDoorPassThroughToDivider(SheetPart divider, CabinetConfig config, int boundaryIndex, double bodyHeight, double shelfZoneTop)
+        {
+            if (divider == null || config == null) return;
+            var left = GetUnit(config, boundaryIndex);
+            var right = GetUnit(config, boundaryIndex + 1);
+            if (left == null || right == null || !left.SlidingDoors || !right.SlidingDoors) return;
+
+            var bottomProfileDepth = SlidingDoorBottomProfileDepth(config);
+            var trackSpacing = SlidingDoorTrackCenterSpacing(config);
+            var doorThickness = MaterialThickness(config.SlidingDoorMaterial ?? config.FrontMaterial ?? config.CarcassMaterial);
+            var materialThickness = MaterialThickness(divider.Material);
+            var profilePassDepth = bottomProfileDepth + trackSpacing + doorThickness + 6.0;
+            var passDepth = Math.Min(divider.LengthMm - 2.0, Math.Max(profilePassDepth, SlidingDoorTopLatDepthMm(config)));
+            var zone = SlidingDoorOpeningZone(config, new UnitRange(boundaryIndex, boundaryIndex + 1), shelfZoneTop);
+            var bottom = Math.Max(config.PlinthHeightMm, config.PlinthHeightMm + materialThickness + SlidingDoorTapeThickness(config));
+            var top = zone.CenterYmm + zone.HeightMm / 2.0;
+            var height = Math.Max(0, top - bottom);
+            if (passDepth <= 4 || height <= 80) return;
+
+            SheetOperations.AddThroughCutout(
+                divider,
+                "Schuifdeur doorvoer",
+                0,
+                bottom,
+                passDepth,
+                height,
+                OperationFace.CenterPlane,
+                "Door-en-door uitsparing zodat schuifdeurpanelen door het tussenschot kunnen schuiven.");
+        }
+
+        private static void AddSlidingDoorTopLatHoles(SheetPart lat, CabinetConfig config, UnitRange range, double rangeLeftX, double materialThickness)
+        {
+            if (lat == null || config == null) return;
+            var diameter = AssemblyHoleDiameter(config);
+            var ys = PatternPositions(lat.WidthMm, 12.0, 120.0, 2);
+            var firstBoundary = Math.Max(0, range.Start - 1);
+            var lastBoundary = Math.Min(config.UnitCount, range.End);
+
+            for (var boundary = firstBoundary; boundary <= lastBoundary; boundary++)
+            {
+                var supportX = SupportCenterX(config, boundary, materialThickness);
+                var localX = Clamp(supportX - rangeLeftX, 12.0, Math.Max(12.0, lat.LengthMm - 12.0));
+                foreach (var y in ys)
+                {
+                    AddUniqueCabinetHole(lat, localX, y, diameter, "schuifdeur bovenlat naar staander " + boundary.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+        }
+
+        private static void AddSlidingDoorProfileVisual(WorkbenchModel model, string name, double x, double y, double z, double length, double depth, double height)
+        {
+            if (model == null) return;
+            model.AssemblyPlacements.Add(new AssemblyPlacement
+            {
+                Kind = AssemblyComponentKind.Profile,
+                PartName = name,
+                LengthMm = Math.Max(2, length),
+                WidthMm = Math.Max(2, depth),
+                HeightMm = Math.Max(2, height),
+                Xmm = x,
+                Ymm = y,
+                Zmm = z,
+                Orientation = AssemblyOrientation.Default
+            });
+        }
+
+        private static DoorZone SlidingDoorOpeningZone(CabinetConfig config, UnitRange range, double shelfZoneTop)
+        {
+            var bottom = config.PlinthHeightMm + config.DoorGapMm;
+            var top = shelfZoneTop - config.DoorGapMm;
+            for (var unitNumber = range.Start; unitNumber <= range.End; unitNumber++)
+            {
+                var unit = GetUnit(config, unitNumber);
+                var zone = DoorPanelZone(unit, config, shelfZoneTop);
+                top = Math.Min(top, zone.CenterYmm + zone.HeightMm / 2.0);
+                bottom = Math.Max(bottom, zone.CenterYmm - zone.HeightMm / 2.0);
+            }
+
+            var height = Math.Max(0, top - bottom);
+            return new DoorZone(bottom + height / 2.0, height);
+        }
+
+        private static List<UnitRange> SlidingDoorRanges(CabinetConfig config)
+        {
+            var ranges = new List<UnitRange>();
+            if (config == null) return ranges;
+
+            var start = 0;
+            for (var unitNumber = 1; unitNumber <= config.UnitCount; unitNumber++)
+            {
+                var sliding = GetUnit(config, unitNumber).SlidingDoors;
+                if (sliding && start == 0)
+                {
+                    start = unitNumber;
+                }
+                else if (!sliding && start > 0)
+                {
+                    ranges.Add(new UnitRange(start, unitNumber - 1));
+                    start = 0;
+                }
+            }
+
+            if (start > 0) ranges.Add(new UnitRange(start, config.UnitCount));
+            return ranges;
+        }
+
+        private static bool HasSlidingDoors(CabinetConfig config)
+        {
+            if (config == null) return false;
+            for (var i = 1; i <= config.UnitCount; i++)
+            {
+                if (GetUnit(config, i).SlidingDoors) return true;
+            }
+
+            return false;
+        }
+
+        private static bool UnitHasSlidingDoors(CabinetConfig config, int unitNumber)
+        {
+            return config != null
+                && unitNumber >= 1
+                && unitNumber <= config.UnitCount
+                && GetUnit(config, unitNumber).SlidingDoors;
+        }
+
+        private static double UnitClearLeftX(CabinetConfig config, int unitNumber, double materialThickness)
+        {
+            var fit = BottomFitForUnit(config, unitNumber - 1, materialThickness, 0);
+            return fit.CenterXmm - fit.WidthMm / 2.0;
+        }
+
+        private static double UnitClearRightX(CabinetConfig config, int unitNumber, double materialThickness)
+        {
+            var fit = BottomFitForUnit(config, unitNumber - 1, materialThickness, 0);
+            return fit.CenterXmm + fit.WidthMm / 2.0;
+        }
+
+        private static double SupportCenterX(CabinetConfig config, int boundaryIndex, double materialThickness)
+        {
+            if (config == null) return 0;
+            var unitCount = Math.Max(1, config.UnitCount);
+            var unitWidth = config.WidthMm / unitCount;
+            if (boundaryIndex <= 0) return -config.WidthMm / 2.0 + materialThickness / 2.0;
+            if (boundaryIndex >= unitCount) return config.WidthMm / 2.0 - materialThickness / 2.0;
+            return -config.WidthMm / 2.0 + unitWidth * boundaryIndex;
+        }
+
+        private static double SlidingDoorTopLatDepthMm(CabinetConfig config)
+        {
+            var material = config == null ? null : (config.SlidingDoorMaterial ?? config.FrontMaterial ?? config.CarcassMaterial);
+            var doorThickness = MaterialThickness(material);
+            var profileWallThickness = SlidingDoorProfileWallThickness(config);
+            var clearance = SlidingDoorTrackClearance(config, doorThickness);
+            var profileStackDepth = 3.0 * profileWallThickness + 2.0 * clearance;
+            return Math.Max(60.0, profileStackDepth + 18.0);
+        }
+
+        private static double SlidingDoorProfileWallThickness(CabinetConfig config)
+        {
+            return DefaultSlidingDoorProfileWallThicknessMm;
+        }
+
+        private static double SlidingDoorTrackClearance(CabinetConfig config, double doorThickness)
+        {
+            return Math.Max(doorThickness + 4.0, SlidingDoorTrackCenterSpacing(config));
+        }
+
+        private static double SlidingDoorTrackCenterFromFront(CabinetConfig config, int trackIndex, double doorThickness)
+        {
+            var profileWallThickness = SlidingDoorProfileWallThickness(config);
+            var clearance = SlidingDoorTrackClearance(config, doorThickness);
+            return profileWallThickness + clearance / 2.0 + Math.Max(0, trackIndex) * (clearance + profileWallThickness);
+        }
+
+        private static double SlidingDoorOverlap(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorOverlapMm > 0
+                ? config.SlidingDoorOverlapMm
+                : DefaultSlidingDoorOverlapMm;
+        }
+
+        private static double SlidingDoorFreeSpaceBehind(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorFreeSpaceBehindMm > 0
+                ? config.SlidingDoorFreeSpaceBehindMm
+                : DefaultSlidingDoorFreeSpaceBehindMm;
+        }
+
+        private static double SlidingDoorTrackCenterSpacing(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorTrackCenterSpacingMm > 0
+                ? config.SlidingDoorTrackCenterSpacingMm
+                : DefaultSlidingDoorTrackCenterSpacingMm;
+        }
+
+        private static double SlidingDoorTopProfileHeight(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorTopProfileHeightMm > 0
+                ? config.SlidingDoorTopProfileHeightMm
+                : DefaultSlidingDoorTopProfileHeightMm;
+        }
+
+        private static double SlidingDoorBottomProfileHeight(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorBottomProfileHeightMm > 0
+                ? config.SlidingDoorBottomProfileHeightMm
+                : DefaultSlidingDoorBottomProfileHeightMm;
+        }
+
+        private static double SlidingDoorTapeThickness(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorTapeThicknessMm > 0
+                ? config.SlidingDoorTapeThicknessMm
+                : DefaultSlidingDoorTapeThicknessMm;
+        }
+
+        private static double SlidingDoorTopProfileDepth(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorTopProfileDepthMm > 0
+                ? config.SlidingDoorTopProfileDepthMm
+                : DefaultSlidingDoorTopProfileDepthMm;
+        }
+
+        private static double SlidingDoorBottomProfileDepth(CabinetConfig config)
+        {
+            return config != null && config.SlidingDoorBottomProfileDepthMm > 0
+                ? config.SlidingDoorBottomProfileDepthMm
+                : DefaultSlidingDoorBottomProfileDepthMm;
+        }
+
         private static double MaterialThickness(Material material)
         {
             return material == null ? 18.0 : material.ThicknessMm;
@@ -314,12 +684,7 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double DrawerBottomY(CabinetConfig config, int drawerIndex, double drawerHeight, double shelfZoneTop)
         {
-            if (IsTopStart(config.ShelfStartMode))
-            {
-                return shelfZoneTop - config.DoorGapMm - drawerHeight - drawerIndex * (drawerHeight + config.DoorGapMm);
-            }
-
-            return config.PlinthHeightMm + config.DoorGapMm + drawerIndex * (drawerHeight + config.DoorGapMm);
+            return shelfZoneTop - config.DoorGapMm - drawerHeight - drawerIndex * (drawerHeight + config.DoorGapMm);
         }
 
         private static VerticalZone ShelfZoneForUnit(CabinetUnitConfig unit, CabinetConfig config, double shelfZoneTop)
@@ -333,18 +698,24 @@ namespace SWWerkplaats.Configurator.Engine
 
             var drawerHeight = Math.Max(80, unit.DrawerHeightMm);
             var drawerCount = Math.Max(0, unit.DrawerCount);
-            if (IsTopStart(config.ShelfStartMode))
-            {
-                var lowestDrawerBottom = DrawerBottomY(config, drawerCount - 1, drawerHeight, shelfZoneTop);
-                max = Math.Min(max, lowestDrawerBottom - 60);
-            }
-            else
-            {
-                var highestDrawerBottom = DrawerBottomY(config, drawerCount - 1, drawerHeight, shelfZoneTop);
-                min = Math.Max(min, highestDrawerBottom + drawerHeight + 60);
-            }
+            var lowestDrawerBottom = DrawerBottomY(config, drawerCount - 1, drawerHeight, shelfZoneTop);
+            max = Math.Min(max, lowestDrawerBottom - 60);
 
             return new VerticalZone(min, max);
+        }
+
+        private static DoorZone DoorPanelZone(CabinetUnitConfig unit, CabinetConfig config, double shelfZoneTop)
+        {
+            var bottom = config.PlinthHeightMm + config.DoorGapMm;
+            var top = shelfZoneTop - config.DoorGapMm;
+            if (unit != null && unit.DrawerCount > 0)
+            {
+                var drawerHeight = Math.Max(80, unit.DrawerHeightMm);
+                top = DrawerBottomY(config, unit.DrawerCount - 1, drawerHeight, shelfZoneTop) - config.DoorGapMm;
+            }
+
+            var height = Math.Max(0, top - bottom);
+            return new DoorZone(bottom + height / 2.0, height);
         }
 
         private static SheetPart SidePanel(string name, Material material, double length, double width, double notchDepth, double notchHeight)
@@ -378,6 +749,7 @@ namespace SWWerkplaats.Configurator.Engine
                     grooveWidth,
                     Math.Min(depth, sheet.WidthMm),
                     grooveDepth,
+                    OperationFace.NegativeY,
                     "3mm verdiepte positioneergroef voor kopse kant tussenschot");
             }
         }
@@ -477,6 +849,38 @@ namespace SWWerkplaats.Configurator.Engine
                 "3mm verdiepte groef zodat achterzijde bodemplaten in achterwand valt");
         }
 
+        private static void AddSideReceivingGroovesToBackPanel(SheetPart backPanel, CabinetConfig config, double bodyHeight)
+        {
+            if (backPanel == null || config == null) return;
+            var materialThickness = MaterialThickness(config.CarcassMaterial);
+            var grooveWidth = Math.Min(backPanel.LengthMm / 2.0, materialThickness + AlignmentGrooveClearanceMm());
+            var grooveHeight = Math.Min(backPanel.WidthMm, bodyHeight);
+            var grooveDepth = AlignmentGrooveDepthMm(backPanel);
+            if (grooveWidth <= 0 || grooveHeight <= 0 || grooveDepth <= 0) return;
+
+            AddPocket(
+                backPanel,
+                "Linker zijwand achterwandgroef",
+                0,
+                0,
+                grooveWidth,
+                grooveHeight,
+                grooveDepth,
+                OperationFace.NegativeZ,
+                "3mm verdiepte groef zodat linker zijwand in achterwand valt");
+
+            AddPocket(
+                backPanel,
+                "Rechter zijwand achterwandgroef",
+                backPanel.LengthMm - grooveWidth,
+                0,
+                grooveWidth,
+                grooveHeight,
+                grooveDepth,
+                OperationFace.NegativeZ,
+                "3mm verdiepte groef zodat rechter zijwand in achterwand valt");
+        }
+
         private static void AddDrawerBottomGroove(SheetPart panel, Material drawerMaterial)
         {
             if (panel == null || drawerMaterial == null) return;
@@ -518,7 +922,9 @@ namespace SWWerkplaats.Configurator.Engine
             var grooveHeight = Math.Min(front.WidthMm - 2.0 * DrawerGrooveBottomOffsetMm(), drawerMaterial.ThicknessMm + DrawerGrooveClearanceMm());
             var sideInset = Math.Max(0, (front.LengthMm - boxWidth) / 2.0);
             var verticalY = DrawerGrooveBottomOffsetMm();
-            var verticalHeight = Math.Max(10, front.WidthMm - 2.0 * DrawerGrooveBottomOffsetMm());
+            var verticalHeight = Math.Min(
+                front.WidthMm - DrawerGrooveBottomOffsetMm(),
+                Math.Max(10, front.WidthMm - 2.0 * DrawerGrooveBottomOffsetMm() + DrawerGrooveDepthMm()));
             AddPocket(
                 front,
                 "Ladefront linker zij-rabat",
@@ -551,6 +957,74 @@ namespace SWWerkplaats.Configurator.Engine
                 "3mm verdiept rabat voor ladebodem in binnenkant front");
         }
 
+        private static void AddDrawerPullCutout(SheetPart front, CabinetConfig config)
+        {
+            if (front == null || config == null || !config.IncludeDrawerPullCutouts) return;
+
+            const double preferredLength = 140.0;
+            const double preferredHeight = 32.0;
+            const double minLength = 96.0;
+            const double sideMargin = 60.0;
+            const double topOffset = 30.0;
+            const double minVerticalMargin = 26.0;
+
+            var length = Math.Min(preferredLength, front.LengthMm - 2.0 * sideMargin);
+            if (length < minLength)
+            {
+                length = Math.Min(front.LengthMm * 0.48, front.LengthMm - 2.0 * 35.0);
+            }
+
+            var height = Math.Min(preferredHeight, Math.Max(18.0, front.WidthMm - 2.0 * minVerticalMargin));
+            if (length < 80 || height < 14) return;
+
+            var x = (front.LengthMm - length) / 2.0;
+            var y = front.WidthMm - topOffset - height;
+            y = Clamp(y, minVerticalMargin, Math.Max(minVerticalMargin, front.WidthMm - height - minVerticalMargin));
+
+            var radius = height / 2.0;
+            var centerLength = Math.Max(1.0, length - height);
+
+            var skinDepth = Math.Max(0.1, MaterialThickness(front.Material) - 2.0);
+            AddPocket(
+                front,
+                "Uitgefreesde handgreep midden tot 2mm restmateriaal",
+                x + radius,
+                y,
+                centerLength,
+                height,
+                skinDepth,
+                OperationFace.PositiveZ,
+                "Capsule eerst uitruimen met 2mm restmateriaal voor vacuümbehoud");
+            AddDrawerPullRoundEnd(front, x + radius, y + radius, height, skinDepth, "links");
+            AddDrawerPullRoundEnd(front, x + length - radius, y + radius, height, skinDepth, "rechts");
+            SheetOperations.AddThroughCutout(
+                front,
+                "Uitgefreesde handgreep afwerkcontour tabs 8x2 max70",
+                x,
+                y,
+                length,
+                height,
+                OperationFace.CenterPlane,
+                "Alleen capsule-binnencontour doorfrezen; tabs 8mm breed, 2mm hoog en maximaal 70mm uit elkaar");
+        }
+
+        private static void AddDrawerPullRoundEnd(SheetPart front, double x, double y, double diameter, double depthMm, string side)
+        {
+            if (front == null || diameter <= 0) return;
+            front.Holes.Add(new SheetHole
+            {
+                Name = "Uitgefreesde handgreep " + side + " ronding tot 2mm restmateriaal",
+                Xmm = Math.Round(x, 3),
+                Ymm = Math.Round(y, 3),
+                DiameterMm = Math.Round(diameter, 3),
+                DepthMm = Math.Round(depthMm, 3),
+                Face = OperationFace.PositiveZ,
+                DepthMode = OperationDepthMode.PocketFromFace,
+                Countersunk = false,
+                SupportKind = SheetHoleSupportKind.MachiningCutout
+            });
+        }
+
         private static void AddWorktopToUprightHoles(SheetPart worktop, CabinetConfig config, double topDepth)
         {
             if (worktop == null || config == null) return;
@@ -566,6 +1040,13 @@ namespace SWWerkplaats.Configurator.Engine
                 if (i == 0) localX = (config.CarcassMaterial == null ? 18.0 : config.CarcassMaterial.ThicknessMm) / 2.0;
                 else if (i == config.UnitCount) localX = config.WidthMm - (config.CarcassMaterial == null ? 18.0 : config.CarcassMaterial.ThicknessMm) / 2.0;
                 AddMountingLine(worktop, localX, zStart, localX, zEnd, diameter, 260, "werkblad naar staander " + i.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (config.IncludeBackPanel)
+            {
+                var backThickness = config.BackMaterial == null ? MaterialThickness(config.CarcassMaterial) : MaterialThickness(config.BackMaterial);
+                var backLineY = Clamp(config.DepthMm + backThickness / 2.0, 12.0, Math.Max(12.0, worktop.WidthMm - 12.0));
+                AddMountingLine(worktop, edgeInset, backLineY, worktop.LengthMm - edgeInset, backLineY, diameter, 220, "werkblad naar achterwand");
             }
         }
 
@@ -617,6 +1098,29 @@ namespace SWWerkplaats.Configurator.Engine
                     y,
                     diameter,
                     "Montagegat bodem U" + unitNumber.ToString(CultureInfo.InvariantCulture) + " naar zijpaneel " + (i + 1).ToString(CultureInfo.InvariantCulture),
+                SheetHoleSupportKind.PanelScrew);
+            }
+        }
+
+        private static void AddBottomToPlinthHoles(SheetPart bottom, CabinetConfig config, int unitNumber)
+        {
+            if (bottom == null || config == null || unitNumber < 1 || unitNumber > config.UnitCount) return;
+            if (config.UnitCount <= 1) return;
+
+            var diameter = AssemblyHoleDiameter(config);
+            var materialThickness = MaterialThickness(config.CarcassMaterial);
+            var frontPlinthCenterY = config.PlinthDepthMm + materialThickness / 2.0;
+            var y = Clamp(frontPlinthCenterY, 12.0, Math.Max(12.0, bottom.WidthMm - 12.0));
+            var positions = PatternPositions(bottom.LengthMm, 80.0, 180.0, 2);
+
+            for (var i = 0; i < positions.Count; i++)
+            {
+                AddCabinetHole(
+                    bottom,
+                    positions[i],
+                    y,
+                    diameter,
+                    "Plintbevestigingsgat bodem U" + unitNumber.ToString(CultureInfo.InvariantCulture) + " " + (i + 1).ToString(CultureInfo.InvariantCulture),
                     SheetHoleSupportKind.PanelScrew);
             }
         }
@@ -635,7 +1139,7 @@ namespace SWWerkplaats.Configurator.Engine
             var frontSideInset = Math.Max(0, (drawerFront.LengthMm - boxWidth) / 2.0);
             var leftSideX = frontSideInset + drawerThickness / 2.0;
             var rightSideX = drawerFront.LengthMm - frontSideInset - drawerThickness / 2.0;
-            var frontYs = PatternPositions(drawerFront.WidthMm, 32, 95, drawerFront.WidthMm > 135 ? 3 : 2);
+            var frontYs = PatternPositions(drawerFront.WidthMm, 32, 95, 2);
             foreach (var y in frontYs)
             {
                 AddUniqueCabinetHole(drawerFront, leftSideX, y, diameter, "ladefront naar linker zijkant");
@@ -676,6 +1180,7 @@ namespace SWWerkplaats.Configurator.Engine
                     grooveWidth,
                     Math.Min(bodyHeight, backPanel.WidthMm),
                     grooveDepth,
+                    OperationFace.NegativeZ,
                     "3mm verdiepte positioneergroef voor achterzijde tussenschot");
             }
         }
@@ -714,6 +1219,55 @@ namespace SWWerkplaats.Configurator.Engine
                 AddUniqueCabinetHole(door, x, y - screwSpacing / 2.0, diameter, "scharnier op deurblad", SheetHoleSupportKind.HingeScrew);
                 AddUniqueCabinetHole(door, x, y + screwSpacing / 2.0, diameter, "scharnier op deurblad", SheetHoleSupportKind.HingeScrew);
             }
+        }
+
+        private static void AddShelfBracketMountingHoles(SheetPart shelf, CabinetConfig config)
+        {
+            if (shelf == null || config == null || !config.IncludeAdjustableShelfHoles || config.ShelfSupport == null) return;
+
+            const double sideInset = 10.0;
+            const double rowOffset = 20.0;
+            const double edgeSafety = 8.0;
+
+            var support = config.ShelfSupport;
+            var diameter = support.HoleDiameterMm > 0 ? support.HoleDiameterMm : 5.0;
+            var sideXs = new[] { sideInset, shelf.LengthMm - sideInset };
+            var rowCenters = new[]
+            {
+                support.FrontInsetMm,
+                shelf.WidthMm - support.BackInsetMm
+            };
+
+            var index = 1;
+            foreach (var xRaw in sideXs)
+            {
+                var x = Clamp(xRaw, edgeSafety, shelf.LengthMm - edgeSafety);
+                foreach (var centerRaw in rowCenters)
+                {
+                    var center = Clamp(centerRaw, edgeSafety + rowOffset, shelf.WidthMm - edgeSafety - rowOffset);
+                    AddShelfBracketHole(shelf, x, center - rowOffset, diameter, index++);
+                    AddShelfBracketHole(shelf, x, center + rowOffset, diameter, index++);
+                }
+            }
+        }
+
+        private static void AddShelfBracketHole(SheetPart shelf, double x, double y, double diameter, int index)
+        {
+            if (shelf == null) return;
+            x = Math.Round(Clamp(x, 6, shelf.LengthMm - 6), 3);
+            y = Math.Round(Clamp(y, 6, shelf.WidthMm - 6), 3);
+            shelf.Holes.Add(new SheetHole
+            {
+                Name = "Onderzijde legplank beugelgat " + index.ToString(CultureInfo.InvariantCulture),
+                Xmm = x,
+                Ymm = y,
+                DiameterMm = diameter,
+                DepthMm = ShelfBracketBlindHoleDepthMm(),
+                Face = OperationFace.NegativeY,
+                DepthMode = OperationDepthMode.BlindFromFace,
+                Countersunk = false,
+                SupportKind = SheetHoleSupportKind.ShelfSupport
+            });
         }
 
         private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, string note)
@@ -783,9 +1337,16 @@ namespace SWWerkplaats.Configurator.Engine
             return 12.0;
         }
 
+        private static double ShelfBracketBlindHoleDepthMm()
+        {
+            return 8.0;
+        }
+
         private static double AssemblyHoleDiameter(CabinetConfig config)
         {
-            return 4.5;
+            return config != null && config.SheetFastener != null && config.SheetFastener.ClearanceHoleDiameterMm > 0
+                ? config.SheetFastener.ClearanceHoleDiameterMm
+                : ProductDrawingStrategy.DefaultWoodScrewClearanceHoleDiameterMm;
         }
 
         private static List<double> PatternPositions(double length, double edgeInset, double maxSpacing, int minimumCount)
@@ -910,12 +1471,6 @@ namespace SWWerkplaats.Configurator.Engine
             return value == "top" || value == "boven" || value == "bottom" || value == "onder";
         }
 
-        private static bool IsTopStart(string value)
-        {
-            value = (value ?? "").Trim().ToLowerInvariant();
-            return value == "top" || value == "boven";
-        }
-
         private static bool ContainsNear(List<double> values, double value)
         {
             foreach (var existing in values)
@@ -954,6 +1509,30 @@ namespace SWWerkplaats.Configurator.Engine
 
             public double MinMm { get; private set; }
             public double MaxMm { get; private set; }
+        }
+
+        private sealed class DoorZone
+        {
+            public DoorZone(double centerYmm, double heightMm)
+            {
+                CenterYmm = centerYmm;
+                HeightMm = heightMm;
+            }
+
+            public double CenterYmm { get; private set; }
+            public double HeightMm { get; private set; }
+        }
+
+        private sealed class UnitRange
+        {
+            public UnitRange(int start, int end)
+            {
+                Start = start;
+                End = end;
+            }
+
+            public int Start { get; private set; }
+            public int End { get; private set; }
         }
 
         private static void AddRailHardware(WorkbenchModel model, CabinetConfig config, int unitNumber, int drawerNumber)
@@ -1047,7 +1626,7 @@ namespace SWWerkplaats.Configurator.Engine
             var y = Math.Round(rail.DrawerVerticalOffsetMm, 3);
             if (y <= 5 || y >= panel.WidthMm - 5) return;
 
-            AddRailHoleLine(panel, rail.DrawerHolePositionsMm, rail.DrawerHoleCount, rail.DrawerFirstHoleOffsetMm, rail.DrawerHoleSpacingMm, rail.DrawerHoleDiameterMm, y, "Laderailgat", 0, 0);
+            AddRailHoleLine(panel, rail.DrawerHolePositionsMm, rail.DrawerHoleCount, rail.DrawerFirstHoleOffsetMm, rail.DrawerHoleSpacingMm, rail.DrawerHoleDiameterMm, y, "Laderailgat", 0, Math.Max(0.0, rail.DrawerFrontInsertionCompensationMm));
         }
 
         private static void AddRailHoleLine(SheetPart panel, string explicitPositions, int count, double firstOffset, double spacing, double diameter, double y, string name, double depthMm, double xOffset)
@@ -1104,7 +1683,13 @@ namespace SWWerkplaats.Configurator.Engine
             var zones = new List<VerticalZone>();
             AddShelfHoleZoneForUnit(zones, config, boundaryIndex, shelfZoneTop);
             AddShelfHoleZoneForUnit(zones, config, boundaryIndex + 1, shelfZoneTop);
-            AddAdjustableShelfHoles(panel, config, bodyHeight, zones);
+            var frontInset = config.ShelfFrontInsetMm;
+            if (UnitHasSlidingDoors(config, boundaryIndex) || UnitHasSlidingDoors(config, boundaryIndex + 1))
+            {
+                frontInset = Math.Max(frontInset, SlidingDoorRequiredShelfInset(config));
+            }
+
+            AddAdjustableShelfHoles(panel, config, bodyHeight, zones, frontInset);
         }
 
         private static void AddShelfHoleZoneForUnit(List<VerticalZone> zones, CabinetConfig config, int unitNumber, double shelfZoneTop)
@@ -1118,13 +1703,13 @@ namespace SWWerkplaats.Configurator.Engine
             }
         }
 
-        private static void AddAdjustableShelfHoles(SheetPart panel, CabinetConfig config, double usableHeight, List<VerticalZone> zones)
+        private static void AddAdjustableShelfHoles(SheetPart panel, CabinetConfig config, double usableHeight, List<VerticalZone> zones, double shelfFrontInset)
         {
             if (!config.IncludeAdjustableShelfHoles || config.ShelfSupport == null) return;
             var support = config.ShelfSupport;
             var spacing = Math.Max(1, support.HoleSpacingMm);
             var endY = Math.Min(panel.WidthMm - config.AdjustableShelfHoleEndMarginMm, usableHeight - config.AdjustableShelfHoleEndMarginMm);
-            var frontX = support.FrontInsetMm;
+            var frontX = support.FrontInsetMm + Clamp(shelfFrontInset, 0, Math.Max(0, panel.LengthMm - 80));
             var backX = panel.LengthMm - support.BackInsetMm;
             if (frontX <= 5 || backX >= panel.LengthMm - 5 || frontX >= backX) return;
 
@@ -1272,7 +1857,7 @@ namespace SWWerkplaats.Configurator.Engine
             return count;
         }
 
-        private readonly struct HorizontalFit
+        private sealed class HorizontalFit
         {
             public HorizontalFit(double centerXmm, double widthMm)
             {
@@ -1280,8 +1865,8 @@ namespace SWWerkplaats.Configurator.Engine
                 WidthMm = widthMm;
             }
 
-            public double CenterXmm { get; }
-            public double WidthMm { get; }
+            public double CenterXmm { get; private set; }
+            public double WidthMm { get; private set; }
         }
 
         private static void Validate(CabinetConfig config)

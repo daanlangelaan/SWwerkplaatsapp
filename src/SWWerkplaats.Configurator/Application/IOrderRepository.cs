@@ -133,17 +133,55 @@ namespace SWWerkplaats.Configurator.Application
 
             Directory.CreateDirectory(QueueFolder);
             var target = Path.Combine(QueueFolder, ProductionOutputService.SafeFileName(record.OrderId));
+            if (Directory.Exists(target))
+            {
+                Directory.Delete(target, true);
+            }
+
             Directory.CreateDirectory(target);
+            CopyReleasedOrderBundle(record.OutputFolder, target);
             CopyTapFiles(Path.Combine(record.OutputFolder, "Nesting"), target);
-            CopyIfExists(Path.Combine(record.OutputFolder, "BOM.csv"), Path.Combine(target, "BOM.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "CAM-operaties.csv"), Path.Combine(target, "CAM-operaties.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "Plaatgaten.csv"), Path.Combine(target, "Plaatgaten.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "RailgatenControle.csv"), Path.Combine(target, "RailgatenControle.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "RailTemplateControle.csv"), Path.Combine(target, "RailTemplateControle.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "RailTemplateVisualisatie.svg"), Path.Combine(target, "RailTemplateVisualisatie.svg"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestPlan.csv"), Path.Combine(target, "NestPlan.csv"));
-            CopyIfExists(Path.Combine(record.OutputFolder, "Nesting", "NestVisualisatie.svg"), Path.Combine(target, "NestVisualisatie.svg"));
             return target;
+        }
+
+        private static void CopyReleasedOrderBundle(string sourceFolder, string targetFolder)
+        {
+            if (!Directory.Exists(sourceFolder)) return;
+
+            foreach (var file in Directory.GetFiles(sourceFolder))
+            {
+                var targetFile = Path.Combine(targetFolder, Path.GetFileName(file));
+                if (string.Equals(Path.GetExtension(file), ".tap", StringComparison.OrdinalIgnoreCase))
+                {
+                    var looseTapFolder = Path.Combine(targetFolder, "LossePlaatdelen");
+                    Directory.CreateDirectory(looseTapFolder);
+                    targetFile = Path.Combine(looseTapFolder, Path.GetFileName(file));
+                }
+
+                File.Copy(file, targetFile, true);
+            }
+
+            foreach (var folder in Directory.GetDirectories(sourceFolder))
+            {
+                var targetSubfolder = Path.Combine(targetFolder, Path.GetFileName(folder));
+                Directory.CreateDirectory(targetSubfolder);
+                CopyDirectory(folder, targetSubfolder);
+            }
+        }
+
+        private static void CopyDirectory(string sourceFolder, string targetFolder)
+        {
+            foreach (var file in Directory.GetFiles(sourceFolder))
+            {
+                File.Copy(file, Path.Combine(targetFolder, Path.GetFileName(file)), true);
+            }
+
+            foreach (var folder in Directory.GetDirectories(sourceFolder))
+            {
+                var targetSubfolder = Path.Combine(targetFolder, Path.GetFileName(folder));
+                Directory.CreateDirectory(targetSubfolder);
+                CopyDirectory(folder, targetSubfolder);
+            }
         }
 
         private static void CopyTapFiles(string sourceFolder, string targetFolder)
@@ -153,11 +191,6 @@ namespace SWWerkplaats.Configurator.Application
             {
                 File.Copy(file, Path.Combine(targetFolder, Path.GetFileName(file)), true);
             }
-        }
-
-        private static void CopyIfExists(string source, string target)
-        {
-            if (File.Exists(source)) File.Copy(source, target, true);
         }
     }
 }

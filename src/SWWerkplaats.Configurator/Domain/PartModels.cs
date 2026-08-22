@@ -13,7 +13,14 @@ namespace SWWerkplaats.Configurator.Domain
         ProfileNut,
         TappedProfileEnd,
         PanelScrew,
-        HingeScrew
+        HingeScrew,
+        HingePlate,
+        HingeCup,
+        AdjustableFoot,
+        PlinthClip,
+        ShelfSupport,
+        DrawerRail,
+        MachiningCutout
     }
 
     public sealed class ProfilePart
@@ -23,6 +30,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double LengthMm { get; set; }
         public int Quantity { get; set; }
         public string OrientationNote { get; set; }
+        public string BomStatus { get; set; }
         public List<DrillOperation> Drills { get; private set; }
 
         public ProfilePart()
@@ -42,18 +50,39 @@ namespace SWWerkplaats.Configurator.Domain
         public bool UseTabs { get; set; }
         public bool HasCornerNotches { get; set; }
         public double CornerNotchSizeMm { get; set; }
+        public double CornerNotchLengthMm { get; set; }
+        public double CornerNotchWidthMm { get; set; }
+        public double CornerRadiusMm { get; set; }
         public bool HasToeKickNotch { get; set; }
         public double ToeKickDepthMm { get; set; }
         public double ToeKickHeightMm { get; set; }
         public bool MirrorInNestingX { get; set; }
+        public double CustomContourCornerRadiusMm { get; set; }
+        public string BomStatus { get; set; }
         public List<SheetHole> Holes { get; private set; }
         public List<SheetPocket> Pockets { get; private set; }
+        public List<SheetContourPoint> CustomContour { get; private set; }
 
         public SheetPart()
         {
             Holes = new List<SheetHole>();
             Pockets = new List<SheetPocket>();
+            CustomContour = new List<SheetContourPoint>();
         }
+    }
+
+    public sealed class SheetContourPoint
+    {
+        public SheetContourPoint() { }
+
+        public SheetContourPoint(double xMm, double yMm)
+        {
+            Xmm = xMm;
+            Ymm = yMm;
+        }
+
+        public double Xmm { get; set; }
+        public double Ymm { get; set; }
     }
 
     public sealed class SheetHole
@@ -83,9 +112,11 @@ namespace SWWerkplaats.Configurator.Domain
         {
             Face = OperationFace.CenterPlane;
             DepthMode = OperationDepthMode.PocketFromFace;
+            Shape = "rectangle";
         }
 
         public string Name { get; set; }
+        public string Shape { get; set; }
         public double Xmm { get; set; }
         public double Ymm { get; set; }
         public double LengthMm { get; set; }

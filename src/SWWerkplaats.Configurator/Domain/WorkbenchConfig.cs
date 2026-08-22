@@ -30,5 +30,6 @@ namespace SWWerkplaats.Configurator.Domain
         public double SmallPartAreaThresholdMm2 { get; set; }
         public double TabWidthMm { get; set; }
         public double TabHeightMm { get; set; }
+        public ProfileSawingMode SawingMode { get; set; }
     }
 }

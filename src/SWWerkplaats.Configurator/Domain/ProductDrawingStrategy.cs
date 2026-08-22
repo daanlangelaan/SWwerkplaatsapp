@@ -8,6 +8,7 @@ namespace SWWerkplaats.Configurator.Domain
         public const double DefaultAlignmentGrooveClearanceMm = 1.0;
         public const double DefaultDrawerGrooveDepthMm = 3.0;
         public const double DefaultDrawerGrooveClearanceMm = 0.8;
+        public const double DefaultWoodScrewClearanceHoleDiameterMm = 4.0;
 
         public static double GrooveDepthForMaterial(Material material)
         {

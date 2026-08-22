@@ -23,6 +23,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double SawAngleDeg { get; set; }
         public string WorkOrigin { get; set; }
         public string MachineHint { get; set; }
+        public string ExecutionParty { get; set; }
         public string Note { get; set; }
     }
 }

@@ -19,7 +19,8 @@ namespace SWWerkplaats.Configurator.Engine
                 ProjectName = config.ProjectName,
                 SheetFastener = fastener,
                 LowerFrameHeightMm = config.LowerFrameHeightMm,
-                MiddleLayerHeightMm = config.MiddleLayerHeightMm
+                MiddleLayerHeightMm = config.MiddleLayerHeightMm,
+                SawingMode = config.SawingMode
             };
 
             var legLength = config.HeightMm - topThickness;
@@ -74,24 +75,41 @@ namespace SWWerkplaats.Configurator.Engine
 
             top.UseTabs = config.AutoTabs && top.LengthMm * top.WidthMm < config.SmallPartAreaThresholdMm2;
             AddTopMountingHoles(top, config, profileSize);
-            model.Sheets.Add(top);
+            AddHorizontalSheet(model, top);
 
             if (config.IncludeLowerShelf)
             {
-                model.Sheets.Add(Shelf("Onderblad", shelfMaterial, config, config.LowerFrameHeightMm + profileSize / 2.0 + shelfMaterial.ThicknessMm / 2.0));
+                AddHorizontalSheet(model, Shelf("Onderblad", shelfMaterial, config, config.LowerFrameHeightMm + profileSize / 2.0 + shelfMaterial.ThicknessMm / 2.0));
             }
 
             if (config.IncludeMiddleShelf)
             {
-                model.Sheets.Add(Shelf("Tussenblad", shelfMaterial, config, config.MiddleLayerHeightMm + profileSize / 2.0 + shelfMaterial.ThicknessMm / 2.0));
+                AddHorizontalSheet(model, Shelf("Tussenblad", shelfMaterial, config, config.MiddleLayerHeightMm + profileSize / 2.0 + shelfMaterial.ThicknessMm / 2.0));
             }
 
-            BuildProfileOperations(model);
+            BuildProfileOperations(model, config.SawingMode);
             AddHardware(model);
             return model;
         }
 
-        private static void BuildProfileOperations(WorkbenchModel model)
+        private static void AddHorizontalSheet(WorkbenchModel model, SheetPart sheet)
+        {
+            model.Sheets.Add(sheet);
+            model.AssemblyPlacements.Add(new AssemblyPlacement
+            {
+                Kind = AssemblyComponentKind.Sheet,
+                PartName = sheet.Name,
+                LengthMm = sheet.LengthMm,
+                WidthMm = sheet.WidthMm,
+                HeightMm = sheet.Material == null ? 18.0 : sheet.Material.ThicknessMm,
+                Xmm = 0,
+                Ymm = sheet.CenterHeightMm,
+                Zmm = 0,
+                Orientation = AssemblyOrientation.SheetHorizontal
+            });
+        }
+
+        private static void BuildProfileOperations(WorkbenchModel model, ProfileSawingMode sawingMode)
         {
             foreach (var profile in model.Profiles)
             {
@@ -112,7 +130,8 @@ namespace SWWerkplaats.Configurator.Engine
                     ThroughHole = false,
                     SawAngleDeg = 90,
                     WorkOrigin = "Kop A",
-                    MachineHint = "SAW_CUT",
+                    MachineHint = sawingMode == ProfileSawingMode.InHouse ? "SAW_CUT" : "SUPPLIER_CUT_TO_LENGTH",
+                    ExecutionParty = sawingMode == ProfileSawingMode.InHouse ? "WERKPLAATS" : "INKOOP/LEVERANCIER",
                     Note = profile.OrientationNote
                 });
 
@@ -135,6 +154,7 @@ namespace SWWerkplaats.Configurator.Engine
                         SawAngleDeg = 0,
                         WorkOrigin = "Kop A",
                         MachineHint = kind == ProfileOperationKind.Drill ? "DRILL" : "TAP",
+                        ExecutionParty = "WERKPLAATS",
                         Note = drill.Note
                     });
                 }

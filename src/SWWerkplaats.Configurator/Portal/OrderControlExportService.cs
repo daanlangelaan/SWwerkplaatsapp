@@ -260,23 +260,30 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static void ValidateDrawerShelfOverlap(WorkbenchModel model, List<AssemblyFinding> findings)
         {
-            var drawerTops = new List<double>();
+            var drawerZones = new List<double[]>();
             foreach (var placement in model.AssemblyPlacements)
             {
                 if (StartsWith(placement.PartName, "Ladefront") || StartsWith(placement.PartName, "Bovenlade front"))
                 {
-                    drawerTops.Add(placement.Ymm + placement.WidthMm / 2.0);
+                    var drawerHalfHeight = Math.Max(0, placement.WidthMm) / 2.0;
+                    drawerZones.Add(new[] { placement.Ymm - drawerHalfHeight, placement.Ymm + drawerHalfHeight });
                 }
             }
 
-            if (drawerTops.Count == 0) return;
+            if (drawerZones.Count == 0) return;
 
             foreach (var placement in model.AssemblyPlacements)
             {
                 if (!StartsWith(placement.PartName, "Legplank")) continue;
-                foreach (var drawerTop in drawerTops)
+                var shelf = FindSheet(model, placement.PartName);
+                var shelfThickness = shelf != null && shelf.Material != null ? Math.Max(0, shelf.Material.ThicknessMm) : 18.0;
+                var shelfBottom = placement.Ymm - shelfThickness / 2.0;
+                var shelfTop = placement.Ymm + shelfThickness / 2.0;
+                foreach (var drawerZone in drawerZones)
                 {
-                    if (placement.Ymm < drawerTop + 25.0)
+                    var drawerBottom = drawerZone[0];
+                    var drawerTop = drawerZone[1];
+                    if (shelfTop >= drawerBottom - 25.0 && shelfBottom <= drawerTop + 25.0)
                     {
                         findings.Add(new AssemblyFinding("Waarschuwing", "LEGPLANK_DICHT_BIJ_LADE", placement.PartName + " zit dicht boven/in het ladegebied. Controleer of de lade vrij loopt."));
                         break;

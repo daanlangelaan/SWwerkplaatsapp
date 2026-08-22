@@ -67,9 +67,10 @@ namespace SWWerkplaats.Configurator.Application
             }
             else
             {
-                if (placements.Count > 1)
+                var expectedPlacements = Math.Max(1, sheet.Quantity);
+                if (placements.Count != expectedPlacements)
                 {
-                    findings.Add(new DrawingContractFinding("Waarschuwing", "PLAATSING_DUBBEL", sheet.Name, "Plaatdeel heeft meerdere assemblyplaatsingen met dezelfde naam."));
+                    findings.Add(new DrawingContractFinding("Waarschuwing", "PLAATSING_AANTAL", sheet.Name, "Plaatdeel heeft " + placements.Count + " assemblyplaatsingen; verwacht " + expectedPlacements + " volgens de stukshoeveelheid."));
                 }
 
                 ValidatePlacementMatchesSheet(sheet, placements[0], findings);

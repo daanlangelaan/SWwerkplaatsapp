@@ -24,7 +24,7 @@ namespace SWWerkplaats.Configurator.Portal
         private static string Worksheet(PortalPrice price)
         {
             var rows = new StringBuilder();
-            rows.Append(Row(1, new[] { "Categorie", "Omschrijving", "Aantal", "Eenheid", "Inkoop/eenheid", "Inkoop totaal", "Opslag %", "Verkoop/eenheid", "Verkoop totaal", "Notitie" }, 1));
+            rows.Append(Row(1, new[] { "Categorie", "Omschrijving", "Aantal", "Eenheid", "Inkoop/eenheid", "Inkoop totaal", "Opslag %", "Verkoop/eenheid", "Verkoop totaal", "Notitie", "Inkoopsleutel", "Leverancier", "Leveranciers-artikelcode", "Bestel-URL", "Prijsdatum", "Prijsstatus" }, 1));
             var row = 2;
             foreach (var line in price.Lines)
             {
@@ -39,20 +39,26 @@ namespace SWWerkplaats.Configurator.Portal
                     F(line.MarkupPercent),
                     M(line.SalesUnitPrice),
                     M(line.SalesTotal),
-                    line.Note
+                    line.Note,
+                    line.Key,
+                    line.Supplier,
+                    line.SupplierArticleCode,
+                    line.OrderUrl,
+                    line.PriceDate,
+                    line.PriceStatus
                 }, 0));
             }
 
-            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Subtotaal excl. btw", M(price.ExVat), "" }, 2));
-            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Btw 21%", M(price.Vat), "" }, 2));
-            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Totaal incl. btw", M(price.IncVat), "" }, 3));
+            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Subtotaal excl. btw", M(price.ExVat), "", "", "", "", "", "", "" }, 2));
+            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Btw 21%", M(price.Vat), "", "", "", "", "", "", "" }, 2));
+            rows.Append(Row(row++, new[] { "", "", "", "", "", "", "", "Totaal incl. btw", M(price.IncVat), "", "", "", "", "", "", "" }, 3));
 
             return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
                 "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
                 "<sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews>" +
-                "<cols>" + Col(1, 1, 16) + Col(2, 2, 42) + Col(3, 4, 12) + Col(5, 9, 16) + Col(10, 10, 56) + "</cols>" +
+                "<cols>" + Col(1, 1, 16) + Col(2, 2, 42) + Col(3, 4, 12) + Col(5, 9, 16) + Col(10, 10, 56) + Col(11, 13, 28) + Col(14, 14, 50) + Col(15, 16, 18) + "</cols>" +
                 "<sheetData>" + rows + "</sheetData>" +
-                "<autoFilter ref=\"A1:J" + (row - 4).ToString(CultureInfo.InvariantCulture) + "\"/>" +
+                "<autoFilter ref=\"A1:P" + (row - 4).ToString(CultureInfo.InvariantCulture) + "\"/>" +
                 "</worksheet>";
         }
 

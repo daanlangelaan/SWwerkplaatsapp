@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -138,7 +139,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "GET" && path == "/api/catalog")
             {
                 var catalog = new CatalogApplicationService().GetCatalog();
-                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, rails = catalog.Rails, shelfSupports = catalog.ShelfSupports, statuses = catalog.Statuses, products = catalog.Products });
+                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, rails = catalog.Rails, linearGuides = catalog.LinearGuides, liftColumns = catalog.LiftColumns, shelfSupports = catalog.ShelfSupports, statuses = catalog.Statuses, products = catalog.Products });
                 return;
             }
 
@@ -169,6 +170,21 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
                 WriteJson(stream, 200, new QuoteApplicationService().BuildQuote(quoteRequest));
+                return;
+            }
+
+            if (request.Method == "POST" && path == "/api/solidworks/export")
+            {
+                var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
+                WriteJson(stream, 200, new ProductionOutputService().GenerateSolidWorksControlFiles(quoteRequest, RootFolder));
+                return;
+            }
+
+            if (request.Method == "POST" && path == "/api/output/open-folder")
+            {
+                var openRequest = serializer.Deserialize<OpenOutputFolderRequest>(request.Body);
+                var openedFolder = OpenOutputFolder(openRequest == null ? null : openRequest.Path);
+                WriteJson(stream, 200, new { ok = true, folder = openedFolder });
                 return;
             }
 
@@ -248,6 +264,25 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var orderId = path.Substring("/api/orders/".Length);
             return orderId.Substring(0, orderId.Length - suffix.Length);
+        }
+
+        private string OpenOutputFolder(string requestedPath)
+        {
+            if (string.IsNullOrWhiteSpace(requestedPath)) throw new ArgumentException("Outputpad ontbreekt.");
+            var fullPath = Path.GetFullPath(requestedPath);
+            if (File.Exists(fullPath)) fullPath = Path.GetDirectoryName(fullPath);
+            var allowedRoot = Path.GetFullPath(RootFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var candidate = Path.GetFullPath(fullPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(allowedRoot, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(fullPath))
+                throw new InvalidOperationException("De outputmap valt buiten de portal-output of bestaat niet.");
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = fullPath,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
+            });
+            return fullPath;
         }
 
         private static int FindHeaderEnd(byte[] buffer, int length)
@@ -368,6 +403,11 @@ namespace SWWerkplaats.Configurator.Portal
             public string Method { get; set; }
             public string Path { get; set; }
             public string Body { get; set; }
+        }
+
+        private sealed class OpenOutputFolderRequest
+        {
+            public string Path { get; set; }
         }
     }
 }

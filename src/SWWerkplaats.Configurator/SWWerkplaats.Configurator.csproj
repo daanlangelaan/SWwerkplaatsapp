@@ -36,18 +36,30 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
+    <Compile Include="Application\CamMasterSettings.cs" />
     <Compile Include="Application\CubbyCabinetProductBuilder.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
     <Compile Include="Application\HealthApplicationService.cs" />
     <Compile Include="Application\HardwareLibraryRepository.cs" />
     <Compile Include="Application\ICatalogRepository.cs" />
     <Compile Include="Application\IProductBuilder.cs" />
+    <Compile Include="Application\LexWorkbenchProductBuilder.cs" />
+    <Compile Include="Application\MachineBaseProductBuilder.cs" />
+    <Compile Include="Application\RobotCellProductBuilder.cs" />
+    <Compile Include="Application\ShippingBoxProductBuilder.cs" />
+    <Compile Include="Application\LexRevolutionProductBuilder.cs" />
+    <Compile Include="Application\WorkbenchCabinetProductBuilder.cs" />
     <Compile Include="Application\IOrderRepository.cs" />
     <Compile Include="Application\OrderApplicationService.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
+    <Compile Include="Application\ProductFastenerStandards.cs" />
     <Compile Include="Application\ProductCatalogApplicationService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
     <Compile Include="Application\ProductRegistry.cs" />
@@ -57,6 +69,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Domain\CutListItem.cs" />
     <Compile Include="Domain\AssemblyPlacement.cs" />
+    <Compile Include="Domain\AdjustableFootTemplate.cs" />
     <Compile Include="Domain\AppSettings.cs" />
     <Compile Include="Domain\CabinetConfig.cs" />
     <Compile Include="Domain\CubbyCabinetConfig.cs" />
@@ -65,32 +78,50 @@
     <Compile Include="Domain\FastenerDefinition.cs" />
     <Compile Include="Domain\HardwareItem.cs" />
     <Compile Include="Domain\LibraryCatalog.cs" />
+    <Compile Include="Domain\LexWorkbenchConfig.cs" />
     <Compile Include="Domain\MachineProfile.cs" />
+    <Compile Include="Domain\MachineBaseConfig.cs" />
+    <Compile Include="Domain\RobotCellConfig.cs" />
+    <Compile Include="Domain\ShippingBoxConfig.cs" />
     <Compile Include="Domain\Material.cs" />
     <Compile Include="Domain\NestingModels.cs" />
     <Compile Include="Domain\OrderWorkflowPolicy.cs" />
     <Compile Include="Domain\OrderWorkflowStatus.cs" />
     <Compile Include="Domain\PartModels.cs" />
+    <Compile Include="Domain\PlinthClipAdapterTemplate.cs" />
     <Compile Include="Domain\ProfileOperation.cs" />
     <Compile Include="Domain\ProductDrawingStrategy.cs" />
+    <Compile Include="Domain\ProductFastenerStandard.cs" />
     <Compile Include="Domain\RailTemplate.cs" />
     <Compile Include="Domain\ShelfSupportTemplate.cs" />
+    <Compile Include="Domain\SystemComponentTemplates.cs" />
     <Compile Include="Domain\ToolDefinition.cs" />
     <Compile Include="Domain\WorkbenchConfig.cs" />
+    <Compile Include="Domain\WorkbenchCabinetConfig.cs" />
     <Compile Include="Domain\WorkbenchModel.cs" />
     <Compile Include="Drawing\Products\CubbyCabinet\CubbyCabinetDrawingRules.cs" />
     <Compile Include="Drawing\SheetDrawing.cs" />
+    <Compile Include="Drawing\SheetContourGeometry.cs" />
     <Compile Include="Drawing\SheetOperations.cs" />
     <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
+    <Compile Include="Engine\MachineBaseEngine.cs" />
+    <Compile Include="Engine\RobotCellEngine.cs" />
+    <Compile Include="Engine\ShippingBoxEngine.cs" />
+    <Compile Include="Engine\LexWorkbenchEngine.cs" />
+    <Compile Include="Engine\WorkbenchCabinetEngine.cs" />
     <Compile Include="Engine\CabinetEngine.cs" />
     <Compile Include="Engine\CubbyCabinetEngine.cs" />
     <Compile Include="Manufacturing\CsvExporter.cs" />
     <Compile Include="Manufacturing\CamJobOptions.cs" />
+    <Compile Include="Manufacturing\ContourDepthStrategy.cs" />
+    <Compile Include="Manufacturing\GCodeSafetyValidator.cs" />
+    <Compile Include="Manufacturing\GCodeMonitoringMarkerWriter.cs" />
     <Compile Include="Manufacturing\Mach3GCodeGenerator.cs" />
     <Compile Include="Manufacturing\NestedMach3GCodeGenerator.cs" />
     <Compile Include="Manufacturing\NestingExporter.cs" />
     <Compile Include="Manufacturing\PencilMarkingGCodeGenerator.cs" />
+    <Compile Include="Manufacturing\PlinthClipAdapterExportService.cs" />
     <Compile Include="Manufacturing\ProfileOperationsXlsxExporter.cs" />
     <Compile Include="Manufacturing\SheetNestingEngine.cs" />
     <Compile Include="Manufacturing\ToolpathPreviewExporter.cs" />
@@ -104,8 +135,15 @@
     <Compile Include="Portal\PortalVisualizationService.cs" />
     <Compile Include="Portal\PortalWebServer.cs" />
     <Compile Include="Portal\ProductionOutputService.cs" />
+    <Compile Include="Portal\WorkbenchCabinetAuditService.cs" />
     <Compile Include="SolidWorks\ISolidWorksExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksComPartExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksCustomerHtmlExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksCustomerDrawingExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksCustomerPowerPointExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksCustomerPresentationProfile.cs" />
+    <Compile Include="SolidWorks\SolidWorksCustomerPresentation.cs" />
+    <Compile Include="SolidWorks\SolidWorksGlbTextureMapper.cs" />
     <Compile Include="SolidWorks\SolidWorksExportPlan.cs" />
     <Compile Include="SolidWorks\SolidWorksMacroExporter.cs" />
     <Compile Include="UI\MainForm.cs" />
@@ -130,6 +168,18 @@
     <Content Include="Portal\images\product-cubby.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>PortalAssets\images\product-cubby.png</Link>
+    </Content>
+    <Content Include="SolidWorks\Assets\betonplex-birch-edge.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>SolidWorksAssets\betonplex-birch-edge.png</Link>
+    </Content>
+    <Content Include="SolidWorks\Assets\model-viewer-4.3.1.min.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>SolidWorksAssets\model-viewer-4.3.1.min.js</Link>
+    </Content>
+    <Content Include="SolidWorks\Assets\Klantpresentatie-template.pptx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>SolidWorksAssets\Klantpresentatie-template.pptx</Link>
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

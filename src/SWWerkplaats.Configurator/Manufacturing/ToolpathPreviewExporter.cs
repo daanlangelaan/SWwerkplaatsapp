@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using SWWerkplaats.Configurator.Domain;
+using SWWerkplaats.Configurator.Drawing;
 
 namespace SWWerkplaats.Configurator.Manufacturing
 {
@@ -65,6 +66,19 @@ namespace SWWerkplaats.Configurator.Manufacturing
             {
                 if (pocket.DepthMode == OperationDepthMode.Through)
                 {
+                    if (IsDrawerPullPocket(pocket))
+                    {
+                        var handlePoints = DrawerPullCapsulePoints(placement.Part, pocket);
+                        var transformedHandlePoints = new List<Point2>();
+                        foreach (var handlePoint in handlePoints)
+                        {
+                            transformedHandlePoints.Add(Transform(placement, handlePoint.X, handlePoint.Y));
+                        }
+
+                        sb.AppendLine("<path class=\"cutout\" d=\"" + Path(transformedHandlePoints, stock, margin, scale) + " Z\"><title>" + Xml(placement.Part.Name + " - uitgefreesde handgreep door-en-door") + "</title></path>");
+                        continue;
+                    }
+
                     var cutoutPoints = new List<Point2>
                     {
                         Transform(placement, pocket.Xmm, pocket.Ymm),
@@ -106,6 +120,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
         {
             foreach (var hole in placement.Part.Holes)
             {
+                if (IsDrawerPullRoundEnd(hole)) continue;
                 var p = Transform(placement, hole.Xmm, hole.Ymm);
                 var x = margin + p.X * scale;
                 var y = margin + (stock.StockWidthMm - p.Y) * scale;
@@ -119,6 +134,60 @@ namespace SWWerkplaats.Configurator.Manufacturing
                     sb.AppendLine("<circle class=\"hole\" cx=\"" + F(x) + "\" cy=\"" + F(y) + "\" r=\"" + F(radius) + "\"><title>" + Xml(hole.Name + " diameter " + F(hole.DiameterMm)) + "</title></circle>");
                 }
             }
+        }
+
+        private static List<Point2> DrawerPullCapsulePoints(SheetPart part, SheetPocket middle)
+        {
+            var x0 = middle.Xmm;
+            var y0 = middle.Ymm;
+            var x1 = middle.Xmm + middle.LengthMm;
+            var y1 = middle.Ymm + middle.WidthMm;
+
+            foreach (var hole in part.Holes)
+            {
+                if (!IsDrawerPullRoundEnd(hole)) continue;
+                var radius = hole.DiameterMm / 2.0;
+                x0 = Math.Min(x0, hole.Xmm - radius);
+                y0 = Math.Min(y0, hole.Ymm - radius);
+                x1 = Math.Max(x1, hole.Xmm + radius);
+                y1 = Math.Max(y1, hole.Ymm + radius);
+            }
+
+            var radiusMm = Math.Max(0.1, Math.Min(x1 - x0, y1 - y0) / 2.0);
+            var centerY = (y0 + y1) / 2.0;
+            var leftCenterX = x0 + radiusMm;
+            var rightCenterX = x1 - radiusMm;
+            var points = new List<Point2>();
+            const int segments = 16;
+            points.Add(new Point2(leftCenterX, y0));
+            points.Add(new Point2(rightCenterX, y0));
+            for (var i = 1; i <= segments; i++)
+            {
+                var angle = -Math.PI / 2.0 + Math.PI * i / segments;
+                points.Add(new Point2(rightCenterX + Math.Cos(angle) * radiusMm, centerY + Math.Sin(angle) * radiusMm));
+            }
+            for (var i = 1; i <= segments; i++)
+            {
+                var angle = Math.PI / 2.0 + Math.PI * i / segments;
+                points.Add(new Point2(leftCenterX + Math.Cos(angle) * radiusMm, centerY + Math.Sin(angle) * radiusMm));
+            }
+            points.Add(points[0]);
+            return points;
+        }
+
+        private static bool IsDrawerPullPocket(SheetPocket pocket)
+        {
+            return pocket != null
+                && pocket.Name != null
+                && pocket.Name.IndexOf("Uitgefreesde handgreep", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsDrawerPullRoundEnd(SheetHole hole)
+        {
+            return hole != null
+                && hole.Name != null
+                && hole.Name.StartsWith("Uitgefreesde handgreep ", StringComparison.OrdinalIgnoreCase)
+                && hole.Name.IndexOf("ronding", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static void DrawContour(StringBuilder sb, NestedStockSheet stock, NestedSheetPlacement placement, ToolDefinition tool, double margin, double scale)
@@ -136,6 +205,12 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static List<Point2> ContourPoints(SheetPart part, double radius)
         {
             var points = new List<Point2>();
+            var custom = SheetContourGeometry.ToolCenterContour(part, radius);
+            if (custom.Count > 0)
+            {
+                foreach (var point in custom) points.Add(new Point2(point.Xmm, point.Ymm));
+                return points;
+            }
             var x0 = -radius;
             var y0 = -radius;
             var x1 = part.LengthMm + radius;
@@ -156,11 +231,12 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             if (part.HasCornerNotches)
             {
-                var n = part.CornerNotchSizeMm;
-                var nx0 = n + radius;
-                var ny0 = n + radius;
-                var nx1 = part.LengthMm - n - radius;
-                var ny1 = part.WidthMm - n - radius;
+                var nl = part.CornerNotchLengthMm > 0 ? part.CornerNotchLengthMm : part.CornerNotchSizeMm;
+                var nw = part.CornerNotchWidthMm > 0 ? part.CornerNotchWidthMm : part.CornerNotchSizeMm;
+                var nx0 = nl + radius;
+                var ny0 = nw + radius;
+                var nx1 = part.LengthMm - nl - radius;
+                var ny1 = part.WidthMm - nw - radius;
                 points.Add(new Point2(nx0, y0));
                 points.Add(new Point2(nx1, y0));
                 points.Add(new Point2(nx1, ny0));
@@ -177,12 +253,43 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 return points;
             }
 
+            if (part.CornerRadiusMm > 0.001)
+            {
+                AddRoundedRectangleContour(points, part.LengthMm, part.WidthMm, part.CornerRadiusMm, radius);
+                return points;
+            }
+
             points.Add(new Point2(x0, y0));
             points.Add(new Point2(x1, y0));
             points.Add(new Point2(x1, y1));
             points.Add(new Point2(x0, y1));
             points.Add(new Point2(x0, y0));
             return points;
+        }
+
+        private static void AddRoundedRectangleContour(List<Point2> points, double length, double width, double cornerRadius, double toolRadius)
+        {
+            var r = Math.Max(0, Math.Min(cornerRadius, Math.Min(length, width) / 2.0));
+            var pathRadius = r + toolRadius;
+            points.Add(new Point2(r, -toolRadius));
+            points.Add(new Point2(length - r, -toolRadius));
+            AddContourArc(points, length - r, r, pathRadius, -Math.PI / 2.0, 0);
+            points.Add(new Point2(length + toolRadius, width - r));
+            AddContourArc(points, length - r, width - r, pathRadius, 0, Math.PI / 2.0);
+            points.Add(new Point2(r, width + toolRadius));
+            AddContourArc(points, r, width - r, pathRadius, Math.PI / 2.0, Math.PI);
+            points.Add(new Point2(-toolRadius, r));
+            AddContourArc(points, r, r, pathRadius, Math.PI, Math.PI * 1.5);
+        }
+
+        private static void AddContourArc(List<Point2> points, double centerX, double centerY, double radius, double startAngle, double endAngle)
+        {
+            const int segments = 8;
+            for (var i = 1; i <= segments; i++)
+            {
+                var angle = startAngle + (endAngle - startAngle) * i / segments;
+                points.Add(new Point2(centerX + radius * Math.Cos(angle), centerY + radius * Math.Sin(angle)));
+            }
         }
 
         private static string Path(List<Point2> points, NestedStockSheet stock, double margin, double scale)

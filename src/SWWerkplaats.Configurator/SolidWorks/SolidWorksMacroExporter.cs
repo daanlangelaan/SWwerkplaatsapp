@@ -9,7 +9,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
     {
         public string ExportMacro(WorkbenchModel model, string outputFolder)
         {
-            var cadFolder = Path.Combine(outputFolder, "SolidWorks");
+            var cadFolder = Path.Combine(outputFolder, "02_SolidWorks");
             Directory.CreateDirectory(cadFolder);
 
             var macroFileName = "Maak_" + SafeName(model.ProjectName) + "_Parts.bas";
@@ -55,7 +55,9 @@ namespace SWWerkplaats.Configurator.SolidWorks
             foreach (var sheet in model.Sheets)
             {
                 var path = Path.Combine(cadFolder, SafeName(sheet.Name) + "_" + sheet.LengthMm.ToString("0", CultureInfo.InvariantCulture) + "x" + sheet.WidthMm.ToString("0", CultureInfo.InvariantCulture) + ".SLDPRT");
-                sb.AppendLine("    CreateSheetPart " + Q(path) + ", " + M(sheet.LengthMm) + ", " + M(sheet.Material.ThicknessMm) + ", " + M(sheet.WidthMm) + ", " + M(sheet.HasCornerNotches ? sheet.CornerNotchSizeMm : 0) + ", " + Q(HoleData(sheet)) + ", " + Q(SheetPartOrientation(model, sheet)) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickDepthMm : 0) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickHeightMm : 0));
+                var notchLength = sheet.HasCornerNotches ? (sheet.CornerNotchLengthMm > 0 ? sheet.CornerNotchLengthMm : sheet.CornerNotchSizeMm) : 0;
+                var notchWidth = sheet.HasCornerNotches ? (sheet.CornerNotchWidthMm > 0 ? sheet.CornerNotchWidthMm : sheet.CornerNotchSizeMm) : 0;
+                sb.AppendLine("    CreateSheetPart " + Q(path) + ", " + M(sheet.LengthMm) + ", " + M(sheet.Material.ThicknessMm) + ", " + M(sheet.WidthMm) + ", " + M(notchLength) + ", " + M(notchWidth) + ", " + Q(HoleData(sheet)) + ", " + Q(SheetPartOrientation(model, sheet)) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickDepthMm : 0) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickHeightMm : 0));
             }
 
             AppendAssemblyCalls(sb, model, cadFolder);
@@ -178,7 +180,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swModel.EditRebuild3");
             sb.AppendLine("End Sub");
             sb.AppendLine();
-            sb.AppendLine("Sub CreateSheetPart(filePath As String, x As Double, thickness As Double, z As Double, notch As Double, holeData As String, orientation As String, toeDepth As Double, toeHeight As Double)");
+            sb.AppendLine("Sub CreateSheetPart(filePath As String, x As Double, thickness As Double, z As Double, notchLength As Double, notchWidth As Double, holeData As String, orientation As String, toeDepth As Double, toeHeight As Double)");
             sb.AppendLine("    Dim swModel As Object");
             sb.AppendLine("    Dim ok As Boolean");
             sb.AppendLine("    Dim errors As Long");
@@ -200,12 +202,12 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swModel.SketchManager.InsertSketch True");
             sb.AppendLine("    If isVerticalZ Then");
             sb.AppendLine("        CreateVerticalZBaseSketch swModel, x, z, toeDepth, toeHeight");
-            sb.AppendLine("    ElseIf notch > 0 And orientation = \"HORIZONTAL\" Then");
-            sb.AppendLine("        CreateNotchedSheetSketch swModel, x, z, notch");
+            sb.AppendLine("    ElseIf notchLength > 0 And notchWidth > 0 And orientation = \"HORIZONTAL\" Then");
+            sb.AppendLine("        CreateNotchedSheetSketch swModel, x, z, notchLength, notchWidth");
             sb.AppendLine("    Else");
             sb.AppendLine("        CreateSheetRectangle swModel, x, thickness, z, orientation");
             sb.AppendLine("    End If");
-            sb.AppendLine("    If notch = 0 And Not isVerticalZ Then FullyDefineSketchWithDimensions swModel");
+            sb.AppendLine("    If notchLength = 0 And Not isVerticalZ Then FullyDefineSketchWithDimensions swModel");
             sb.AppendLine("    swModel.SketchManager.InsertSketch True");
             sb.AppendLine("    extrudeDepth = thickness");
             sb.AppendLine("    On Error Resume Next");
@@ -603,23 +605,23 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swModel.EditRebuild3");
             sb.AppendLine("End Sub");
             sb.AppendLine();
-            sb.AppendLine("Sub CreateNotchedSheetSketch(swModel As Object, x As Double, z As Double, notch As Double)");
+            sb.AppendLine("Sub CreateNotchedSheetSketch(swModel As Object, x As Double, z As Double, notchLength As Double, notchWidth As Double)");
             sb.AppendLine("    Dim hx As Double");
             sb.AppendLine("    Dim hz As Double");
             sb.AppendLine("    hx = x / 2");
             sb.AppendLine("    hz = z / 2");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notch, -hz, 0, hx - notch, -hz, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notch, -hz, 0, hx - notch, -hz + notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notch, -hz + notch, 0, hx, -hz + notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx, -hz + notch, 0, hx, hz - notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx, hz - notch, 0, hx - notch, hz - notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notch, hz - notch, 0, hx - notch, hz, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notch, hz, 0, -hx + notch, hz, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notch, hz, 0, -hx + notch, hz - notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notch, hz - notch, 0, -hx, hz - notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx, hz - notch, 0, -hx, -hz + notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx, -hz + notch, 0, -hx + notch, -hz + notch, 0");
-            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notch, -hz + notch, 0, -hx + notch, -hz, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notchLength, -hz, 0, hx - notchLength, -hz, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notchLength, -hz, 0, hx - notchLength, -hz + notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notchLength, -hz + notchWidth, 0, hx, -hz + notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx, -hz + notchWidth, 0, hx, hz - notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx, hz - notchWidth, 0, hx - notchLength, hz - notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notchLength, hz - notchWidth, 0, hx - notchLength, hz, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine hx - notchLength, hz, 0, -hx + notchLength, hz, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notchLength, hz, 0, -hx + notchLength, hz - notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notchLength, hz - notchWidth, 0, -hx, hz - notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx, hz - notchWidth, 0, -hx, -hz + notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx, -hz + notchWidth, 0, -hx + notchLength, -hz + notchWidth, 0");
+            sb.AppendLine("    swModel.SketchManager.CreateLine -hx + notchLength, -hz + notchWidth, 0, -hx + notchLength, -hz, 0");
             sb.AppendLine("End Sub");
             sb.AppendLine();
             sb.AppendLine("Sub CreateVerticalZBaseSketch(swModel As Object, depth As Double, height As Double, toeDepth As Double, toeHeight As Double)");

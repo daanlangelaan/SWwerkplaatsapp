@@ -292,7 +292,9 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double AssemblyHoleDiameter(CubbyCabinetConfig config)
         {
-            return config.SheetFastener == null || config.SheetFastener.ClearanceHoleDiameterMm <= 0 ? 4.5 : config.SheetFastener.ClearanceHoleDiameterMm;
+            return config != null && config.SheetFastener != null && config.SheetFastener.ClearanceHoleDiameterMm > 0
+                ? config.SheetFastener.ClearanceHoleDiameterMm
+                : ProductDrawingStrategy.DefaultWoodScrewClearanceHoleDiameterMm;
         }
 
         private static void Validate(CubbyCabinetConfig config)

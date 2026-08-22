@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using SWWerkplaats.Configurator.Domain;
+using SWWerkplaats.Configurator.Portal;
 
 namespace SWWerkplaats.Configurator.Manufacturing
 {
@@ -51,7 +53,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
         public string ExportProfileOperations(IEnumerable<ProfileOperation> operations)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("ProfielId;Onderdeel;Aantal;Materiaal;Profielmaat_mm;Lengte_mm;Volgorde;Bewerking;Nulpunt;Zijde;Positie_mm;Diameter_mm;Doorlopend;MachineHint;Opmerking");
+            sb.AppendLine("ProfielId;Onderdeel;Aantal;Materiaal;Profielmaat_mm;Lengte_mm;Volgorde;Bewerking;Nulpunt;Zijde;Positie_mm;Diameter_mm;Doorlopend;Uitvoerder;MachineHint;Opmerking");
 
             string lastProfileId = null;
             foreach (var operation in operations)
@@ -72,7 +74,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             rows.AppendLine(Row(new[]
             {
                 "ProfielId", "Onderdeel", "Aantal", "Materiaal", "Profielmaat mm", "Lengte mm", "Volgorde",
-                "Bewerking", "Nulpunt", "Zijde", "Positie mm", "Diameter mm", "Doorlopend", "MachineHint", "Opmerking"
+                "Bewerking", "Nulpunt", "Zijde", "Positie mm", "Diameter mm", "Doorlopend", "Uitvoerder", "MachineHint", "Opmerking"
             }, "Header"));
 
             string lastProfileId = null;
@@ -93,7 +95,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 "</Styles>\r\n" +
                 "<Worksheet ss:Name=\"Profielbewerkingen\">\r\n" +
                 "<Table>\r\n" +
-                Columns(new[] { 130, 150, 55, 120, 95, 75, 60, 90, 70, 105, 90, 80, 75, 90, 360 }) +
+                Columns(new[] { 130, 150, 55, 120, 95, 75, 60, 90, 70, 105, 90, 80, 75, 120, 90, 360 }) +
                 rows +
                 "</Table>\r\n" +
                 "<WorksheetOptions xmlns=\"urn:schemas-microsoft-com:office:excel\">\r\n" +
@@ -137,26 +139,79 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         public string ExportCamOperations(IEnumerable<SheetPart> sheets, ToolDefinition tool)
         {
+            return ExportCamOperations(sheets, tool, tool);
+        }
+
+        public string ExportCamOperations(IEnumerable<SheetPart> sheets, ToolDefinition holeTool, ToolDefinition contourTool)
+        {
+            return ExportCamOperations(sheets, holeTool, contourTool, null, false, false, 0);
+        }
+
+        public string ExportCamOperations(IEnumerable<SheetPart> sheets, ToolDefinition holeTool, ToolDefinition contourTool, ToolDefinition vBitTool, bool enableWoodScrewCountersinks, bool enableOutsideEdgeChamfer, double edgeChamferWidthMm)
+        {
+            return ExportCamOperations(sheets, holeTool, contourTool, vBitTool, enableWoodScrewCountersinks, enableOutsideEdgeChamfer, edgeChamferWidthMm, 1.0);
+        }
+
+        public string ExportCamOperations(IEnumerable<SheetPart> sheets, ToolDefinition holeTool, ToolDefinition contourTool, ToolDefinition vBitTool, bool enableWoodScrewCountersinks, bool enableOutsideEdgeChamfer, double edgeChamferWidthMm, double throughCutOvertravelMm)
+        {
             var sb = new StringBuilder();
             sb.AppendLine("Plaat;Volgorde;Bewerking;Tool;X_mm;Y_mm;Diameter_mm;Lengte_mm;Breedte_mm;Diepte_mm;Opmerking");
 
             foreach (var sheet in sheets)
             {
                 var order = 1;
+                foreach (var hole in sheet.Holes.Where(h => h.DiameterMm < contourTool.DiameterMm - 0.05))
+                {
+                    var holeDepth = HoleDepth(hole, sheet.Material.ThicknessMm, throughCutOvertravelMm);
+                    AppendCamOperation(
+                        sb,
+                        sheet,
+                        order++,
+                        hole.DepthMode == OperationDepthMode.Through ? "Doorboren/circulair frezen" : "Blindgat/circulair frezen",
+                        holeTool,
+                        hole.Xmm,
+                        hole.Ymm,
+                        hole.DiameterMm,
+                        0,
+                        0,
+                        holeDepth,
+                        hole.Name);
+                }
+
+                foreach (var hole in sheet.Holes.Where(h => h.DiameterMm >= contourTool.DiameterMm - 0.05))
+                {
+                    var holeDepth = HoleDepth(hole, sheet.Material.ThicknessMm, throughCutOvertravelMm);
+                    AppendCamOperation(
+                        sb,
+                        sheet,
+                        order++,
+                        hole.DepthMode == OperationDepthMode.Through ? "Doorboren/circulair frezen" : "Blindgat/circulair frezen",
+                        contourTool,
+                        hole.Xmm,
+                        hole.Ymm,
+                        hole.DiameterMm,
+                        0,
+                        0,
+                        holeDepth,
+                        hole.Name);
+                }
+
                 foreach (var pocket in sheet.Pockets)
                 {
                     AppendCamOperation(
                         sb,
                         sheet,
                         order++,
-                        "Rechthoekige pocket/groef",
-                        tool,
+                        pocket.DepthMode == OperationDepthMode.Through ? "Doorlopende pocket/groef" : "Rechthoekige pocket/groef",
+                        contourTool,
                         pocket.Xmm,
                         pocket.Ymm,
                         0,
                         pocket.LengthMm,
                         pocket.WidthMm,
-                        pocket.DepthMm,
+                        pocket.DepthMode == OperationDepthMode.Through
+                            ? sheet.Material.ThicknessMm + System.Math.Max(0, throughCutOvertravelMm)
+                            : System.Math.Min(pocket.DepthMm, System.Math.Max(0.1, sheet.Material.ThicknessMm - 0.1)),
                         pocket.Name + " - " + pocket.Note);
                 }
 
@@ -171,8 +226,12 @@ namespace SWWerkplaats.Configurator.Manufacturing
                         sb,
                         sheet,
                         order++,
-                        "Kopkamer helix-frezen",
-                        tool,
+                        enableWoodScrewCountersinks && vBitTool != null && hole.SupportKind == SheetHoleSupportKind.PanelScrew
+                            ? "V-verzinken hout-op-hout"
+                            : "Kopkamer helix-frezen",
+                        enableWoodScrewCountersinks && vBitTool != null && hole.SupportKind == SheetHoleSupportKind.PanelScrew
+                            ? vBitTool
+                            : contourTool,
                         hole.Xmm,
                         hole.Ymm,
                         hole.CountersinkDiameterMm,
@@ -182,22 +241,21 @@ namespace SWWerkplaats.Configurator.Manufacturing
                         hole.Name);
                 }
 
-                foreach (var hole in sheet.Holes)
+                if (enableOutsideEdgeChamfer && vBitTool != null && edgeChamferWidthMm > 0)
                 {
-                    var holeDepth = HoleDepth(hole, sheet.Material.ThicknessMm);
                     AppendCamOperation(
                         sb,
                         sheet,
                         order++,
-                        hole.DepthMm > 0 ? "Blindgat/circulair frezen" : "Doorboren/circulair frezen",
-                        tool,
-                        hole.Xmm,
-                        hole.Ymm,
-                        hole.DiameterMm,
+                        "Volledige buitencontour afschuinen",
+                        vBitTool,
                         0,
                         0,
-                        holeDepth,
-                        hole.Name);
+                        0,
+                        sheet.LengthMm,
+                        sheet.WidthMm,
+                        edgeChamferWidthMm,
+                        "90° V-frees; afschuining " + F(edgeChamferWidthMm) + "x" + F(edgeChamferWidthMm) + "mm vóór doorfrezen");
                 }
 
                 AppendCamOperation(
@@ -205,27 +263,28 @@ namespace SWWerkplaats.Configurator.Manufacturing
                     sheet,
                     order,
                     "Buitencontour",
-                    tool,
+                    contourTool,
                     0,
                     0,
-                    tool.DiameterMm,
+                    contourTool.DiameterMm,
                     0,
                     0,
-                    sheet.Material.ThicknessMm,
-                    ContourNote(sheet));
+                    sheet.Material.ThicknessMm + System.Math.Max(0, throughCutOvertravelMm),
+                    ContourNote(sheet) + "; doorsteek " + F(System.Math.Max(0, throughCutOvertravelMm)) + " mm");
             }
 
             return sb.ToString();
         }
 
-        private static double HoleDepth(SheetHole hole, double materialThicknessMm)
+        private static double HoleDepth(SheetHole hole, double materialThicknessMm, double throughCutOvertravelMm)
         {
-            if (hole != null && hole.DepthMm > 0)
-            {
-                return System.Math.Min(hole.DepthMm, System.Math.Max(0.1, materialThicknessMm - 0.1));
-            }
+            if (hole != null && hole.DepthMode == OperationDepthMode.Through)
+                return materialThicknessMm + System.Math.Max(0, throughCutOvertravelMm);
 
-            return materialThicknessMm;
+            if (hole != null && hole.DepthMm > 0)
+                return System.Math.Min(hole.DepthMm, System.Math.Max(0.1, materialThicknessMm - 0.1));
+
+            return System.Math.Max(0.1, materialThicknessMm - 0.1);
         }
 
         public string ExportToolLibrary(ToolDefinition tool)
@@ -331,11 +390,17 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
         public string ExportBom(WorkbenchModel model)
         {
+            return ExportBom(model, null);
+        }
+
+        public string ExportBom(WorkbenchModel model, PortalPrice price)
+        {
             var sb = new StringBuilder();
-            sb.AppendLine("Type;Naam;Artikelnummer;Aantal;Eenheid;Materiaal;Maat;Opmerking");
+            sb.AppendLine("Type;Naam;Artikelnummer;Aantal;Eenheid;Materiaal;Maat;Opmerking;Modelstatus;BOM-status;Inkoopsleutel;Leverancier;Leveranciers-artikelcode;Inkoopprijs;Prijseenheid;Prijsstatus;Bestel-URL");
 
             foreach (var profile in model.Profiles)
             {
+                var purchase = FindPurchaseLine(price, profile.Material == null ? "" : profile.Material.Id, profile.Material == null ? "" : profile.Material.Name);
                 sb.Append("Profiel;");
                 sb.Append(E(profile.Name)).Append(';');
                 sb.Append(';');
@@ -343,11 +408,15 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 sb.Append("st;");
                 sb.Append(E(profile.Material.Name)).Append(';');
                 sb.Append(E(F(profile.LengthMm) + " mm")).Append(';');
-                sb.AppendLine(E(profile.OrientationNote));
+                sb.Append(E(profile.OrientationNote)).Append(';');
+                sb.Append(E("In 3D-model")).Append(';');
+                sb.Append(E(string.IsNullOrWhiteSpace(profile.BomStatus) ? "Actueel uit model" : profile.BomStatus));
+                AppendPurchaseColumns(sb, purchase, "");
             }
 
             foreach (var sheet in model.Sheets)
             {
+                var purchase = FindPurchaseLine(price, sheet.Material == null ? "" : sheet.Material.Id, sheet.Material == null ? "" : sheet.Material.Name);
                 sb.Append("Plaat;");
                 sb.Append(E(sheet.Name)).Append(';');
                 sb.Append(';');
@@ -355,11 +424,15 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 sb.Append("st;");
                 sb.Append(E(sheet.Material.Name)).Append(';');
                 sb.Append(E(F(sheet.LengthMm) + " x " + F(sheet.WidthMm) + " x " + F(sheet.Material.ThicknessMm) + " mm")).Append(';');
-                sb.AppendLine(E(ContourNote(sheet)));
+                sb.Append(E(ContourNote(sheet))).Append(';');
+                sb.Append(E("In 3D-model")).Append(';');
+                sb.Append(E(string.IsNullOrWhiteSpace(sheet.BomStatus) ? "Actueel uit model" : sheet.BomStatus));
+                AppendPurchaseColumns(sb, purchase, "");
             }
 
             foreach (var item in model.Hardware)
             {
+                var purchase = FindPurchaseLine(price, "", item.Name);
                 sb.Append("Bevestiging;");
                 sb.Append(E(item.Name)).Append(';');
                 sb.Append(E(item.ArticleNumber)).Append(';');
@@ -367,10 +440,36 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 sb.Append(E(item.Unit)).Append(';');
                 sb.Append(';');
                 sb.Append(';');
-                sb.AppendLine(E(item.Note));
+                sb.Append(E(item.Note)).Append(';');
+                sb.Append(E(item.ModelStatus)).Append(';');
+                sb.Append(E(item.BomStatus));
+                AppendPurchaseColumns(sb, purchase, item.ArticleNumber);
             }
 
             return sb.ToString();
+        }
+
+        private static PortalPriceLine FindPurchaseLine(PortalPrice price, string key, string description)
+        {
+            if (price == null) return null;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                var byKey = price.Lines.FirstOrDefault(line => string.Equals(line.Key, key, StringComparison.OrdinalIgnoreCase));
+                if (byKey != null) return byKey;
+            }
+            return price.Lines.FirstOrDefault(line => string.Equals(line.Description, description, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void AppendPurchaseColumns(StringBuilder sb, PortalPriceLine line, string fallbackArticleNumber)
+        {
+            sb.Append(';').Append(E(line == null ? "" : line.Key));
+            sb.Append(';').Append(E(line == null ? "" : line.Supplier));
+            var articleCode = line != null && !string.IsNullOrWhiteSpace(line.SupplierArticleCode) ? line.SupplierArticleCode : fallbackArticleNumber;
+            sb.Append(';').Append(E(articleCode));
+            sb.Append(';').Append(line == null ? "" : line.PurchaseUnitPrice.ToString("0.00", CultureInfo.InvariantCulture));
+            sb.Append(';').Append(E(line == null ? "" : line.Unit));
+            sb.Append(';').Append(E(line == null ? "Niet gekoppeld" : line.PriceStatus));
+            sb.Append(';').AppendLine(E(line == null ? "" : line.OrderUrl));
         }
 
         private static string ContourNote(SheetPart sheet)
@@ -453,6 +552,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 PositionText(operation),
                 operation.DiameterMm > 0 ? F(operation.DiameterMm) : "",
                 operation.DiameterMm > 0 ? (operation.ThroughHole ? "ja" : "nee") : "",
+                operation.ExecutionParty,
                 operation.MachineHint,
                 operation.Note
             };
@@ -511,8 +611,17 @@ namespace SWWerkplaats.Configurator.Manufacturing
         private static string HoleSupportText(SheetHole hole)
         {
             if (hole.SupportKind == SheetHoleSupportKind.TappedProfileEnd) return "M8 draad in kopse staander";
-            if (hole.SupportKind == SheetHoleSupportKind.PanelScrew) return "Plaat-op-plaat schroef 4x45, boorgat 4,5mm";
-            if (hole.SupportKind == SheetHoleSupportKind.HingeScrew) return "Scharnier-op-hout schroef 4x12, boorgat 4,5mm";
+            if (hole.SupportKind == SheetHoleSupportKind.PanelScrew) return "Hout-op-hout plaatschroef; boorgat volgens productstandaard Ø" + hole.DiameterMm.ToString("0.##", CultureInfo.InvariantCulture) + "mm";
+            if (hole.SupportKind == SheetHoleSupportKind.HingeScrew) return "Scharnierbevestiging op deurblad; diameter en diepte volgens boorbewerking";
+            if (hole.SupportKind == SheetHoleSupportKind.HingePlate) return "Scharniermontageplaat; diameter en diepte volgens boorbewerking";
+            if (hole.SupportKind == SheetHoleSupportKind.HingeCup) return "Scharnierpot; diameter en diepte volgens boorbewerking";
+            if (hole.SupportKind == SheetHoleSupportKind.AdjustableFoot) return "Montagegat verstelbare kastpoot in doorlopende bodemplaat";
+            if (hole.SupportKind == SheetHoleSupportKind.PlinthClip) return "Montagegat losneembare voorzetplintclip";
+            if (hole.SupportKind == SheetHoleSupportKind.ShelfSupport) return "Blind gat voor legplankdrager; diameter en diepte volgens boorbewerking";
+            if (hole.SupportKind == SheetHoleSupportKind.DrawerRail) return hole.DepthMode == OperationDepthMode.Through
+                ? "Door-en-door bevestigingsgat voor ladegeleider"
+                : "Bevestigingsgat voor ladegeleider; diameter en diepte volgens boorbewerking";
+            if (hole.SupportKind == SheetHoleSupportKind.MachiningCutout) return "Ronde eindbewerking van doorlopende CNC-uitsparing";
             return "M8 T-moer / profielmoer";
         }
 

@@ -10,6 +10,8 @@ namespace SWWerkplaats.Configurator.Application
         public ShelfSupportTemplate[] ShelfSupports { get; set; }
         public string[] Statuses { get; set; }
         public ProductCatalogItem[] Products { get; set; }
+        public LinearGuideTemplate[] LinearGuides { get; set; }
+        public LiftColumnTemplate[] LiftColumns { get; set; }
     }
 
     public sealed class CatalogApplicationService
@@ -35,7 +37,9 @@ namespace SWWerkplaats.Configurator.Application
                 Rails = catalog.DrawerRails(),
                 ShelfSupports = catalog.ShelfSupports(),
                 Statuses = OrderWorkflowStatus.All(),
-                Products = new ProductCatalogApplicationService().ListProducts()
+                Products = new ProductCatalogApplicationService().ListProducts(),
+                LinearGuides = new[] { ProductDefaults.LexHsr15LinearGuide() },
+                LiftColumns = new[] { ProductDefaults.LexHte2LiftColumn() }
             };
         }
     }

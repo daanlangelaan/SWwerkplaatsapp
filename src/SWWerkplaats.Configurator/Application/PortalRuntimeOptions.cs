@@ -25,7 +25,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             return new PortalRuntimeOptions
             {
-                RootFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PortalData"),
+                RootFolder = DefaultRootFolder(),
                 Prefix = "http://localhost:8088/",
                 Port = 8088,
                 PortalOnly = false
@@ -40,11 +40,15 @@ namespace SWWerkplaats.Configurator.Application
             try
             {
                 var configured = new JavaScriptSerializer().Deserialize<PortalRuntimeOptions>(File.ReadAllText(path));
-            if (configured == null) return;
-            if (!string.IsNullOrWhiteSpace(configured.RootFolder)) options.RootFolder = configured.RootFolder;
-            if (configured.Port > 0) ApplyPort(options, configured.Port);
-            if (!string.IsNullOrWhiteSpace(configured.Prefix)) options.Prefix = configured.Prefix;
-            if (configured.PortalOnly) options.PortalOnly = true;
+                if (configured == null) return;
+                if (!string.IsNullOrWhiteSpace(configured.RootFolder))
+                {
+                    options.RootFolder = ResolveConfiguredRootFolder(configured.RootFolder, Path.GetDirectoryName(path));
+                }
+
+                if (configured.Port > 0) ApplyPort(options, configured.Port);
+                if (!string.IsNullOrWhiteSpace(configured.Prefix)) options.Prefix = configured.Prefix;
+                if (configured.PortalOnly) options.PortalOnly = true;
             }
             catch
             {
@@ -101,7 +105,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (string.IsNullOrWhiteSpace(options.RootFolder))
             {
-                options.RootFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PortalData");
+                options.RootFolder = DefaultRootFolder();
             }
 
             options.RootFolder = Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.RootFolder));
@@ -172,6 +176,31 @@ namespace SWWerkplaats.Configurator.Application
             }
 
             return null;
+        }
+
+        private static string DefaultRootFolder()
+        {
+            var configFolder = FindConfigFolder(AppDomain.CurrentDomain.BaseDirectory);
+            if (configFolder == null) configFolder = FindConfigFolder(Environment.CurrentDirectory);
+            if (configFolder != null)
+            {
+                var root = Directory.GetParent(configFolder);
+                if (root != null) return Path.Combine(root.FullName, "bin", "PortalData");
+            }
+
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PortalData");
+        }
+
+        private static string ResolveConfiguredRootFolder(string value, string configFolder)
+        {
+            var expanded = Environment.ExpandEnvironmentVariables(value);
+            if (Path.IsPathRooted(expanded)) return expanded;
+            if (!string.IsNullOrWhiteSpace(configFolder))
+            {
+                return Path.Combine(configFolder, expanded);
+            }
+
+            return expanded;
         }
     }
 }

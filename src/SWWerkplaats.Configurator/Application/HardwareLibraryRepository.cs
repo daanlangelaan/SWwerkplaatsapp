@@ -137,6 +137,7 @@ namespace SWWerkplaats.Configurator.Application
                 CabinetFirstHoleOffsetMm = NonNegative(rail.CabinetFirstHoleOffsetMm),
                 CabinetHoleSpacingMm = NonNegative(rail.CabinetHoleSpacingMm),
                 CabinetHolePositionsMm = rail.CabinetHolePositionsMm ?? "",
+                CabinetOppositeHolePositionsMm = rail.CabinetOppositeHolePositionsMm ?? "",
                 CabinetVerticalOffsetMm = NonNegative(rail.CabinetVerticalOffsetMm),
                 CabinetHoleDiameterMm = Positive(rail.CabinetHoleDiameterMm, 5),
                 DrawerHoleCount = NonNegative(rail.DrawerHoleCount),
@@ -145,8 +146,28 @@ namespace SWWerkplaats.Configurator.Application
                 DrawerHolePositionsMm = rail.DrawerHolePositionsMm ?? "",
                 DrawerVerticalOffsetMm = NonNegative(rail.DrawerVerticalOffsetMm),
                 DrawerHoleDiameterMm = Positive(rail.DrawerHoleDiameterMm, 4.5),
-                FastenerName = rail.FastenerName ?? ""
+                DrawerFrontInsertionCompensationMm = NonNegative(rail.DrawerFrontInsertionCompensationMm),
+                FastenerName = rail.FastenerName ?? "",
+                CabinetFastenerDiameterMm = Positive(rail.CabinetFastenerDiameterMm, 4),
+                CabinetFastenerLengthMm = Positive(rail.CabinetFastenerLengthMm, FastenerLengthFromName(rail.FastenerName)),
+                CabinetFastenerPassingStackMm = NonNegative(rail.CabinetFastenerPassingStackMm),
+                CabinetFastenerHeadStyle = rail.CabinetFastenerHeadStyle ?? "",
+                CabinetOpposingFitVerificationSignature = rail.CabinetOpposingFitVerificationSignature ?? ""
             };
+        }
+
+        private static double FastenerLengthFromName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return 0;
+            var marker = name.IndexOf('x');
+            if (marker < 0) marker = name.IndexOf('X');
+            if (marker < 0 || marker >= name.Length - 1) return 0;
+            var end = marker + 1;
+            while (end < name.Length && (char.IsDigit(name[end]) || name[end] == ',' || name[end] == '.')) end++;
+            double value;
+            return double.TryParse(name.Substring(marker + 1, end - marker - 1).Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value)
+                ? value
+                : 0;
         }
 
         private static ShelfSupportTemplate CloneShelfSupport(ShelfSupportTemplate support)

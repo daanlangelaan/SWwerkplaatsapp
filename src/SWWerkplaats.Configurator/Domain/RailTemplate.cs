@@ -10,6 +10,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double CabinetFirstHoleOffsetMm { get; set; }
         public double CabinetHoleSpacingMm { get; set; }
         public string CabinetHolePositionsMm { get; set; }
+        public string CabinetOppositeHolePositionsMm { get; set; }
         public double CabinetVerticalOffsetMm { get; set; }
         public double CabinetHoleDiameterMm { get; set; }
         public int DrawerHoleCount { get; set; }
@@ -18,7 +19,13 @@ namespace SWWerkplaats.Configurator.Domain
         public string DrawerHolePositionsMm { get; set; }
         public double DrawerVerticalOffsetMm { get; set; }
         public double DrawerHoleDiameterMm { get; set; }
+        public double DrawerFrontInsertionCompensationMm { get; set; }
         public string FastenerName { get; set; }
+        public double CabinetFastenerDiameterMm { get; set; }
+        public double CabinetFastenerLengthMm { get; set; }
+        public double CabinetFastenerPassingStackMm { get; set; }
+        public string CabinetFastenerHeadStyle { get; set; }
+        public string CabinetOpposingFitVerificationSignature { get; set; }
 
         public int HoleCount
         {

@@ -8,6 +8,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
     {
         public NestingPlan Build(WorkbenchModel model, MachineProfile machine, double spacingMm, double marginMm, double stockLengthOverrideMm, double stockWidthOverrideMm)
         {
+            return Build(model, machine, spacingMm, marginMm, stockLengthOverrideMm, stockWidthOverrideMm, null);
+        }
+
+        public NestingPlan Build(WorkbenchModel model, MachineProfile machine, double spacingMm, double marginMm, double stockLengthOverrideMm, double stockWidthOverrideMm, IList<string> firstSheetPriorityPartNames)
+        {
             if (model == null) throw new ArgumentNullException("model");
             if (machine == null) throw new ArgumentNullException("machine");
 
@@ -15,13 +20,13 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var groups = GroupSheets(model.Sheets);
             foreach (var group in groups)
             {
-                NestGroup(plan, group, machine, Math.Max(0, spacingMm), Math.Max(0, marginMm), stockLengthOverrideMm, stockWidthOverrideMm);
+                NestGroup(plan, group, machine, Math.Max(0, spacingMm), Math.Max(0, marginMm), stockLengthOverrideMm, stockWidthOverrideMm, firstSheetPriorityPartNames);
             }
 
             return plan;
         }
 
-        private static void NestGroup(NestingPlan plan, SheetGroup group, MachineProfile machine, double spacingMm, double marginMm, double stockLengthOverrideMm, double stockWidthOverrideMm)
+        private static void NestGroup(NestingPlan plan, SheetGroup group, MachineProfile machine, double spacingMm, double marginMm, double stockLengthOverrideMm, double stockWidthOverrideMm, IList<string> firstSheetPriorityPartNames)
         {
             var stockLength = stockLengthOverrideMm > 0 ? stockLengthOverrideMm : (group.Material.SheetLengthMm > 0 ? group.Material.SheetLengthMm : machine.MaxXmm);
             var stockWidth = stockWidthOverrideMm > 0 ? stockWidthOverrideMm : (group.Material.SheetWidthMm > 0 ? group.Material.SheetWidthMm : machine.MaxYmm);
@@ -32,6 +37,8 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             group.Parts.Sort(delegate(SheetPart a, SheetPart b)
             {
+                var priorityCompare = PriorityRank(a, firstSheetPriorityPartNames).CompareTo(PriorityRank(b, firstSheetPriorityPartNames));
+                if (priorityCompare != 0) return priorityCompare;
                 var areaCompare = (b.LengthMm * b.WidthMm).CompareTo(a.LengthMm * a.WidthMm);
                 if (areaCompare != 0) return areaCompare;
                 return b.LengthMm.CompareTo(a.LengthMm);
@@ -54,7 +61,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
                 if (best == null)
                 {
-                    var stock = NewStockSheet(group.Material, stockLength, stockWidth, ++sheetNumber);
+                    var stock = NewStockSheet(group.Material, stockLength, stockWidth, ++sheetNumber, firstSheetPriorityPartNames != null && firstSheetPriorityPartNames.Count > 0);
                     plan.StockSheets.Add(stock);
                     var packer = new SheetPacker(stock, stockLength, stockWidth, marginMm, spacingMm);
                     openSheets.Add(packer);
@@ -69,6 +76,16 @@ namespace SWWerkplaats.Configurator.Manufacturing
             }
         }
 
+        private static int PriorityRank(SheetPart part, IList<string> priorityNames)
+        {
+            if (part == null || priorityNames == null) return int.MaxValue;
+            for (var i = 0; i < priorityNames.Count; i++)
+            {
+                if (string.Equals(part.Name, priorityNames[i], StringComparison.OrdinalIgnoreCase)) return i;
+            }
+            return int.MaxValue;
+        }
+
         private static bool IsBetterCandidate(PlacementCandidate candidate, PlacementCandidate currentBest)
         {
             if (currentBest == null) return true;
@@ -81,11 +98,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
             return candidate.Score < currentBest.Score;
         }
 
-        private static NestedStockSheet NewStockSheet(Material material, double length, double width, int sheetNumber)
+        private static NestedStockSheet NewStockSheet(Material material, double length, double width, int sheetNumber, bool testFitPlan)
         {
             return new NestedStockSheet
             {
-                Name = SafeName(material.Name) + "_NestPlaat_" + sheetNumber.ToString("00"),
+                Name = SafeName(material.Name) + (testFitPlan && sheetNumber == 1 ? "_TestPlaat_" : "_NestPlaat_") + sheetNumber.ToString("00"),
                 Material = material,
                 StockLengthMm = length,
                 StockWidthMm = width,

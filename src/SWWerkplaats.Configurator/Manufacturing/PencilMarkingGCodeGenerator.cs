@@ -79,7 +79,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             return sb.ToString();
         }
 
-        public void Append(StringBuilder sb, NestedStockSheet stock, MachineProfile machine, PencilMarkingOptions options)
+        public void Append(StringBuilder sb, NestedStockSheet stock, MachineProfile machine, PencilMarkingOptions options, bool enableMonitoringMarkers = true)
         {
             if (!HasMarks(stock)) return;
             if (sb == null) throw new ArgumentNullException("sb");
@@ -88,9 +88,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             sb.AppendLine();
             sb.AppendLine("(--- BEWERKING 0: onderdelen markeren met geveerd potlood ---)");
+            GCodeMonitoringMarkerWriter.AppendStep(sb, enableMonitoringMarkers, 0, "Onderdelen markeren met geveerd potlood");
             sb.AppendLine("(Plaats " + options.ToolName + " in de freeshouder. Zet Z0 op de potloodpunt.)");
             sb.AppendLine("(Schrijfdiepte " + F(options.WriteDepthMm) + " mm vanaf potlood-Z0; hou rekening met veerweg.)");
             sb.AppendLine("M5");
+            GCodeMonitoringMarkerWriter.AppendToolChangeEvent(sb, enableMonitoringMarkers, options.ToolNumber, options.ToolName);
             sb.AppendLine("(TOOLCHANGE: machine gaat eerst naar home/wisselpositie)");
             sb.AppendLine("(1/2 Z-as naar machine-home)");
             sb.AppendLine("G28 G91 Z0.");

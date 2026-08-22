@@ -1,6 +1,9 @@
 using System;
 using System.Net.Sockets;
 using System.Windows.Forms;
+using System.IO;
+using System.Web.Script.Serialization;
+using SWWerkplaats.Configurator.SolidWorks;
 using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Portal;
 using SWWerkplaats.Configurator.UI;
@@ -13,6 +16,8 @@ namespace SWWerkplaats.Configurator
         [STAThread]
         private static void Main(string[] args)
         {
+            if (TryCloseGeneratedSolidWorksDocuments(args)) return;
+            if (TryRunSolidWorksWorker(args)) return;
             PortalWebServer portal = null;
             var portalOptions = PortalRuntimeOptions.Load(args);
             WinFormsApplication.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
@@ -65,6 +70,45 @@ namespace SWWerkplaats.Configurator
             {
                 if (portal != null) portal.Dispose();
             }
+        }
+
+        private static bool TryCloseGeneratedSolidWorksDocuments(string[] args)
+        {
+            if (args == null || args.Length < 2 || !string.Equals(args[0], "--solidworks-close-documents-under", StringComparison.OrdinalIgnoreCase)) return false;
+            try
+            {
+                var closed = new SolidWorksComPartExporter().CloseGeneratedDocumentsUnder(args[1]);
+                Console.WriteLine("Gesloten SolidWorks-documenten: " + closed);
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.ToString());
+                Environment.ExitCode = 2;
+            }
+            return true;
+        }
+
+        private static bool TryRunSolidWorksWorker(string[] args)
+        {
+            if (args == null || args.Length < 3 || !string.Equals(args[0], "--solidworks-worker", StringComparison.OrdinalIgnoreCase)) return false;
+            var resultPath = args[2];
+            try
+            {
+                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                var request = serializer.Deserialize<PortalQuoteRequest>(File.ReadAllText(args[1]));
+                var factory = new PortalConfigurationFactory();
+                var model = new ProductModelBuildService().Build(factory, request);
+                var assemblyPath = new SolidWorksComPartExporter().ExportPartsAndAssembly(model, Path.GetDirectoryName(resultPath), request);
+                File.WriteAllText(resultPath, serializer.Serialize(new { Ok = true, AssemblyPath = assemblyPath }));
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                try { File.WriteAllText(resultPath, new JavaScriptSerializer().Serialize(new { Ok = false, Error = ex.ToString() })); } catch { }
+                Environment.ExitCode = 2;
+            }
+            return true;
         }
 
         private static bool IsLocalPortOpen(int port)

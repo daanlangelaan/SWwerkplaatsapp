@@ -23,11 +23,13 @@ namespace SWWerkplaats.Configurator.Domain
         public Material WorktopMaterial { get; set; }
         public Material DrawerMaterial { get; set; }
         public Material FrontMaterial { get; set; }
+        public Material SlidingDoorMaterial { get; set; }
         public Material BackMaterial { get; set; }
         public FastenerDefinition SheetFastener { get; set; }
         public RailTemplate DrawerRail { get; set; }
         public ShelfSupportTemplate ShelfSupport { get; set; }
         public bool IncludeFullWidthTopDrawer { get; set; }
+        public bool IncludeDrawerPullCutouts { get; set; }
         public double FullWidthTopDrawerHeightMm { get; set; }
         public string ShelfStartMode { get; set; }
         public bool IncludeAdjustableShelfHoles { get; set; }
@@ -37,9 +39,20 @@ namespace SWWerkplaats.Configurator.Domain
         public double TabWidthMm { get; set; }
         public double TabHeightMm { get; set; }
         public double ShelfClearanceMm { get; set; }
+        public double ShelfFrontInsetMm { get; set; }
         public double DrawerSideClearanceMm { get; set; }
         public double DrawerBackClearanceMm { get; set; }
         public double DoorGapMm { get; set; }
+        public int SlidingDoorStartUnit { get; set; }
+        public int SlidingDoorEndUnit { get; set; }
+        public double SlidingDoorOverlapMm { get; set; }
+        public double SlidingDoorFreeSpaceBehindMm { get; set; }
+        public double SlidingDoorTrackCenterSpacingMm { get; set; }
+        public double SlidingDoorTopProfileHeightMm { get; set; }
+        public double SlidingDoorBottomProfileHeightMm { get; set; }
+        public double SlidingDoorTapeThicknessMm { get; set; }
+        public double SlidingDoorTopProfileDepthMm { get; set; }
+        public double SlidingDoorBottomProfileDepthMm { get; set; }
         public List<CabinetUnitConfig> Units { get; private set; }
 
         public CabinetConfig()

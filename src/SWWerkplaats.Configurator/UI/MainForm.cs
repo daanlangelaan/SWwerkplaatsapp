@@ -6,6 +6,7 @@ using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Engine;
 using SWWerkplaats.Configurator.Manufacturing;
+using SWWerkplaats.Configurator.Portal;
 using SWWerkplaats.Configurator.SolidWorks;
 
 namespace SWWerkplaats.Configurator.UI
@@ -60,6 +61,7 @@ namespace SWWerkplaats.Configurator.UI
         private readonly CheckBox countersinkHoles;
         private readonly CheckBox cabinetBackPanel;
         private readonly CheckBox cabinetTopDrawer;
+        private readonly CheckBox cabinetDrawerPullCutouts;
         private readonly CheckBox cabinetAdjustableShelfHoles;
         private readonly CheckBox exportSolidWorks;
         private readonly CheckBox pencilMarking;
@@ -135,6 +137,7 @@ namespace SWWerkplaats.Configurator.UI
             topSheet = MaterialCombo(LibraryCatalog.Sheets(), 2);
             shelfSheet = MaterialCombo(LibraryCatalog.Sheets(), 2);
             fastener = FastenerCombo(LibraryCatalog.SheetFasteners(), 0);
+            fastener.Enabled = false;
             cabinetCarcassMaterial = MaterialCombo(LibraryCatalog.Sheets(), 2);
             cabinetWorktopMaterial = MaterialCombo(LibraryCatalog.Sheets(), 2);
             cabinetDrawerMaterial = MaterialCombo(LibraryCatalog.Sheets(), 3);
@@ -154,11 +157,12 @@ namespace SWWerkplaats.Configurator.UI
             countersinkHoles = new CheckBox { Text = "Kopkamers frezen voor cilinderkop/inbusbout", Checked = true, AutoSize = true };
             cabinetBackPanel = new CheckBox { Text = "Achterwand toevoegen", Checked = false, AutoSize = true };
             cabinetTopDrawer = new CheckBox { Text = "Bovenaan 1 lade per unit", Checked = false, AutoSize = true };
+            cabinetDrawerPullCutouts = new CheckBox { Text = "Uitgefreesde handgrepen lades", Checked = false, AutoSize = true };
             cabinetAdjustableShelfHoles = new CheckBox { Text = "Legplankgaten onder bovenlade", Checked = false, AutoSize = true };
             autoTabs = new CheckBox { Text = "Tabs automatisch voor kleine delen", Checked = true, AutoSize = true };
             exportSolidWorks = new CheckBox { Text = "SolidWorks parts genereren", Checked = false, AutoSize = true };
             pencilMarking = new CheckBox { Text = "Potloodmarkering eerst schrijven", Checked = false, AutoSize = true };
-            jobTool4mm = new CheckBox { Text = "Frees 4mm", Checked = true, AutoSize = true };
+            jobTool4mm = new CheckBox { Text = "Frees 3mm 2-fluit carbide", Checked = true, AutoSize = true };
             jobTool6mm = new CheckBox { Text = "Frees 6mm", Checked = false, AutoSize = true };
             jobToolCurrent = new CheckBox { Text = "Primaire freesdiameter hierboven", Checked = true, Enabled = false, AutoSize = true };
             cabinetUnits = BuildCabinetUnitsGrid();
@@ -219,7 +223,7 @@ namespace SWWerkplaats.Configurator.UI
             AddRow(panel, "Tussenblad", middleShelf);
             AddRow(panel, "Uitsparing speling mm", shelfCornerClearance);
             AddRow(panel, "Max boutafstand mm", boltMaxSpacing);
-            AddRow(panel, "Bevestiging blad", fastener);
+            AddRow(panel, "Productstandaard bevestiging blad", fastener);
             AddRow(panel, "Kopkamers", countersinkHoles);
             AddRow(panel, "Kopkamerdiameter mm", countersinkDiameter);
             AddRow(panel, "Kopkamerdiepte mm", countersinkDepth);
@@ -248,6 +252,7 @@ namespace SWWerkplaats.Configurator.UI
             AddRow4(panel, "Achterwand materiaal", cabinetBackMaterial, "Rail-template", cabinetRailTemplate);
             AddRow4(panel, "Legplankdrager", cabinetShelfSupportTemplate, "Bovenlade", cabinetTopDrawer);
             AddRow4(panel, "Hoogte bovenlade mm", cabinetTopDrawerHeight, "Legplankgaten", cabinetAdjustableShelfHoles);
+            AddRow4(panel, "Ladefront", cabinetDrawerPullCutouts, "", new Label());
             AddRow4(panel, "Gaten eindmarge boven mm", cabinetShelfHoleEndMargin, "", new Label());
             AddRow4(panel, "Legplank speling mm", cabinetShelfClearance, "Lade zijdelingse speling mm", cabinetDrawerClearance);
             AddRow4(panel, "Lade achterspeling mm", cabinetDrawerBackClearance, "", new Label());
@@ -375,6 +380,8 @@ namespace SWWerkplaats.Configurator.UI
                 var holeTool = BuildHoleTool(contourTool);
                 var camJob = BuildCamJobOptions(holeTool);
                 camJob.AddTool(contourTool);
+                var camMaster = CamMasterSettings.LoadRequired();
+                camMaster.ApplyTo(camJob);
                 var machine = BuildMachine();
                 var model = isCabinet ? new CabinetEngine().Build(BuildCabinetConfig()) : new WorkbenchEngine().Build(BuildConfig());
 
@@ -387,23 +394,23 @@ namespace SWWerkplaats.Configurator.UI
                 new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profielbewerkingen.xlsx"), model.ProfileOperations);
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielStationPlan.txt"), csv.ExportProfileStationPlan(model));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "Plaatgaten.csv"), csv.ExportSheetHoleList(model.Sheets));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, contourTool));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, holeTool, contourTool, null, false, false, 0, camJob.ThroughCutOvertravelMm));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ToolLibrary.csv"), csv.ExportToolLibrary(camJob));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "BOM.csv"), csv.ExportBom(model));
-
                 var gcode = new Mach3GCodeGenerator();
                 foreach (var sheet in model.Sheets)
                 {
-                    var tap = gcode.GenerateSheetPart(sheet, holeTool, contourTool, machine, sheet.Material.ThicknessMm, (double)8, (double)1.5);
+                    var tap = gcode.GenerateSheetPart(sheet, holeTool, contourTool, null, false, false, 1.0, machine, sheet.Material.ThicknessMm, camJob.TabWidthMm, camJob.TabHeightMm, camJob.ThroughCutOvertravelMm, camJob.SafeTravelZMm, camJob.ContourOnionSkinMm, camJob.FinalContourFeedRateMmMin, camJob.FinalContourRampLengthMm);
                     File.WriteAllText(Path.Combine(outputFolder.Text, sheet.Name + ".tap"), tap);
                 }
 
                 var nestingFolder = Path.Combine(outputFolder.Text, "Nesting");
                 Directory.CreateDirectory(nestingFolder);
                 var nestingPlan = new SheetNestingEngine().Build(model, machine, (double)nestSpacing.Value, (double)nestMargin.Value, (double)nestStockLength.Value, (double)nestStockWidth.Value);
+                var price = new PortalPricingService().Calculate(model, nestingPlan);
+                File.WriteAllText(Path.Combine(outputFolder.Text, "BOM.csv"), csv.ExportBom(model, price));
                 var nestingExporter = new NestingExporter();
                 File.WriteAllText(Path.Combine(nestingFolder, "NestPlan.csv"), nestingExporter.ExportCsv(nestingPlan));
-                File.WriteAllText(Path.Combine(nestingFolder, "NestVisualisatie.svg"), nestingExporter.ExportSvg(nestingPlan));
+                File.WriteAllText(Path.Combine(nestingFolder, "NestVisualisatie.svg"), nestingExporter.ExportSvg(nestingPlan, contourTool));
                 if (camJob.EnablePencilMarking)
                 {
                     File.WriteAllText(Path.Combine(nestingFolder, "PotloodMarkeerPlan.csv"), new PencilMarkingGCodeGenerator().ExportPlan(nestingPlan, camJob.BuildPencilMarkingOptions()));
@@ -467,6 +474,12 @@ namespace SWWerkplaats.Configurator.UI
 
         private CabinetConfig BuildCabinetConfig()
         {
+            var carcass = CloneMaterial((Material)cabinetCarcassMaterial.SelectedItem);
+            var cabinetFastener = ProductStandardFastener("cabinet", true);
+            cabinetFastener.LengthMm = FastenerSelectionService.SelectWoodToWoodEdgeLength(
+                cabinetFastener,
+                carcass.ThicknessMm,
+                Math.Max((double)cabinetDepth.Value, (double)cabinetWorktopHeight.Value));
             var config = new CabinetConfig
             {
                 ProjectName = "Cabinet_" + cabinetWidth.Value.ToString("0") + "x" + cabinetDepth.Value.ToString("0") + "x" + cabinetWorktopHeight.Value.ToString("0"),
@@ -477,15 +490,17 @@ namespace SWWerkplaats.Configurator.UI
                 PlinthHeightMm = (double)cabinetPlinthHeight.Value,
                 PlinthDepthMm = (double)cabinetPlinthDepth.Value,
                 IncludeBackPanel = cabinetBackPanel.Checked,
-                CarcassMaterial = CloneMaterial((Material)cabinetCarcassMaterial.SelectedItem),
+                CarcassMaterial = carcass,
                 WorktopMaterial = CloneMaterial((Material)cabinetWorktopMaterial.SelectedItem),
                 DrawerMaterial = CloneMaterial((Material)cabinetDrawerMaterial.SelectedItem),
                 FrontMaterial = CloneMaterial((Material)cabinetFrontMaterial.SelectedItem),
+                SlidingDoorMaterial = CloneMaterial((Material)cabinetFrontMaterial.SelectedItem),
                 BackMaterial = CloneMaterial((Material)cabinetBackMaterial.SelectedItem),
-                SheetFastener = CloneFastener((FastenerDefinition)fastener.SelectedItem),
+                SheetFastener = cabinetFastener,
                 DrawerRail = CloneRail((RailTemplate)cabinetRailTemplate.SelectedItem),
                 ShelfSupport = CloneShelfSupport((ShelfSupportTemplate)cabinetShelfSupportTemplate.SelectedItem),
                 IncludeFullWidthTopDrawer = cabinetTopDrawer.Checked,
+                IncludeDrawerPullCutouts = cabinetDrawerPullCutouts.Checked,
                 FullWidthTopDrawerHeightMm = (double)cabinetTopDrawerHeight.Value,
                 IncludeAdjustableShelfHoles = cabinetAdjustableShelfHoles.Checked,
                 AdjustableShelfHoleEndMarginMm = (double)cabinetShelfHoleEndMargin.Value,
@@ -496,7 +511,15 @@ namespace SWWerkplaats.Configurator.UI
                 ShelfClearanceMm = (double)cabinetShelfClearance.Value,
                 DrawerSideClearanceMm = Math.Max((double)cabinetDrawerClearance.Value, ((RailTemplate)cabinetRailTemplate.SelectedItem).ThicknessMm),
                 DrawerBackClearanceMm = (double)cabinetDrawerBackClearance.Value,
-                DoorGapMm = (double)cabinetDoorGap.Value
+                DoorGapMm = (double)cabinetDoorGap.Value,
+                SlidingDoorOverlapMm = ProductDefaults.CabinetSlidingDoorOverlapMm,
+                SlidingDoorFreeSpaceBehindMm = ProductDefaults.CabinetSlidingDoorFreeSpaceBehindMm,
+                SlidingDoorTrackCenterSpacingMm = ProductDefaults.CabinetSlidingDoorTrackCenterSpacingMm,
+                SlidingDoorTopProfileHeightMm = ProductDefaults.CabinetSlidingDoorTopProfileHeightMm,
+                SlidingDoorBottomProfileHeightMm = ProductDefaults.CabinetSlidingDoorBottomProfileHeightMm,
+                SlidingDoorTapeThicknessMm = ProductDefaults.CabinetSlidingDoorTapeThicknessMm,
+                SlidingDoorTopProfileDepthMm = ProductDefaults.CabinetSlidingDoorTopProfileDepthMm,
+                SlidingDoorBottomProfileDepthMm = ProductDefaults.CabinetSlidingDoorBottomProfileDepthMm
             };
 
             foreach (DataGridViewRow row in cabinetUnits.Rows)
@@ -524,6 +547,7 @@ namespace SWWerkplaats.Configurator.UI
         {
             var selectedTopSheet = CloneMaterial((Material)topSheet.SelectedItem);
             selectedTopSheet.ThicknessMm = (double)topThickness.Value;
+            var workbenchFastener = ProductStandardFastener("werktafel", false);
 
             return new WorkbenchConfig
             {
@@ -546,11 +570,11 @@ namespace SWWerkplaats.Configurator.UI
                 TopOverhangBackMm = 0,
                 TopOverhangLeftMm = 0,
                 TopOverhangRightMm = 0,
-                SheetFastener = CloneFastener((FastenerDefinition)fastener.SelectedItem),
-                ConnectorHoleDiameterMm = ((FastenerDefinition)fastener.SelectedItem).ClearanceHoleDiameterMm,
+                SheetFastener = workbenchFastener,
+                ConnectorHoleDiameterMm = workbenchFastener.ClearanceHoleDiameterMm,
                 CountersinkSheetHoles = countersinkHoles.Checked,
-                CountersinkDiameterMm = ((FastenerDefinition)fastener.SelectedItem).CounterboreDiameterMm,
-                CountersinkDepthMm = ((FastenerDefinition)fastener.SelectedItem).CounterboreDepthMm,
+                CountersinkDiameterMm = workbenchFastener.CounterboreDiameterMm,
+                CountersinkDepthMm = workbenchFastener.CounterboreDepthMm,
                 AutoTabs = autoTabs.Checked,
                 SmallPartAreaThresholdMm2 = 300 * 300,
                 TabWidthMm = 8,
@@ -563,14 +587,25 @@ namespace SWWerkplaats.Configurator.UI
             return LibraryCatalog.DefaultEndMill((double)toolDiameter.Value, (double)passDepth.Value);
         }
 
+        private static FastenerDefinition ProductStandardFastener(string productId, bool woodToWood)
+        {
+            var standard = ProductFastenerStandards.Resolve(productId);
+            var id = woodToWood ? standard.WoodToWoodFastenerId : standard.StructuralFastenerId;
+            foreach (var candidate in LibraryCatalog.SheetFasteners())
+            {
+                if (string.Equals(candidate.Id, id, StringComparison.OrdinalIgnoreCase)) return CloneFastener(candidate);
+            }
+            throw new InvalidOperationException("Bevestiger " + id + " ontbreekt voor producttype " + productId + ".");
+        }
+
         private ToolDefinition BuildHoleTool(ToolDefinition contourTool)
         {
-            if (contourTool != null && contourTool.DiameterMm <= 4.5)
+            if (contourTool != null && contourTool.DiameterMm <= 3.5)
             {
                 return contourTool;
             }
 
-            return LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3.5));
+            return LibraryCatalog.DefaultEndMill(3, Math.Min((double)passDepth.Value, 2.0));
         }
 
         private CamJobOptions BuildCamJobOptions(ToolDefinition primaryTool)
@@ -586,7 +621,7 @@ namespace SWWerkplaats.Configurator.UI
 
             if (jobTool4mm.Checked)
             {
-                options.AddTool(LibraryCatalog.DefaultEndMill(4, Math.Min((double)passDepth.Value, 3.5)));
+                options.AddTool(LibraryCatalog.DefaultEndMill(3, Math.Min((double)passDepth.Value, 2.0)));
             }
 
             if (jobTool6mm.Checked)
@@ -1082,10 +1117,16 @@ namespace SWWerkplaats.Configurator.UI
                 Standard = fastener.Standard,
                 NominalDiameterMm = fastener.NominalDiameterMm,
                 ClearanceHoleDiameterMm = fastener.ClearanceHoleDiameterMm,
+                ReceivingPilotHoleDiameterMm = fastener.ReceivingPilotHoleDiameterMm,
                 HeadKind = fastener.HeadKind,
                 HeadDiameterMm = fastener.HeadDiameterMm,
                 HeadHeightMm = fastener.HeadHeightMm,
-                HeadClearanceMm = fastener.HeadClearanceMm
+                HeadClearanceMm = fastener.HeadClearanceMm,
+                UsageKind = fastener.UsageKind,
+                LengthMm = fastener.LengthMm,
+                AvailableLengthsMm = fastener.AvailableLengthsMm == null ? null : (double[])fastener.AvailableLengthsMm.Clone(),
+                MinimumEdgePenetrationMm = fastener.MinimumEdgePenetrationMm,
+                MinimumTipClearanceMm = fastener.MinimumTipClearanceMm
             };
         }
 
@@ -1109,7 +1150,13 @@ namespace SWWerkplaats.Configurator.UI
                 DrawerHolePositionsMm = rail.DrawerHolePositionsMm,
                 DrawerVerticalOffsetMm = rail.DrawerVerticalOffsetMm,
                 DrawerHoleDiameterMm = rail.DrawerHoleDiameterMm,
-                FastenerName = rail.FastenerName
+                FastenerName = rail.FastenerName,
+                CabinetFastenerLengthMm = rail.CabinetFastenerLengthMm,
+                CabinetFastenerPassingStackMm = rail.CabinetFastenerPassingStackMm,
+                CabinetFastenerDiameterMm = rail.CabinetFastenerDiameterMm,
+                CabinetFastenerHeadStyle = rail.CabinetFastenerHeadStyle,
+                CabinetOppositeHolePositionsMm = rail.CabinetOppositeHolePositionsMm,
+                CabinetOpposingFitVerificationSignature = rail.CabinetOpposingFitVerificationSignature
             };
         }
 

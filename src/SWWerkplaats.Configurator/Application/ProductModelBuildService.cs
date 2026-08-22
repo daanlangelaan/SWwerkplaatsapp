@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Portal;
 
@@ -27,9 +28,44 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (factory == null) throw new ArgumentNullException("factory");
 
-            var model = products.Resolve(request).Build(factory, request);
+            var builder = products.Resolve(request);
+            var model = builder.Build(factory, request);
+            model.ProductId = builder.ProductId;
+            ValidateProductFastenerStandard(builder.ProductId, model);
+            ApplyOptionalVBitFinishing(builder.ProductId, model, request);
             ApplyOrderQuantity(model, request);
             return model;
+        }
+
+        private static void ApplyOptionalVBitFinishing(string productId, WorkbenchModel model, PortalQuoteRequest request)
+        {
+            if (model == null || request == null) return;
+            var countersinksEnabled = request.EnableWoodScrewCountersinks == true
+                || request.EnableCountersinkAndEdgeChamfer == true;
+            if (!countersinksEnabled) return;
+            if (!string.Equals(productId, "werkbankkast", StringComparison.OrdinalIgnoreCase)) return;
+
+            foreach (var hole in model.Sheets.SelectMany(sheet => sheet.Holes))
+            {
+                if (hole.SupportKind != SheetHoleSupportKind.PanelScrew) continue;
+                hole.Countersunk = true;
+                hole.CountersinkDiameterMm = 8.0;
+                hole.CountersinkDepthMm = 5.0;
+            }
+        }
+
+        private static void ValidateProductFastenerStandard(string productId, WorkbenchModel model)
+        {
+            var standard = ProductFastenerStandards.Resolve(productId);
+            if (string.IsNullOrWhiteSpace(standard.WoodToWoodFastenerId)) return;
+            if (model == null || model.SheetFastener == null
+                || model.SheetFastener.UsageKind != FastenerUsageKind.WoodScrew
+                || !string.Equals(model.SheetFastener.Id, standard.WoodToWoodFastenerId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Producttype " + productId + " gebruikt niet zijn productgebonden hout-op-hout bevestigerstandaard.");
+
+            var diameter = model.SheetFastener.ClearanceHoleDiameterMm;
+            if (model.Sheets.SelectMany(s => s.Holes).Any(h => h.SupportKind == SheetHoleSupportKind.PanelScrew && Math.Abs(h.DiameterMm - diameter) > 0.001))
+                throw new InvalidOperationException("Productie-export geblokkeerd: hout-op-hout gat wijkt af van productstandaard Ø" + diameter.ToString("0.##") + "mm.");
         }
 
         private static void ApplyOrderQuantity(WorkbenchModel model, PortalQuoteRequest request)

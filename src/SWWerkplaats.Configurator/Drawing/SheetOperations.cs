@@ -58,6 +58,17 @@ namespace SWWerkplaats.Configurator.Drawing
             });
         }
 
+        public static void AddCapsuleThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
+        {
+            if (sheet == null) return;
+            var before = sheet.Pockets.Count;
+            AddThroughCutout(sheet, name, x, y, length, width, face, note);
+            if (sheet.Pockets.Count > before)
+            {
+                sheet.Pockets[sheet.Pockets.Count - 1].Shape = "capsule";
+            }
+        }
+
         public static void AddUniqueThroughHole(SheetPart sheet, double x, double y, double diameter, string name, SheetHoleSupportKind supportKind, double edgeClampMm)
         {
             if (sheet == null) return;

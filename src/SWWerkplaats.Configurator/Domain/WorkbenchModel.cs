@@ -4,6 +4,7 @@ namespace SWWerkplaats.Configurator.Domain
 {
     public sealed class WorkbenchModel
     {
+        public string ProductId { get; set; }
         public string ProjectName { get; set; }
         public FastenerDefinition SheetFastener { get; set; }
         public double LowerFrameHeightMm { get; set; }
@@ -13,6 +14,8 @@ namespace SWWerkplaats.Configurator.Domain
         public List<SheetPart> Sheets { get; private set; }
         public List<HardwareItem> Hardware { get; private set; }
         public List<AssemblyPlacement> AssemblyPlacements { get; private set; }
+        public ProfileSawingMode SawingMode { get; set; }
+        public List<string> DesignNotes { get; private set; }
 
         public WorkbenchModel()
         {
@@ -21,6 +24,7 @@ namespace SWWerkplaats.Configurator.Domain
             Sheets = new List<SheetPart>();
             Hardware = new List<HardwareItem>();
             AssemblyPlacements = new List<AssemblyPlacement>();
+            DesignNotes = new List<string>();
         }
     }
 }
