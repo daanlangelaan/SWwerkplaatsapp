@@ -1,0 +1,4 @@
+interface:
+  display_name: "Profielopbouw detecteren"
+  short_description: "Reconstructeer en controleer profielconstructies"
+  default_prompt: "Gebruik $detect-profile-assembly om deze profielconstructie per profiel te reconstrueren en geometrisch te controleren."

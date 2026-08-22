@@ -6,6 +6,7 @@ Lokale configurator en werkplaatsportal voor SW Werkplaats. De app rekent kast- 
 
 - Klantconfigurator via lokale webportal op `http://localhost:8088`.
 - Cabinet/kast generator met lades, legplanken, achterwand, groeven en montagegaten.
+- Werkbank met kastonderbouw: doorlopende bodem, deurparen met T-stijlen, stelpootgaten en losse voorzetplint.
 - Nesting per plaatmateriaal met SVG-preview en CSV-controle.
 - Mach3 G-code voor geneste platen, inclusief toolwissel-stop (`M0`) en plaatwisseltekst.
 - Controle-output voor railgaten, tekencontracten, BOM, prijs en assemblage.
@@ -33,7 +34,7 @@ Start de webportal:
 .\Web configurator starten.cmd
 ```
 
-Start of rebuild de desktop configurator:
+Start of rebuild de tijdelijke desktop configurator:
 
 ```powershell
 .\SW configurator rebuild.cmd
@@ -80,7 +81,7 @@ Invoke-RestMethod http://localhost:8088/api/health
 4. Open daarna `http://localhost:8088`.
 
 Gebruik `.\Web configurator stoppen.cmd` als de app oud lijkt of als een build faalt omdat `SWWerkplaats.Configurator.exe` nog draait. Gebruik daarna `rebuild`.
-Gebruik `.\SW configurator rebuild.cmd` voor de desktop tabs zoals `Library`, `CAM` en `Output`; dit werkt de root-map `bin\SWWerkplaats.Configurator.exe` bij.
+Gebruik `.\SW configurator rebuild.cmd` alleen voor de nog niet gemigreerde desktopfuncties zoals de rail-/dragereditor. De webportal is de voorkeursinterface. De twee startroutes worden in een volgende fase samengevoegd.
 
 ## Build check
 
@@ -102,6 +103,10 @@ Set-Content -LiteralPath $tmp -Value $match.Groups[1].Value -Encoding UTF8
 node --check $tmp
 ```
 
+Na het genereren van een actuele configuratie staat **Exporteer projectpakket** klaar. Iedere export krijgt één map onder `<PortalData>\Projecten` (op de huidige ontwikkelinstallatie `C:\SWWerkplaats\PortalData\Projecten`), met een vast contract: `01_CAM` voor productie- en freesbestanden, `02_SolidWorks` uitsluitend voor `.SLDPRT`, `.SLDASM` en `.SLDDRW`, `03_Klantvoorstel` voor PDF, PowerPoint, GLB, HTML, aanzichten en render-assets, `04_3D-print` voor printdelen en `05_Projectdata` voor configuratie, BOM, prijzen, validatie- en generatiegegevens. Niet-relevante mappen worden niet aangemaakt. Het zelfstandige HTML-bestand bevat het volledige GLB-model en de viewer. De klantpresentatiemodule wijst automatisch materiaalachtige appearances toe (onder andere betonplex, OSB, multiplex, aluminium en beslag) en bewaart de benodigde materiaalassets onder het klantvoorstel.
+
+De exporter ondersteunt zowel de standaard COM-registratie `SldWorks.Application` als de afwijkende 3DEXPERIENCE ROT-registratie `SolidWorks_PID_*`. Als nog geen sessie actief is, start hij SOLIDWORKS Design via de bureaubladsnelkoppeling of `CATSTART.exe` voor tenant `R1132104190977` en wacht hij maximaal vijf minuten op een eventuele handmatige login.
+
 Snelle vakjeskast-check:
 
 ```powershell
@@ -122,13 +127,13 @@ Invoke-RestMethod -Uri http://localhost:8088/api/quote -Method Post -ContentType
 
 ## Lokale data
 
-De portal schrijft orders, freeswachtrij en gegenereerde bestanden naar:
+De portal schrijft orders, freeswachtrij en gegenereerde bestanden standaard naar de externe operationele map:
 
 ```text
-src\SWWerkplaats.Configurator\bin\Debug\PortalData
+C:\SWWerkplaats\PortalData
 ```
 
-Deze map wordt niet naar GitHub gepusht. Ook lokale machine-instellingen zoals `config/app-settings.json` blijven buiten git.
+Deze map staat bewust buiten buildoutput en wordt niet naar GitHub gepusht. Ook lokale machine-instellingen zoals `config/app-settings.json` en `config/portal-runtime.json` blijven buiten git.
 
 ## Belangrijke scripts
 
@@ -152,6 +157,8 @@ src/SWWerkplaats.Configurator/
 config/           Voorbeeldconfiguratie en lokale instellingen
 docs/             Ontwerpnotities
 scripts/          Start/build scripts
+.codex/skills/    Projectskills; geen gegenereerde Python-caches
+artifacts/        Gegenereerde tijdelijke QA- en exportresultaten
 ```
 
 ## Git workflow
@@ -168,6 +175,14 @@ git push
 Niet alles hoeft in git. Lokale orderdata, gegenereerde freesbestanden en losse referentiebestanden blijven lokaal tenzij je ze bewust toevoegt.
 
 ## Library-data
+
+Het leidende beheerregister voor productregels, materialen, componenten, verbindingsrecepten, prijzen en inkoopgegevens staat in:
+
+```text
+config\product-master-data.xlsx
+```
+
+De portal leest het tabblad `Prijs & inkoop` rechtstreeks. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus. `config\pricing-estimates.csv` blijft tijdelijk uitsluitend als compatibiliteits-terugval bestaan wanneer de hoofdwerkmap ontbreekt of niet leesbaar is. Verwijder deze terugval pas nadat alle masterdataconsumenten naar één gevalideerde runtime-snapshot zijn gemigreerd.
 
 Rails en legplankdragers staan in:
 

@@ -7,7 +7,11 @@ De portal kan zonder codewijziging op een andere poort of datafolder starten.
 Zonder extra configuratie:
 
 - URL: `http://localhost:8088/`
-- Datafolder: `bin/PortalData`
+- Datafolder: `C:\SWWerkplaats\PortalData`
+
+De lokale override staat in `config/portal-runtime.json`. Dit bestand blijft buiten Git,
+zodat iedere installatie een eigen absolute runtime-locatie kan gebruiken. Gegenereerde
+orders, exports en freeswachtrijen horen niet in de repository.
 
 ## Klikbare startbestanden
 
@@ -41,7 +45,9 @@ Of korter:
 
 ## Configbestand
 
-Kopieer `config/portal-runtime.example.json` naar `config/portal-runtime.json` en pas waarden aan.
+Kopieer op een nieuwe installatie `config/portal-runtime.example.json` naar
+`config/portal-runtime.json` en pas de waarden aan. De huidige ontwikkelinstallatie
+gebruikt `C:\SWWerkplaats\PortalData`.
 
 Belangrijke velden:
 

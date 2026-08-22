@@ -49,3 +49,5 @@ De volgende stap is een echte `SolidWorksExporter`:
 - Nesting van plaatdelen.
 - Kasten en ladekasten als extra productfamilies.
 - Mach3 preview/simulatie en waarschuwingen.
+- Gehost interactief offerteportaal met 3D-model en akkoordworkflow; geparkeerd in
+  `docs/producten/Werktafel-LEX-nice-to-have.md` tot de huidige LEX-offerte gereed is.

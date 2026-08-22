@@ -66,6 +66,8 @@ Cabinet-bodemgroeven:
 - Middenbodems worden uitgelijnd via de achterwandgroef en rusten op de plintconstructie; montagegaten in tussenschotten mogen wel blijven.
 - Bodemplaten worden per unit op maat gezet: alleen aan een buitenwandzijde steekt de plaat in de groef, aan tussenschotzijden blijft de bodemplaat binnen de vrije opening.
 - De voorplint krijgt aan de achterzijde positioneergroeven voor linker zijwand, tussenschotten en rechter zijwand. De achterwand lijnt achter uit; de plint lijnt de voorkant uit.
+- Elke bodemplaat krijgt vanaf de bovenzijde plintbevestigingsgaten op de hartlijn van de voorplint. De gaten worden over de unitbreedte verdeeld met ongeveer maximaal 180 mm tussenruimte; de plint wordt bij assemblage direct in de kopse/bovenkant geschroefd.
+- Legplanken kunnen extra verdiept liggen ten opzichte van de kastvoorzijde. Die parameter verkort de legplank aan de voorkant, schuift de assembly-positie naar achteren, en schuift de voorste rij legplankdragergaten met dezelfde waarde mee.
 
 Vakjeskast-frontverdieping:
 

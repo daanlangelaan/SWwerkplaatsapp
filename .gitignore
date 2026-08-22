@@ -3,6 +3,20 @@
 [Oo]bj/
 src/**/[Bb]in/
 src/**/[Oo]bj/
+tests/**/[Bb]in/
+tests/**/[Oo]bj/
+
+# Generated task, QA and export artifacts
+.codex-artifacts/
+artifacts/
+output/
+outputs/
+tmp/
+*.inspect.ndjson
+
+# Generated Python caches
+**/__pycache__/
+*.py[cod]
 
 # IDE / local user state
 .vs/
@@ -20,3 +34,4 @@ src/**/PortalData/
 
 # Machine-specific local settings
 config/app-settings.json
+config/portal-runtime.json
