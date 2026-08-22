@@ -60,6 +60,7 @@
     <Compile Include="Application\IProductBuilder.cs" />
     <Compile Include="Application\LexWorkbenchProductBuilder.cs" />
     <Compile Include="Application\MachineBaseProductBuilder.cs" />
+    <Compile Include="Application\MaterialCartProductBuilder.cs" />
     <Compile Include="Application\RobotCellProductBuilder.cs" />
     <Compile Include="Application\ShippingBoxProductBuilder.cs" />
     <Compile Include="Application\LexRevolutionProductBuilder.cs" />
@@ -91,6 +92,7 @@
     <Compile Include="Domain\LexWorkbenchConfig.cs" />
     <Compile Include="Domain\MachineProfile.cs" />
     <Compile Include="Domain\MachineBaseConfig.cs" />
+    <Compile Include="Domain\MaterialCartConfig.cs" />
     <Compile Include="Domain\RobotCellConfig.cs" />
     <Compile Include="Domain\ShippingBoxConfig.cs" />
     <Compile Include="Domain\Material.cs" />
@@ -116,6 +118,7 @@
     <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
     <Compile Include="Engine\MachineBaseEngine.cs" />
+    <Compile Include="Engine\MaterialCartEngine.cs" />
     <Compile Include="Engine\RobotCellEngine.cs" />
     <Compile Include="Engine\ShippingBoxEngine.cs" />
     <Compile Include="Engine\LexWorkbenchEngine.cs" />

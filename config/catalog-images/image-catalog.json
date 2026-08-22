@@ -175,6 +175,58 @@
       "purpose": "supplier-product-preview",
       "status": "active",
       "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101068",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101068 / S208BRD100",
+      "internalId": "techxxl_caster_fixed_d100",
+      "localPath": "config/catalog-images/techxxl/caster-fixed-d100.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101068.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-101068-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101074",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101074 / S208L100",
+      "internalId": "techxxl_caster_swivel_d100",
+      "localPath": "config/catalog-images/techxxl/caster-swivel-d100.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101074.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-101074-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101076",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101076 / S208LDF100",
+      "internalId": "techxxl_caster_swivel_brake_d100",
+      "localPath": "config/catalog-images/techxxl/caster-swivel-brake-d100.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101076.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-101076-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100360",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100360 / S208WS40",
+      "internalId": "techxxl_corner_bracket_set_8_40x40",
+      "localPath": "config/catalog-images/techxxl/corner-bracket-set-8-40x40.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100360.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-100360-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
     }
   ]
 }

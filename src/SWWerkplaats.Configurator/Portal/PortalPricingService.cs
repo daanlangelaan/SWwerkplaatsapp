@@ -369,6 +369,10 @@ namespace SWWerkplaats.Configurator.Portal
             if (item != null && (item.ArticleNumber ?? "").IndexOf("101219", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_leveling_foot_d80_m16x150";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("101245", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_corner_bracket_set_10_40x80";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("100199", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_end_cap_8_160x40_black";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100360", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_corner_bracket_set_8_40x40";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101068", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_fixed_d100";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101074", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_swivel_d100";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101076", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_swivel_brake_d100";
             if (name.IndexOf("schroef") >= 0 || name.IndexOf("bout") >= 0 || name.IndexOf("ring") >= 0) return "cost_fastener_generic";
             if (name.IndexOf("rail") >= 0 || name.IndexOf("ladegeleider") >= 0) return "measured_500_r2";
             if (name.IndexOf("scharnier") >= 0) return "komplement_hinge_r2";
@@ -898,6 +902,7 @@ namespace SWWerkplaats.Configurator.Portal
         {
             if (request != null && string.Equals(request.Product, "machinebasis", StringComparison.OrdinalIgnoreCase)) return "Parametrische machinebasis";
             if (request != null && string.Equals(request.Product, "robotcel", StringComparison.OrdinalIgnoreCase)) return "Robot cel";
+            if (request != null && string.Equals(request.Product, "materiaalwagen", StringComparison.OrdinalIgnoreCase)) return "Modulaire materiaal- en gereedschapswagen";
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
             if (request != null && string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)) return "Workstation";
             if (request != null && string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)) return "Workstation ontwikkelvariant";

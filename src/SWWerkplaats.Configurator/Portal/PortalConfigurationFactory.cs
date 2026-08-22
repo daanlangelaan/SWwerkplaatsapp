@@ -123,6 +123,29 @@ namespace SWWerkplaats.Configurator.Portal
             };
         }
 
+        public MaterialCartConfig BuildMaterialCart(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 600, 1800, ProductDefaults.MaterialCartWidthMm);
+            var depth = Clamp(request.DepthMm, 450, 1000, ProductDefaults.MaterialCartDepthMm);
+            var height = Clamp(request.HeightMm, 700, 1200, ProductDefaults.MaterialCartTopShelfHeightMm);
+            var shelfCount = request.MaterialCartShelfCount < 2 || request.MaterialCartShelfCount > 4 ? ProductDefaults.MaterialCartShelfCount : request.MaterialCartShelfCount;
+            var shelfMaterialId = string.IsNullOrWhiteSpace(request.MaterialCartShelfMaterialId) ? "hpl_10_lex" : request.MaterialCartShelfMaterialId;
+            return new MaterialCartConfig
+            {
+                ProjectName = "MATERIAALWAGEN_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                TopShelfHeightMm = height,
+                ShelfCount = shelfCount,
+                HandleSide = string.Equals(request.MaterialCartHandleSide, "none", StringComparison.OrdinalIgnoreCase) ? "none" : string.Equals(request.MaterialCartHandleSide, "left", StringComparison.OrdinalIgnoreCase) ? "left" : "right",
+                SteeringMode = string.Equals(request.MaterialCartSteeringMode, "four-swivel", StringComparison.OrdinalIgnoreCase) ? "four-swivel" : "fixed-and-swivel",
+                FrameProfile = CloneMaterial(FindProfile("alu_system_40x40")),
+                ShelfMaterial = CloneMaterial(FindSheet(shelfMaterialId)),
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+        }
+
         public ShippingBoxConfig BuildShippingBox(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();

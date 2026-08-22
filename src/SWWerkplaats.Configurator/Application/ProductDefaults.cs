@@ -57,6 +57,11 @@ namespace SWWerkplaats.Configurator.Application
         public const double RobotCellWorktopHeightMm = 900;
         public const double RobotCellIntermediateBeamMaxSpacingMm = 500;
 
+        public const double MaterialCartWidthMm = 1000;
+        public const double MaterialCartDepthMm = 650;
+        public const double MaterialCartTopShelfHeightMm = 950;
+        public const int MaterialCartShelfCount = 3;
+
         public const double WorkbenchWidthMm = 1500;
         public const double WorkbenchDepthMm = 750;
         public const double WorkbenchHeightMm = 900;

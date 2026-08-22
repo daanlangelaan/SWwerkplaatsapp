@@ -1,0 +1,25 @@
+{
+  "manifest_id": "materiaalwagen-default-1000x650x950",
+  "version": "1.0",
+  "scope": "Mobiel 40x40-profielonderstel met complete legbordlagen, D100-wielen en optionele duwbeugel",
+  "parameters": {
+    "width_mm": { "default": 1000, "min": 600, "max": 1800 },
+    "depth_mm": { "default": 650, "min": 450, "max": 1000 },
+    "top_shelf_height_mm": { "default": 950, "min": 700, "max": 1200 },
+    "shelf_count": { "default": 3, "allowed": [2, 3, 4] },
+    "handle_side": { "default": "right", "allowed": ["none", "left", "right"] },
+    "steering_mode": { "default": "fixed-and-swivel", "allowed": ["fixed-and-swivel", "four-swivel"] }
+  },
+  "members": [
+    { "layer": "wheel", "role": "caster", "expected_count": 4 },
+    { "layer": "wheel", "role": "mounting-plate", "name_prefix": "Wielmontageplaat 40x40", "expected_count": 4 },
+    { "layer": "upright", "role": "corner-upright", "name_prefix": "Hoekstaander 40x40", "section": "40x40", "orientation": "vertical", "expected_count": 4 },
+    { "layer": "each-shelf", "role": "perimeter", "section": "40x40", "orientation": "horizontal", "expected_count_formula": "4 * shelf_count" },
+    { "layer": "each-shelf", "role": "crossmember", "section": "40x40", "orientation": "horizontal", "expected_count_formula": "shelf_count when width_mm >= 1000, otherwise 0" },
+    { "layer": "each-shelf", "role": "sheet", "expected_count_formula": "shelf_count" },
+    { "layer": "handle", "role": "push-handle", "section": "40x40", "expected_count_formula": "3 when handle_side != none, otherwise 0" }
+  ],
+  "end_treatments": [
+    { "role": "profile-end-cap", "expected_count": 0, "reason": "Alle liggerkoppen zijn verbonden; staanderkoppen zijn afgedekt door het bovenblad en onderzijden door wielplaten." }
+  ]
+}

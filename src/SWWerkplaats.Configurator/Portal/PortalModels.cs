@@ -53,6 +53,10 @@ namespace SWWerkplaats.Configurator.Portal
         public int MachineBaseFrontDoorCount { get; set; }
         public string MachineBaseFrontSingleDoorHingeSide { get; set; }
         public double RobotCellIntermediateBeamMaxSpacingMm { get; set; }
+        public int MaterialCartShelfCount { get; set; }
+        public string MaterialCartShelfMaterialId { get; set; }
+        public string MaterialCartHandleSide { get; set; }
+        public string MaterialCartSteeringMode { get; set; }
         public int CubbyColumnCount { get; set; }
         public int CubbyRowCount { get; set; }
         public double CubbyCellWidthMm { get; set; }

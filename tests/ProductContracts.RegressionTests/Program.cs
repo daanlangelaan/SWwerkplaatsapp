@@ -39,7 +39,7 @@ internal static class Program
                         PhysicalSheetCount(item.Model), PhysicalProfileCount(item.Model),
                         PhysicalHardwareCount(item.Model), FootCount(item.Model), EndCapCount(item.Model),
                         FastenerCount(item.Model), item.Model.AssemblyPlacements.Count);
-                    if (item.Contract.ProductId == "robotcel" || item.Contract.ProductId == "machinebasis")
+                    if (item.Contract.ProductId == "robotcel" || item.Contract.ProductId == "machinebasis" || item.Contract.ProductId == "materiaalwagen")
                     {
                         foreach (var placement in item.Model.AssemblyPlacements.Where(p => p.Kind == AssemblyComponentKind.Profile))
                             Console.WriteLine("  {0}|L={1:0.###}|W={2:0.###}|H={3:0.###}|X={4:0.###}|Y={5:0.###}|Z={6:0.###}",
@@ -53,6 +53,8 @@ internal static class Program
             foreach (var item in models) VerifyCountContract(item.Contract, item.Model);
             VerifyRobotCellGeometry(models.Single(item => item.Contract.ProductId == "robotcel").Model);
             VerifyMachineBaseGeometry(models.Single(item => item.Contract.ProductId == "machinebasis").Model);
+            VerifyMaterialCartGeometry(models.Single(item => item.Contract.ProductId == "materiaalwagen").Model);
+            VerifyMaterialCartVariants();
             Console.WriteLine("PASS  Productaantallen, voeten, eindkappen, bevestigingen, profieloriëntatie, coplanaire buitenvlakken en moduulbanen voldoen aan de contracten.");
             return 0;
         }
@@ -71,6 +73,7 @@ internal static class Program
             C("werktafel", Request("werktafel", 1500, 750, 900, null), 1, 12, 64, 0, 0, 44, 1),
             C("machinebasis", Request("machinebasis", 2000, 800, 2000, r => { r.MachineBaseWorktopHeightMm = 900; }), 14, 36, 718, 0, 4, 646, 129),
             C("robotcel", Request("robotcel", 1200, 800, 900, r => { r.RobotCellIntermediateBeamMaxSpacingMm = 700; }), 1, 15, 32, 4, 2, 26, 30),
+            C("materiaalwagen", Request("materiaalwagen", 1000, 650, 950, r => { r.MaterialCartShelfCount = 3; r.MaterialCartShelfMaterialId = "hpl_10_lex"; r.MaterialCartHandleSide = "right"; r.MaterialCartSteeringMode = "fixed-and-swivel"; }), 3, 22, 40, 0, 0, 0, 33),
             C("werktafel_lex", Request("werktafel_lex", 1650, 1000, 833, null), 6, 13, 212, 4, 8, 128, 66),
             C("werktafel_lex_revolution", Request("werktafel_lex_revolution", 1650, 1000, 833, null), 6, 13, 212, 4, 8, 128, 66),
             C("werkbankkast", Request("werkbankkast", 2400, 600, 900, r => { r.UnitCount = 4; r.DefaultShelfCount = 3; r.IncludeBackPanel = true; }), 28, 0, 64, 0, 0, 52, 28),
@@ -155,6 +158,58 @@ internal static class Program
         Require(model.AssemblyPlacements.Count(p => p.PartName.StartsWith("Zwarte eindkap 40x80", StringComparison.Ordinal)) == 4,
             "Machinebasis: vier eindkappen op het bovenframe vereist");
         Require(profiles.All(p => p.LengthMm > 0 && p.WidthMm > 0 && p.HeightMm > 0), "Machinebasis: profiel met nulafmeting gevonden");
+    }
+
+    private static void VerifyMaterialCartGeometry(WorkbenchModel model)
+    {
+        var profiles = model.AssemblyPlacements.Where(p => p.Kind == AssemblyComponentKind.Profile).ToArray();
+        Require(profiles.Count(p => p.PartName.StartsWith("Hoekstaander 40x40", StringComparison.Ordinal)) == 4,
+            "Materiaalwagen: vier doorlopende hoekstaanders vereist");
+        for (var layer = 1; layer <= 3; layer++)
+        {
+            var prefix = "Legbordlaag " + layer + " ";
+            var layerProfiles = profiles.Where(p => p.PartName.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+            Require(layerProfiles.Length == 5, "Materiaalwagen: elke standaardlaag moet vier omtrekliggers en één middenligger bevatten");
+            Require(layerProfiles.All(p => Close(p.HeightMm, 40)), "Materiaalwagen: alle laagprofielen moeten 40 mm hoog liggen");
+        }
+        Require(model.AssemblyPlacements.Count(p => p.Kind == AssemblyComponentKind.Sheet && p.PartName.StartsWith("Legbord ", StringComparison.Ordinal)) == 3,
+            "Materiaalwagen: exact drie legborden vereist");
+        Require(model.AssemblyPlacements.Count(p => p.VisualKind == "hardware-wheel") == 4,
+            "Materiaalwagen: exact vier D100-wielen vereist");
+        Require(model.AssemblyPlacements.Count(p => p.PartName.StartsWith("Duwbeugel ", StringComparison.Ordinal)) == 3,
+            "Materiaalwagen: duwbeugel moet uit twee staanders en één greep bestaan");
+        Require(EndCapCount(model) == 0, "Materiaalwagen: verbonden of afgedekte profielkoppen mogen geen losse eindkappen krijgen");
+    }
+
+    private static void VerifyMaterialCartVariants()
+    {
+        var compact = new ProductModelBuildService().Build(Request("materiaalwagen", 800, 500, 850, r =>
+        {
+            r.MaterialCartShelfCount = 2;
+            r.MaterialCartShelfMaterialId = "betonplex_18";
+            r.MaterialCartHandleSide = "none";
+            r.MaterialCartSteeringMode = "four-swivel";
+        }));
+        Require(compact.Sheets.Sum(p => Math.Max(1, p.Quantity)) == 2, "Materiaalwagen compact: twee legborden vereist");
+        Require(compact.AssemblyPlacements.Count(p => p.PartName.StartsWith("Legbordlaag ", StringComparison.Ordinal)) == 8,
+            "Materiaalwagen compact: onder 1000 mm breedte zijn vier omtrekliggers per laag en geen middenligger vereist");
+        Require(compact.AssemblyPlacements.All(p => !p.PartName.StartsWith("Duwbeugel ", StringComparison.Ordinal)),
+            "Materiaalwagen compact: keuze zonder duwbeugel moet alle beugeldelen verwijderen");
+        Require(compact.Hardware.Any(h => (h.ArticleNumber ?? "").Contains("101074") && h.Quantity == 2),
+            "Materiaalwagen compact: vier-zwenkwielmodus vereist twee vrije D100-zwenkwielen");
+
+        var maximum = new ProductModelBuildService().Build(Request("materiaalwagen", 1800, 1000, 1200, r =>
+        {
+            r.MaterialCartShelfCount = 4;
+            r.MaterialCartShelfMaterialId = "hpl_10_lex";
+            r.MaterialCartHandleSide = "left";
+            r.MaterialCartSteeringMode = "fixed-and-swivel";
+        }));
+        Require(maximum.Sheets.Sum(p => Math.Max(1, p.Quantity)) == 4, "Materiaalwagen maximum: vier legborden vereist");
+        Require(maximum.AssemblyPlacements.Count(p => p.PartName.Contains("middenligger")) == 4,
+            "Materiaalwagen maximum: iedere brede laag vereist één middenligger");
+        Require(maximum.AssemblyPlacements.Count(p => p.PartName.StartsWith("Duwbeugel ", StringComparison.Ordinal)) == 3,
+            "Materiaalwagen maximum: linker duwbeugel moet uit drie profielen bestaan");
     }
 
     private static int PhysicalSheetCount(WorkbenchModel model) { return model.Sheets.Sum(p => Math.Max(1, p.Quantity)); }

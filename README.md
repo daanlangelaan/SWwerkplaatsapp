@@ -7,6 +7,8 @@ Lokale configurator en werkplaatsportal voor SW Werkplaats. De app rekent kast- 
 - Klantconfigurator via lokale webportal op `http://localhost:8088`.
 - Cabinet/kast generator met lades, legplanken, achterwand, groeven en montagegaten.
 - Werkbank met kastonderbouw: doorlopende bodem, deurparen met T-stijlen, stelpootgaten en losse voorzetplint.
+- Profielproducten: machinebasis, robotcel en modulaire materiaal-/gereedschapswagen met centrale TechXXL-leveranciersselectie.
+- Materiaalwagen: 600–1800 mm breed, 450–1000 mm diep, 700–1200 mm bovenbladhoogte, 2–4 legbordlagen, configureerbare duwbeugel en twee D100-wielopstellingen.
 - Nesting per plaatmateriaal met SVG-preview en CSV-controle.
 - Mach3 G-code voor geneste platen, inclusief toolwissel-stop (`M0`) en plaatwisseltekst.
 - Controle-output voor railgaten, tekencontracten, BOM, prijs en assemblage.
@@ -92,6 +94,8 @@ Handmatig bouwen via de canonieke route:
 ```
 
 GitHub Actions draait dezelfde build op Windows bij push en pull request.
+
+Het numerieke bouwcontract van de materiaalwagen staat in `config/material-cart-assembly-manifest.json`. Wijzig profielopbouw of parameters alleen samen met `MaterialCartEngine`, de masterdata en `ProductContracts.RegressionTests`, zodat portal, BOM, prijs en 3D-assembly gelijk blijven.
 
 Voer vóór een uitrol of overdracht de volledige lokale controle uit:
 
