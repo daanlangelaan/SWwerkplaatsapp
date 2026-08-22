@@ -8,3 +8,5 @@
 .\scripts\build-configurator.ps1 -Configuration Debug
 .\scripts\start-web-configurator.ps1 -Action Rebuild
 ```
+
+Voor uitrol wordt `-Configuration Release` gebruikt. De buildmap alleen is nog geen zelfstandige release: start vanuit een volledige repository-checkout zodat `config/runtime/masterdata-runtime.json` en de catalogusassets gevonden worden. Voer vóór uitrol de validatie- en regressiecommando's uit `README.md` en `docs/deployment/Lokale-server.md` uit.

@@ -55,3 +55,10 @@ Bij toevoegen of vervangen:
 ## Migratieregel
 
 Een oude tabel of sleutel mag worden verwijderd zodra elk gebruik naar de canonieke ID is omgezet en de referentie-audit geen ontbrekende of naamgebaseerde koppelingen meer vindt. Oude tabbladen worden niet als permanente fallback bewaard.
+
+## Wijzigingen loggen
+
+- Product-, component-, leverancier-, prijs-, CAM- en andere masterdatawijzigingen krijgen een unieke, oplopende regel in `Wijzigingslog` met datum, versie, betrokken stabiele ID's en besluitreden.
+- De runtimegenerator neemt dit wijzigingslog mee in de snapshot; `Wijziging-ID` mag niet worden hergebruikt.
+- Een uitsluitend redactionele documentatiewijziging krijgt geen kunstmatige masterdatarevisie. Die wordt via een gerichte Git-commit gelogd.
+- Een documentatiewijziging die tegelijk een runtimecontract, ID, tabelstructuur of productregel verandert, wordt zowel in Git als in `Wijzigingslog` vastgelegd.

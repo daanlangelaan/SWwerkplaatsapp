@@ -93,6 +93,19 @@ Handmatig bouwen via de canonieke route:
 
 GitHub Actions draait dezelfde build op Windows bij push en pull request.
 
+Voer vóór een uitrol of overdracht de volledige lokale controle uit:
+
+```powershell
+.\Web configurator stoppen.cmd
+python .\scripts\validate-master-data.py
+python .\scripts\generate-masterdata-runtime.py --check
+python .\scripts\check-repository.py
+.\scripts\build-configurator.ps1 -Configuration Release
+dotnet run --configuration Release --project .\tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj
+dotnet run --configuration Release --project .\tests\ProductContracts.RegressionTests\ProductContracts.RegressionTests.csproj
+dotnet run --configuration Release --project .\tests\OrderStorage.IntegrationTests\OrderStorage.IntegrationTests.csproj
+```
+
 Snelle portal-check na wijzigingen:
 
 ```powershell
@@ -152,14 +165,21 @@ src/SWWerkplaats.Configurator/
   Engine/         Productberekeningen voor kast/werkbank
   Manufacturing/ Nesting, G-code en productie-export
   Portal/         Lokale webportal, visualisaties en outputservice
-  SolidWorks/     Voorbereiding voor SolidWorks-export
+  SolidWorks/     Export, klantoutput en geïsoleerde SolidWorks-worker
   UI/             WinForms shell
-config/           Voorbeeldconfiguratie en lokale instellingen
-docs/             Ontwerpnotities
+config/
+  product-master-data.xlsx        Menselijke beheerbron
+  master-data-schema.json         Tabel-, sleutel- en relatiecontract
+  catalog-images/                 Versiebeheerde leveranciersafbeeldingen
+  runtime/masterdata-runtime.json Gegenereerde applicatiesnapshot
+  portal-runtime.example.json     Installatievoorbeeld; lokale override blijft buiten Git
+docs/             Actuele contracten, productafspraken, toekomst en archief
 scripts/          Start/build scripts
 .codex/skills/    Projectskills; geen gegenereerde Python-caches
-config/runtime/   Gegenereerde, gevalideerde masterdatasnapshot
+tests/            Uitvoerbare rook-, productcontract- en opslagtests
 ```
+
+Begin voor beheer- of architectuurwerk bij `AGENTS.md` en `docs/README.md`. Oude iteratieverslagen onder `docs/archive/` zijn context en geen actueel runtimecontract.
 
 ## Git workflow
 
@@ -184,6 +204,8 @@ config\product-master-data.xlsx
 
 Excel is de menselijke beheerbron. `python scripts\generate-masterdata-runtime.py` compileert de werkmap en afbeeldingscatalogus naar `config\runtime\masterdata-runtime.json`; pricing, leveranciersvoorkeuren en CAM lezen deze snapshot. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus.
 
+De binaire catalogusafbeeldingen staan in `config\catalog-images\<leverancier>\` en hun stabiele koppelingen in `config\catalog-images\image-catalog.json`. Excel bevat alleen previews. Voeg geen losse leveranciers- of cataloguswerkbladen toe; de vaste indeling en wijzigingsprocedure staan in `docs\Masterdata-beheer.md`.
+
 Rails en legplankdragers staan in:
 
 ```text
@@ -191,6 +213,14 @@ config\hardware-library.json
 ```
 
 In de portal kun je deze aanpassen via `/library`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
+
+## Uitrollen
+
+De huidige ondersteunde uitrolvorm is één volledige repository-checkout op een Windows-server of werkstation. Bouw en start vanuit die map. Kopieer **niet alleen** `SWWerkplaats.Configurator.exe`: de app verwacht ook de versiebeheerde `config/runtime/masterdata-runtime.json`, catalogusassets en overige configuratie in de repositorystructuur.
+
+Operationele orderdata hoort niet in Git en staat per installatie onder `C:\SWWerkplaats\PortalData`. Maak op een nieuwe installatie `config\portal-runtime.json` vanuit het voorbeeldbestand en houd dit lokale bestand buiten versiebeheer.
+
+Voor meerdere gebruikers draait één portalproces met SQLite/WAL. Publiceer de ingebouwde listener niet rechtstreeks op internet; gebruik bij externe toegang een HTTPS-reverse-proxy met authenticatie en logging. De volledige installatie-, update-, back-up- en rollbackprocedure staat in `docs\deployment\Lokale-server.md`.
 
 ## Huidige technische afspraken
 
