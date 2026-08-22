@@ -1,5 +1,7 @@
 # Lokale server
 
+Status: **actueel beheercontract**.
+
 De portal kan zonder codewijziging op een andere poort of datafolder starten.
 
 ## Standaard
@@ -8,6 +10,7 @@ Zonder extra configuratie:
 
 - URL: `http://localhost:8088/`
 - Datafolder: `C:\SWWerkplaats\PortalData`
+- Orderdatabase: `C:\SWWerkplaats\PortalData\portal-orders.sqlite`
 
 De lokale override staat in `config/portal-runtime.json`. Dit bestand blijft buiten Git,
 zodat iedere installatie een eigen absolute runtime-locatie kan gebruiken. Gegenereerde
@@ -40,7 +43,7 @@ Of korter:
 ## Tijdelijk starten via argumenten
 
 ```powershell
-.\bin\SWWerkplaats.Configurator.exe --portal-only --portal-port=8090 --portal-root=C:\SWWerkplaats\PortalData
+.\src\SWWerkplaats.Configurator\bin\Debug\net48\win-x64\SWWerkplaats.Configurator.exe --portal-only --portal-port=8090 --portal-root=C:\SWWerkplaats\PortalData
 ```
 
 ## Configbestand
@@ -55,6 +58,8 @@ Belangrijke velden:
 - `Prefix`: URL-prefix voor de portal.
 - `Port`: poort wanneer geen expliciete prefixpoort is gezet.
 - `PortalOnly`: start alleen de webportal zonder WinForms.
+- `OrderStorageProvider`: `sqlite` (standaard) of tijdelijk `files` voor herstel/compatibiliteit.
+- `DatabasePath`: absoluut pad naar de SQLite-database.
 
 ## Omgevingsvariabelen
 
@@ -63,6 +68,8 @@ Deze waarden kunnen ook via de omgeving worden gezet:
 - `SW_PORTAL_ROOT`
 - `SW_PORTAL_PORT`
 - `SW_PORTAL_PREFIX`
+- `SW_ORDER_STORAGE`
+- `SW_ORDER_DATABASE`
 
 ## Controle
 
@@ -71,6 +78,13 @@ Gebruik deze endpoints om een lokale server snel te controleren:
 - `GET /api/health`
 - `GET /api/catalog`
 - `GET /api/workflow`
+- `GET /api/library`
+
+## Meerdere gebruikers en online gebruik
+
+SQLite gebruikt WAL, korte transacties en een verbinding per repositorybewerking. Daarmee kunnen meerdere browsergebruikers veilig via **één draaiende portalserver** werken. Plaats het `.sqlite`-bestand niet op een netwerkshare en start niet meerdere portalservers tegen hetzelfde bestand. Voor meerdere serverinstanties wordt `IOrderRepository` later met PostgreSQL of SQL Server geïmplementeerd.
+
+De ingebouwde listener biedt zelf geen TLS, gebruikersaccounts of internetbeveiliging. Publiceer hem daarom niet rechtstreeks op internet; gebruik voor online gebruik een HTTPS-reverse-proxy met authenticatie, toegangslogging en back-upbeleid.
 
 Voor doorwerken op een andere laptop:
 

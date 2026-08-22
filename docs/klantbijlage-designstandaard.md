@@ -1,5 +1,7 @@
 # Designstandaard klantbijlage
 
+Status: **actueel presentatiecontract**.
+
 Doel: de klant moet binnen enkele seconden begrijpen wat wordt aangeboden, welk voordeel de uitvoering biedt en welke gegevens vóór akkoord gecontroleerd moeten worden.
 
 De huidige Workstation-bijlage is de visuele referentiestandaard. Nieuwe producten gebruiken dezelfde rustige opbouw, typografie, marges, kleuren en paginavolgorde. Alleen de inhoud en relevante productvisualisaties veranderen.

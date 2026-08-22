@@ -1,5 +1,7 @@
 # Werkbank met kastonderbouw
 
+Status: **actuele productafspraak**.
+
 Product-id: `werkbankkast`.
 
 Dit product gebruikt een eigen `WorkbenchCabinetEngine` en levert daarna hetzelfde `WorkbenchModel` als de andere productfamilies. Daardoor blijven nesting, prijs, CNC, SolidWorks, 3D en orderoutput gedeeld.

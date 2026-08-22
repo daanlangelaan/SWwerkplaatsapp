@@ -1,5 +1,7 @@
 # CAD tekenstrategie: werktafel versus cabinets
 
+Status: **actueel technisch contract**.
+
 Doel van dit document: snel kunnen terugvinden waarom de SolidWorks macro voor de werktafel stabiel werkt, welke tekenafspraken daaruit volgen, en waar de cabinet-route daarvan afwijkt of nog risico loopt.
 
 ## Kernprincipe uit de werktafel
@@ -68,7 +70,7 @@ Voor `SheetVerticalZ` is de juiste cabinet-route dus:
 5. Teken gewone railgaten opnieuw op hetzelfde `Right Plane` middenvlak en cut tweezijdig door de dikte.
 6. Plaats het part in de assembly op `X/Y/Z` zonder transform.
 
-Dit sluit aan op de laatste afspraak in `docs/SolidWorksMacroStrategieLog.md`: niet meer terug naar assembly-transforms of losse face-plane cuts voor de eerste stabiele versie.
+Dit sluit aan op de laatste afspraak in `docs/archive/SolidWorksMacroStrategieLog.md`: niet meer terug naar assembly-transforms of losse face-plane cuts voor de eerste stabiele versie.
 
 ## Wat de huidige cabinet-code al goed doet
 

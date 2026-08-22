@@ -1,5 +1,7 @@
 # Vakjeskast productafspraak
 
+Status: **actuele productafspraak**.
+
 Deze productfamilie is actief in de portal. De huidige implementatie rekent de buitenmaat uit op basis van vakmaten, plaatdikte, aantal vakken en de gekozen verdiepte positie van het raster.
 
 ## Klantparameters

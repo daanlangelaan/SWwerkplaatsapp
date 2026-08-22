@@ -1,10 +1,12 @@
 # Masterdata beheren
 
+Status: **actueel contract**.
+
 ## Doel
 
 `config/product-master-data.xlsx` is de levende, controleerbare beheer- en wijzigingsbron voor alle bestaande en nieuwe producten. Nieuwe losse lijsten zijn niet toegestaan.
 
-De runtime-overgang is nog niet volledig: prijzen, leveranciers en CAM-instellingen worden al uit de werkmap gelezen, maar materialen, beslag en een deel van de productdefaults komen tijdelijk nog uit JSON of code. Tot de masterdatacompiler gereed is moeten wijzigingen daarom zowel de werkmap als de nog actieve runtimeconsument consistent houden. De JSON/CSV-bronnen mogen pas verdwijnen nadat een referentie-audit en regressietest aantonen dat geen codepad ze meer leest.
+De werkmap wordt niet rechtstreeks door de actieve pricing- en CAM-code gelezen. `scripts/generate-masterdata-runtime.py` compileert Excel en de afbeeldingscatalogus deterministisch naar `config/runtime/masterdata-runtime.json`. Prijzen, leveranciersvoorkeuren en CAM-instellingen lezen deze gevalideerde snapshot. Materialen, beslag en enkele productdefaults komen tijdelijk nog uit bestaande JSON of code; die bronnen verdwijnen pas nadat hun consumenten zijn omgezet en regressietests slagen.
 
 ## Vaste indeling
 
@@ -16,7 +18,7 @@ De runtime-overgang is nog niet volledig: prijzen, leveranciers en CAM-instellin
 - `Controles`: machineleesbare blokkades en vrijgaveregels.
 - `Wijzigingslog`: iedere structurele wijziging en migratie.
 
-De bedoelde tabelnamen en relaties staan in `config/master-data-schema.json`. Dit schema is nu een contract voor beheer en validatie; de app gebruikt het nog niet als dynamisch runtime-schema.
+De bedoelde tabelnamen en relaties staan in `config/master-data-schema.json`. Validator en snapshotgenerator gebruiken dit contract voor tabellen, sleutels en verboden legacy-tabbladen.
 
 ## Leveranciersselectie
 
@@ -29,7 +31,7 @@ TechXXL is standaard rang 1 voor:
 
 ## Afbeeldingen
 
-De binaire afbeelding staat buiten Excel in `config/catalog-images/<supplier>/`. `config/catalog-images/image-catalog.json` is de canonieke afbeeldingsregistratie en koppelt `Afbeelding-ID`, leverancier, artikelcode, interne ID, bronpagina en lokaal bestand. Excel bevat in `Prijs & inkoop` alleen een kleine ingebedde preview zodat het werkboek visueel bruikbaar blijft. De huidige portal haalt afbeeldingsvelden nog uit de aanbiedingstabel; rechtstreekse runtimeconsumptie van het afbeeldingsregister is een vervolgmigratie.
+De binaire afbeelding staat buiten Excel in `config/catalog-images/<supplier>/`. `config/catalog-images/image-catalog.json` is de canonieke afbeeldingsregistratie en koppelt `Afbeelding-ID`, leverancier, artikelcode, interne ID, bronpagina en lokaal bestand. Excel bevat in `Prijs & inkoop` alleen een kleine ingebedde preview. De snapshot bevat zowel aanbiedingen als het afbeeldingsregister; de portal gebruikt de afbeeldingsvelden van de gekoppelde aanbieding.
 
 Bij toevoegen of vervangen:
 
@@ -47,7 +49,8 @@ Bij toevoegen of vervangen:
 4. Koppel prijzen als aanbiedingen in `Prijs & inkoop`.
 5. Gebruik bestaande leveranciersvoorkeuren; voeg alleen een nieuwe voorkeur toe als categorie, subcategorie of productscope werkelijk afwijkt.
 6. Voeg noodzakelijke controles toe en registreer de wijziging.
-7. Valideer alle foreign keys, unieke ID's, afbeeldingsbestanden en de app-build. Controleer het gewijzigde werkblad visueel.
+7. Valideer alle foreign keys, unieke ID's en afbeeldingsbestanden; controleer het gewijzigde werkblad visueel.
+8. Voer `python scripts/generate-masterdata-runtime.py` uit en daarna de minimale controles uit `AGENTS.md`.
 
 ## Migratieregel
 

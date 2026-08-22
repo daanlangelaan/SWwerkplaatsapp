@@ -1,5 +1,7 @@
 # Repositorystructuur
 
+Status: **actueel contract**.
+
 ## Canonieke mappen
 
 ```text
@@ -23,9 +25,10 @@ C:\SWWerkplaats\PortalData
 
 Back-ups en volledige werkmapsnapshots staan buiten de repository onder `C:\software_builds\SWwerkplaatsapp-snapshots`.
 
-## Tijdelijke uitzonderingen
+## Actuele grenzen
 
-- De webportal en WinForms-interface worden nog uit hetzelfde project gebouwd, maar via verschillende scripts en outputlocaties gestart. Dit wordt in de volgende consolidatiefase één buildroute.
-- WinForms blijft alleen zolang de rail-/dragereditor nog niet naar de portal of een beheertool is gemigreerd.
-- Excel is de menselijke masterdatabron; enkele runtimeconsumenten gebruiken nog JSON, CSV of hardcoded defaults totdat een gevalideerde masterdatasnapshot beschikbaar is.
+- `scripts/build-configurator.ps1` is de enige buildroute. Oude scriptnamen zijn uitsluitend wrappers naar die route.
+- De webportal is standaard en bevat ook de rail-/dragerbibliotheek op `/library`; WinForms blijft tijdelijk als compatibiliteitsschil.
+- Excel is de menselijke masterdatabron. `config/runtime/masterdata-runtime.json` is de gegenereerde applicatiesnapshot; enkele overige catalogusconsumenten gebruiken nog JSON of hardcoded defaults.
+- SQLite bewaart operationele ordermetadata buiten Git; orderbestanden blijven een leesbare export- en herstelmirror.
 - `--solidworks-worker` is geen tweede geometrie-engine. Het is de actieve subprocessgrens rond `SolidWorksComPartExporter` voor timeout, COM-isolatie en retry.

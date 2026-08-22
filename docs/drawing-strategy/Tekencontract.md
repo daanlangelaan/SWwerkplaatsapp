@@ -1,5 +1,7 @@
 # Tekencontract
 
+Status: **actueel contract**.
+
 Dit document is leidend voor nieuwe productfamilies en wijzigingen aan plaatdelen, gaten, pockets, SolidWorks export en 3D preview.
 
 ## Kernregel

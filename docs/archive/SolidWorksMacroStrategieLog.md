@@ -1,5 +1,7 @@
 # SolidWorks macro strategie-log
 
+Status: **archief / ervaringslog**. Dit document voorkomt herhaling van mislukte routes, maar vervangt het actuele workercontract niet.
+
 Doel: voorkomen dat we oude SolidWorks macro-strategieen opnieuw proberen zonder te zien wat er eerder gebeurde.
 
 ## Werkwijze

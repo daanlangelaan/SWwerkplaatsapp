@@ -1,5 +1,7 @@
 # App-structuur en groeipad
 
+Status: **actueel architectuurcontract**.
+
 Doel: de configurator uitbreidbaar maken zonder dat elke nieuwe productfamilie opnieuw dezelfde teken-, gaten-, pricing- en outputproblemen moet oplossen.
 
 ## Richting
@@ -25,8 +27,8 @@ Domain
   materialen en beslagmodellen
 
 Infrastructure
-  catalogi uit JSON/CSV/database
-  orderopslag
+  gevalideerde masterdatasnapshot en resterende catalogi
+  SQLite-orderopslag met bestandsmirror
   bestanden/export
   lokale webserver
 
@@ -76,8 +78,8 @@ Deze laag mag Domain gebruiken en services aanroepen, maar moet zelf weinig UI- 
 Bevat opslag en adapters:
 
 - JSON/CSV catalogus;
-- toekomstige SQLite/database;
-- bestandsopslag voor orders;
+- SQLite-orderrepository;
+- bestandsmirror voor orderexports en herstel;
 - lokale server;
 - notificatiebestanden.
 
@@ -105,6 +107,6 @@ Bestaat uit portal UI en eventueel desktop UI. De UI praat met application-servi
 ## Niet doen
 
 - Niet meteen herschrijven naar een volledig webframework.
-- Niet eerst database afdwingen voordat de domeincontracten stabiel zijn.
+- Geen databaseleveranciersdetails buiten `IOrderRepository` laten lekken.
 - Niet oude SolidWorks-orientatieproblemen oplossen met assembly-transforms.
 - Niet de werkende portal breken om een schonere mapstructuur te krijgen.

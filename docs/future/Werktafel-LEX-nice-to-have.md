@@ -1,5 +1,7 @@
 # Werktafel LEX - upgrades en toekomstconcepten
 
+Status: **toekomst / nog niet besloten**.
+
 ## Status
 
 Dit document parkeert de ideeen uit de conceptsparring rond de Werktafel LEX.

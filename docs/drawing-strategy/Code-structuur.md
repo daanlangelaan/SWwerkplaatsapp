@@ -1,5 +1,7 @@
 # Code-structuur tekenlogica
 
+Status: **actueel implementatiecontract**.
+
 De tekenlogica wordt in lagen opgebouwd zodat nieuwe producten niet opnieuw hoeven uit te vinden welke plaatzijde, coordinaten en gatenstrategie correct zijn.
 
 ## Algemene laag

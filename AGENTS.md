@@ -14,7 +14,8 @@ Lees eerst `docs/README.md`. Gebruik daarna de instructie die bij de wijziging h
 - Koppel uitsluitend met stabiele ID's volgens `config/master-data-schema.json`; nooit op naam, omschrijving of rijpositie.
 - Voeg geen aparte leveranciers-, voorkeurs- of cataloguswerkbladen toe. Leveranciers en voorkeuren horen in `Leveranciers`; aanbiedingen en afbeeldingsverwijzingen in `Prijs & inkoop`.
 - Afbeeldingsbestanden horen in `config/catalog-images/<supplier>/` en worden geregistreerd in `config/catalog-images/image-catalog.json`. Excel bevat alleen een preview.
-- De runtime-migratie naar één gegenereerde masterdatasnapshot is nog niet voltooid. Verwijder JSON/CSV-fallbacks of hardcoded defaults pas nadat alle codeconsumenten zijn omgezet en regressietests slagen.
+- Genereer na iedere Excel- of afbeeldingscataloguswijziging `config/runtime/masterdata-runtime.json` met `python scripts/generate-masterdata-runtime.py`. Applicatiecode leest Excel niet rechtstreeks.
+- Pricing, leveranciersvoorkeur en CAM lezen de runtime-snapshot. Overige JSON- of hardcoded catalogusconsumenten mogen pas verdwijnen nadat ze zijn omgezet en productregressies slagen.
 - Een nieuw product is pas compleet nadat productregister, productregels, bibliotheekreferenties, prijsaanbiedingen, controles en wijzigingslog zijn bijgewerkt en gevalideerd.
 
 ## Repositoryhygiëne
@@ -30,8 +31,12 @@ Voer bij relevante wijzigingen minimaal uit:
 
 ```powershell
 python .\scripts\validate-master-data.py
-dotnet build .\src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj
+python .\scripts\generate-masterdata-runtime.py --check
+python .\scripts\check-repository.py
+.\scripts\build-configurator.ps1
 dotnet run --project .\tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj
+dotnet run --project .\tests\ProductContracts.RegressionTests\ProductContracts.RegressionTests.csproj
+dotnet run --project .\tests\OrderStorage.IntegrationTests\OrderStorage.IntegrationTests.csproj
 ```
 
-De webportal is de voorkeursinterface. De WinForms-interface blijft tijdelijk aanwezig omdat de rail-/dragereditor nog niet naar de portal is gemigreerd. De `--solidworks-worker`-modus is een actieve procesisolatie voor de SolidWorks-export en mag niet als ongebruikte UI worden verwijderd.
+De webportal is de standaardinterface; rails en dragers worden via `/library` beheerd. WinForms is alleen compatibiliteit en krijgt geen nieuwe functies. De `--solidworks-worker`-modus is een actieve procesisolatie voor de SolidWorks-export en mag niet als ongebruikte UI worden verwijderd. Nieuwe ordermetadata gebruikt standaard SQLite; bestanden blijven export- en herstelmirror.

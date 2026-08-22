@@ -81,14 +81,14 @@ Invoke-RestMethod http://localhost:8088/api/health
 4. Open daarna `http://localhost:8088`.
 
 Gebruik `.\Web configurator stoppen.cmd` als de app oud lijkt of als een build faalt omdat `SWWerkplaats.Configurator.exe` nog draait. Gebruik daarna `rebuild`.
-Gebruik `.\SW configurator rebuild.cmd` alleen voor de nog niet gemigreerde desktopfuncties zoals de rail-/dragereditor. De webportal is de voorkeursinterface. De twee startroutes worden in een volgende fase samengevoegd.
+De webportal is de standaardinterface. De rail-/dragereditor staat op `http://localhost:8088/library`. De desktopstart blijft alleen als tijdelijke compatibiliteitsschil; alle routes gebruiken dezelfde `dotnet`/MSBuild-build.
 
 ## Build check
 
-Handmatig bouwen:
+Handmatig bouwen via de canonieke route:
 
 ```powershell
-dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj
+.\scripts\build-configurator.ps1
 ```
 
 GitHub Actions draait dezelfde build op Windows bij push en pull request.
@@ -127,7 +127,7 @@ Invoke-RestMethod -Uri http://localhost:8088/api/quote -Method Post -ContentType
 
 ## Lokale data
 
-De portal schrijft orders, freeswachtrij en gegenereerde bestanden standaard naar de externe operationele map:
+De portal schrijft orders, freeswachtrij en gegenereerde bestanden standaard naar de externe operationele map. Ordermetadata staat in SQLite; JSON-orderbestanden blijven als export- en herstelmirror bestaan:
 
 ```text
 C:\SWWerkplaats\PortalData
@@ -158,7 +158,7 @@ config/           Voorbeeldconfiguratie en lokale instellingen
 docs/             Ontwerpnotities
 scripts/          Start/build scripts
 .codex/skills/    Projectskills; geen gegenereerde Python-caches
-artifacts/        Gegenereerde tijdelijke QA- en exportresultaten
+config/runtime/   Gegenereerde, gevalideerde masterdatasnapshot
 ```
 
 ## Git workflow
@@ -182,7 +182,7 @@ Het leidende beheerregister voor productregels, materialen, componenten, verbind
 config\product-master-data.xlsx
 ```
 
-De portal leest het tabblad `Prijs & inkoop` rechtstreeks. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus. `config\pricing-estimates.csv` blijft tijdelijk uitsluitend als compatibiliteits-terugval bestaan wanneer de hoofdwerkmap ontbreekt of niet leesbaar is. Verwijder deze terugval pas nadat alle masterdataconsumenten naar één gevalideerde runtime-snapshot zijn gemigreerd.
+Excel is de menselijke beheerbron. `python scripts\generate-masterdata-runtime.py` compileert de werkmap en afbeeldingscatalogus naar `config\runtime\masterdata-runtime.json`; pricing, leveranciersvoorkeuren en CAM lezen deze snapshot. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus.
 
 Rails en legplankdragers staan in:
 
@@ -190,7 +190,7 @@ Rails en legplankdragers staan in:
 config\hardware-library.json
 ```
 
-In de desktop configurator kun je deze aanpassen via tab `Library` en daarna `Library opslaan`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
+In de portal kun je deze aanpassen via `/library`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
 
 ## Huidige technische afspraken
 

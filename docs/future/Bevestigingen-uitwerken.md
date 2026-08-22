@@ -1,5 +1,7 @@
 # Bevestigingen uitwerken
 
+Status: **toekomst / open werklijst**. Alleen uitgewerkte regels in code, masterdata en regressietests zijn leidend.
+
 Blijvende werklijst voor bevestigers, gaten, lengteselectie en CAM-bewerkingen. Gebruik deze lijst wanneer gevraagd wordt: **“Wat staat er nog open rond bevestigingen?”**
 
 ## Vastgelegde besluiten
