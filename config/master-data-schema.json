@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.8",
+  "workbook": "config/product-master-data.xlsx",
+  "canonicalTables": {
+    "ProductsTable": { "sheet": "Producten", "primaryKey": "Product-ID" },
+    "MaterialsTable": { "sheet": "Materialen", "primaryKey": "Materiaal-ID" },
+    "ComponentsTable": { "sheet": "Componenten", "primaryKey": "Component-ID" },
+    "ProductRulesTable": { "sheet": "Product-regels", "primaryKey": "Regel-ID" },
+    "SuppliersTable": { "sheet": "Leveranciers", "primaryKey": "Leverancier-ID" },
+    "SupplierPreferencesTable": { "sheet": "Leveranciers", "primaryKey": "Voorkeur-ID" },
+    "PricingProcurementTable": { "sheet": "Prijs & inkoop", "primaryKey": "Aanbieding-ID" },
+    "ValidationRulesTable": { "sheet": "Controles", "primaryKey": "Controle-ID" },
+    "ChangeLogTable": { "sheet": "Wijzigingslog", "primaryKey": "Wijziging-ID" }
+  },
+  "foreignKeys": [
+    { "from": "ProductsTable.Basisproduct-ID", "to": "ProductsTable.Product-ID", "nullable": true },
+    { "from": "ProductRulesTable.Product-ID", "to": "ProductsTable.Product-ID" },
+    { "from": "SupplierPreferencesTable.Leverancier-ID", "to": "SuppliersTable.Leverancier-ID" },
+    { "from": "SupplierPreferencesTable.Scope-ID", "to": "ProductsTable.Product-ID", "when": "Scope-type=Product" },
+    { "from": "PricingProcurementTable.Leverancier-ID", "to": "SuppliersTable.Leverancier-ID", "nullable": true },
+    { "from": "PricingProcurementTable.Afbeelding-ID", "to": "config/catalog-images/image-catalog.json#images.imageId", "nullable": true }
+  ],
+  "selectionRule": "Selecteer per Interne-ID alleen aanbiedingen waarvan categorie, subcategorie en productscope passen; kies daarna de laagste actieve leveranciersrang.",
+  "forbiddenWorksheets": ["Leveranciersvoorkeur", "Leverancierscatalogus"],
+  "forbiddenJoins": ["leveranciersnaam", "omschrijving", "werkbladpositie"]
+}

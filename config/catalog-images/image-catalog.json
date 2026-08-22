@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "1.0",
+  "updatedAt": "2026-08-22",
+  "storagePolicy": {
+    "binaryLocation": "config/catalog-images/<supplier>/",
+    "excelUsage": "preview-only",
+    "canonicalReference": "imageId"
+  },
+  "images": [
+    {
+      "imageId": "IMG-TECHXXL-100831",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100831 / S1108040",
+      "internalId": "alu_system_80x40",
+      "localPath": "config/catalog-images/techxxl/alu-system-80x40.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100831.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101114",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101114 / S1108080",
+      "internalId": "alu_system_80x80",
+      "localPath": "config/catalog-images/techxxl/alu-system-80x80.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101114.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100559",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100559 / S10816040L",
+      "internalId": "alu_system_160x40",
+      "localPath": "config/catalog-images/techxxl/alu-system-160x40-series8.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100559.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101445",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101445 / S210FP808016",
+      "internalId": "techxxl_footplate_10_80x80_m16",
+      "localPath": "config/catalog-images/techxxl/footplate-10-80x80-m16.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101445.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101219",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101219 / S210SF8016150AB",
+      "internalId": "techxxl_leveling_foot_d80_m16x150",
+      "localPath": "config/catalog-images/techxxl/leveling-foot-d80-m16x150.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101219.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-101245",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 101245 / S210WS4080",
+      "internalId": "techxxl_corner_bracket_set_10_40x80",
+      "localPath": "config/catalog-images/techxxl/corner-bracket-set-10-40x80.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-101245.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100199",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100199 / S208AK16040",
+      "internalId": "techxxl_end_cap_8_160x40_black",
+      "localPath": "config/catalog-images/techxxl/end-cap-8-160x40-black.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100199.html",
+      "sourceImageUrl": null,
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-22"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "manifest_id": "robotcel-default-1200x800x900",
+  "version": "1.1",
+  "scope": "Frame, werkblad, voeten, adapters en eindafwerking; robot uitgesloten",
+  "members": [
+    { "layer": "voetlaag", "role": "stelvoet", "name_prefix": "TechXXL stelvoet D80 schotel", "expected_count": 4 },
+    { "layer": "voetlaag", "role": "voetplaat", "name_prefix": "TechXXL adapterplaat / voetplaat", "expected_count": 4 },
+    { "layer": "staanderlaag", "role": "upright", "name_prefix": "Staander 80x80", "section": "80x80", "orientation": "vertical", "expected_count": 4 },
+    { "layer": "onderlaag", "role": "lower-perimeter", "name_regex": "^Onderligger (voor|achter|links|rechts) 40x80$", "section": "40x80", "orientation": "standing: Y=80", "expected_count": 4 },
+    { "layer": "onderlaag", "role": "lower-crossmember", "name_prefix": "Onderste dwarsligger 40x80 ", "section": "40x80", "orientation": "standing: Y=80", "expected_count": 1 },
+    { "layer": "bladframe", "role": "top-perimeter", "name_regex": "^Bladligger (voor|achter|links|rechts) 40x80$", "section": "40x80", "orientation": "standing: Y=80", "expected_count": 4 },
+    { "layer": "bladframe", "role": "top-crossmember", "name_prefix": "Dwarsligger 40x80 ", "section": "40x80", "orientation": "standing: Y=80", "expected_count": 2 },
+    { "layer": "blad", "role": "worktop", "name_prefix": "Robotcel werkblad", "expected_count": 1 },
+    { "layer": "achterrail", "role": "rear-rail", "name_prefix": "Achterrail 40x160", "section": "40x160 groove 8 I-type", "orientation": "flat: Y=40", "expected_count": 1 },
+    { "layer": "eindafwerking", "role": "rear-rail-end-cap", "name_prefix": "Zwarte eindkap 8 160x40 achterrail", "section": "160x40 groove 8 I-type", "expected_count": 2 }
+  ]
+}

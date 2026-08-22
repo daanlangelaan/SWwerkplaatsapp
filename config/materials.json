@@ -9,6 +9,38 @@
       "stockLengthMm": 6000
     },
     {
+      "id": "alu_system_40x40",
+      "name": "Geanodiseerd aluminium systeemprofiel 40x40",
+      "kind": "profile",
+      "widthMm": 40,
+      "heightMm": 40,
+      "stockLengthMm": 6000
+    },
+    {
+      "id": "alu_system_80x40",
+      "name": "Geanodiseerd aluminium systeemprofiel 80x40",
+      "kind": "profile",
+      "widthMm": 80,
+      "heightMm": 40,
+      "stockLengthMm": 6000
+    },
+    {
+      "id": "alu_system_80x80",
+      "name": "Geanodiseerd aluminium systeemprofiel 80x80",
+      "kind": "profile",
+      "widthMm": 80,
+      "heightMm": 80,
+      "stockLengthMm": 6000
+    },
+    {
+      "id": "alu_system_160x40",
+      "name": "Geanodiseerd aluminium systeemprofiel 160x40",
+      "kind": "profile",
+      "widthMm": 160,
+      "heightMm": 40,
+      "stockLengthMm": 6040
+    },
+    {
       "id": "osb_18",
       "name": "OSB 18mm",
       "kind": "sheet",
@@ -29,6 +61,30 @@
       "name": "Betonplex 18mm",
       "kind": "sheet",
       "thicknessMm": 18,
+      "sheetLengthMm": 2500,
+      "sheetWidthMm": 1250
+    },
+    {
+      "id": "hpl_10_lex",
+      "name": "HPL plaat wit 10 mm",
+      "kind": "sheet",
+      "thicknessMm": 10,
+      "sheetLengthMm": 3050,
+      "sheetWidthMm": 1300
+    },
+    {
+      "id": "hpl_6_lex_stabilizer",
+      "name": "HPL stabilisatieplaat wit 6 mm",
+      "kind": "sheet",
+      "thicknessMm": 6,
+      "sheetLengthMm": 3050,
+      "sheetWidthMm": 1300
+    },
+    {
+      "id": "alu_6082_10_adapter",
+      "name": "Aluminium EN AW-6082 plaat 10 mm",
+      "kind": "sheet",
+      "thicknessMm": 10,
       "sheetLengthMm": 2500,
       "sheetWidthMm": 1250
     }

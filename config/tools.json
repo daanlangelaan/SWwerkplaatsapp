@@ -1,14 +1,24 @@
 {
   "tools": [
     {
+      "id": "endmill_3mm_2flute_carbide",
+      "name": "Frees 3mm 2-fluit carbide",
+      "kind": "endMill",
+      "diameterMm": 3,
+      "feedRateMmMin": 1600,
+      "plungeRateMmMin": 300,
+      "spindleRpm": 18000,
+      "passDepthMm": 2
+    },
+    {
       "id": "endmill_6mm",
       "name": "Frees 6mm",
       "kind": "endMill",
       "diameterMm": 6,
-      "feedRateMmMin": 1800,
-      "plungeRateMmMin": 400,
-      "spindleRpm": 18000,
-      "passDepthMm": 4
+      "feedRateMmMin": 3200,
+      "plungeRateMmMin": 800,
+      "spindleRpm": 20500,
+      "passDepthMm": 6.25
     },
     {
       "id": "endmill_8mm",
@@ -29,6 +39,24 @@
       "plungeRateMmMin": 300,
       "spindleRpm": 6000,
       "passDepthMm": 3
+    },
+    {
+      "id": "vbit_90deg_8mm_shank_6_35",
+      "name": "V-frees 90° Ø8 / schacht Ø6,35",
+      "kind": "vBit",
+      "diameterMm": 8,
+      "includedAngleDeg": 90,
+      "tipDiameterMm": 0,
+      "shankDiameterMm": 6.35,
+      "fluteCount": 2,
+      "rotation": "right",
+      "coneLengthMm": 4,
+      "cylindricalCutLengthMm": 4.5,
+      "maximumCutDepthMm": 8.5,
+      "feedRateMmMin": 600,
+      "plungeRateMmMin": 150,
+      "spindleRpm": 18000,
+      "passDepthMm": 1
     }
   ]
 }
