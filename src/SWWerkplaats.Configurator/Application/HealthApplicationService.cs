@@ -12,6 +12,9 @@ namespace SWWerkplaats.Configurator.Application
         public string RootFolder { get; set; }
         public bool RootFolderExists { get; set; }
         public string Prefix { get; set; }
+        public string OrderStorageProvider { get; set; }
+        public string DatabasePath { get; set; }
+        public bool DatabaseExists { get; set; }
     }
 
     public sealed class HealthApplicationService
@@ -23,7 +26,7 @@ namespace SWWerkplaats.Configurator.Application
             this.startedAt = startedAt;
         }
 
-        public HealthData GetHealth(string rootFolder, string prefix)
+        public HealthData GetHealth(string rootFolder, string prefix, string orderStorageProvider, string databasePath)
         {
             return new HealthData
             {
@@ -32,7 +35,12 @@ namespace SWWerkplaats.Configurator.Application
                 StartedAt = startedAt.ToString("s"),
                 RootFolder = rootFolder,
                 RootFolderExists = !string.IsNullOrWhiteSpace(rootFolder) && Directory.Exists(rootFolder),
-                Prefix = prefix
+                Prefix = prefix,
+                OrderStorageProvider = orderStorageProvider,
+                DatabasePath = databasePath,
+                DatabaseExists = string.Equals(orderStorageProvider, "sqlite", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(databasePath)
+                    && File.Exists(databasePath)
             };
         }
 

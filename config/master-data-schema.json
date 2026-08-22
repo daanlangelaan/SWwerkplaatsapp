@@ -1,16 +1,19 @@
 {
-  "schemaVersion": "1.8",
+  "schemaVersion": "1.9",
   "workbook": "config/product-master-data.xlsx",
   "canonicalTables": {
     "ProductsTable": { "sheet": "Producten", "primaryKey": "Product-ID" },
     "MaterialsTable": { "sheet": "Materialen", "primaryKey": "Materiaal-ID" },
     "ComponentsTable": { "sheet": "Componenten", "primaryKey": "Component-ID" },
+    "ToolsTable": { "sheet": "Gereedschappen", "primaryKey": "Gereedschap-ID" },
+    "ConnectionRecipesTable": { "sheet": "Verbindingsrecepten", "primaryKey": "Recept-ID" },
     "ProductRulesTable": { "sheet": "Product-regels", "primaryKey": "Regel-ID" },
     "SuppliersTable": { "sheet": "Leveranciers", "primaryKey": "Leverancier-ID" },
     "SupplierPreferencesTable": { "sheet": "Leveranciers", "primaryKey": "Voorkeur-ID" },
     "PricingProcurementTable": { "sheet": "Prijs & inkoop", "primaryKey": "Aanbieding-ID" },
     "ValidationRulesTable": { "sheet": "Controles", "primaryKey": "Controle-ID" },
-    "ChangeLogTable": { "sheet": "Wijzigingslog", "primaryKey": "Wijziging-ID" }
+    "ChangeLogTable": { "sheet": "Wijzigingslog", "primaryKey": "Wijziging-ID" },
+    "CamParametersTable": { "sheet": "CAM-parameters", "primaryKey": "Sleutel" }
   },
   "foreignKeys": [
     { "from": "ProductsTable.Basisproduct-ID", "to": "ProductsTable.Product-ID", "nullable": true },

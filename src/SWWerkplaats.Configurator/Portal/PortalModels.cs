@@ -226,6 +226,14 @@ namespace SWWerkplaats.Configurator.Portal
         public int PlacementCount { get; set; }
     }
 
+    public sealed class SolidWorksWorkerResult
+    {
+        public int ContractVersion { get; set; }
+        public bool Ok { get; set; }
+        public string AssemblyPath { get; set; }
+        public string Error { get; set; }
+    }
+
     public sealed class PortalOrderStatusRequest
     {
         public string Status { get; set; }

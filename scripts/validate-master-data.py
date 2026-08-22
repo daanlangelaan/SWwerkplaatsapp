@@ -12,6 +12,7 @@ from xml.etree import ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 WORKBOOK = ROOT / "config" / "product-master-data.xlsx"
 IMAGE_CATALOG = ROOT / "config" / "catalog-images" / "image-catalog.json"
+SCHEMA = ROOT / "config" / "master-data-schema.json"
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 DOC_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -91,7 +92,20 @@ def unique(records: list[dict[str, str]], key: str, errors: list[str]) -> set[st
 def main() -> int:
     errors: list[str] = []
     sheets = read_workbook(WORKBOOK)
-    for forbidden in ("Leveranciersvoorkeur", "Leverancierscatalogus"):
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    if schema.get("workbook") != WORKBOOK.relative_to(ROOT).as_posix():
+        errors.append("Schema verwijst niet naar config/product-master-data.xlsx")
+    for table_name, contract in schema.get("canonicalTables", {}).items():
+        sheet_name = contract.get("sheet", "")
+        primary_key = contract.get("primaryKey", "")
+        if sheet_name not in sheets:
+            errors.append(f"Schema-tabel {table_name} verwijst naar ontbrekend werkblad {sheet_name}")
+            continue
+        try:
+            table(sheets[sheet_name], primary_key)
+        except ValueError:
+            errors.append(f"Schema-tabel {table_name} mist primaire sleutel {primary_key} op {sheet_name}")
+    for forbidden in schema.get("forbiddenWorksheets", []):
         if forbidden in sheets:
             errors.append(f"Verboden legacy-tab aanwezig: {forbidden}")
 

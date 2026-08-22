@@ -10,6 +10,8 @@ namespace SWWerkplaats.Configurator.Application
         public string Prefix { get; set; }
         public int Port { get; set; }
         public bool PortalOnly { get; set; }
+        public string OrderStorageProvider { get; set; }
+        public string DatabasePath { get; set; }
 
         public static PortalRuntimeOptions Load(string[] args)
         {
@@ -28,7 +30,8 @@ namespace SWWerkplaats.Configurator.Application
                 RootFolder = DefaultRootFolder(),
                 Prefix = "http://localhost:8088/",
                 Port = 8088,
-                PortalOnly = false
+                PortalOnly = false,
+                OrderStorageProvider = "sqlite"
             };
         }
 
@@ -49,6 +52,8 @@ namespace SWWerkplaats.Configurator.Application
                 if (configured.Port > 0) ApplyPort(options, configured.Port);
                 if (!string.IsNullOrWhiteSpace(configured.Prefix)) options.Prefix = configured.Prefix;
                 if (configured.PortalOnly) options.PortalOnly = true;
+                if (!string.IsNullOrWhiteSpace(configured.OrderStorageProvider)) options.OrderStorageProvider = configured.OrderStorageProvider;
+                if (!string.IsNullOrWhiteSpace(configured.DatabasePath)) options.DatabasePath = ResolveConfiguredRootFolder(configured.DatabasePath, Path.GetDirectoryName(path));
             }
             catch
             {
@@ -61,6 +66,8 @@ namespace SWWerkplaats.Configurator.Application
             ApplyString(options, "SW_PORTAL_ROOT", delegate(string value) { options.RootFolder = value; });
             ApplyInt(options, "SW_PORTAL_PORT", delegate(int value) { ApplyPort(options, value); });
             ApplyString(options, "SW_PORTAL_PREFIX", delegate(string value) { options.Prefix = value; });
+            ApplyString(options, "SW_ORDER_STORAGE", delegate(string value) { options.OrderStorageProvider = value; });
+            ApplyString(options, "SW_ORDER_DATABASE", delegate(string value) { options.DatabasePath = value; });
         }
 
         private static void ApplyArgs(PortalRuntimeOptions options, string[] args)
@@ -76,6 +83,8 @@ namespace SWWerkplaats.Configurator.Application
 
                 ApplyArg(arg, "--portal-root=", delegate(string value) { options.RootFolder = value; });
                 ApplyArg(arg, "--portal-prefix=", delegate(string value) { options.Prefix = value; });
+                ApplyArg(arg, "--order-storage=", delegate(string value) { options.OrderStorageProvider = value; });
+                ApplyArg(arg, "--order-database=", delegate(string value) { options.DatabasePath = value; });
                 ApplyArg(arg, "--portal-port=", delegate(string value)
                 {
                     int port;
@@ -109,6 +118,9 @@ namespace SWWerkplaats.Configurator.Application
             }
 
             options.RootFolder = Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.RootFolder));
+            options.OrderStorageProvider = string.Equals(options.OrderStorageProvider, "files", StringComparison.OrdinalIgnoreCase) ? "files" : "sqlite";
+            if (string.IsNullOrWhiteSpace(options.DatabasePath)) options.DatabasePath = Path.Combine(options.RootFolder, "portal-orders.sqlite");
+            options.DatabasePath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(options.DatabasePath));
 
             if (options.Port <= 0) options.Port = 8088;
             if (string.IsNullOrWhiteSpace(options.Prefix))
@@ -165,7 +177,7 @@ namespace SWWerkplaats.Configurator.Application
             if (string.IsNullOrEmpty(startFolder)) return null;
 
             var folder = Path.GetFullPath(startFolder);
-            for (var i = 0; i < 6 && !string.IsNullOrEmpty(folder); i++)
+            for (var i = 0; i < 8 && !string.IsNullOrEmpty(folder); i++)
             {
                 var candidate = Path.Combine(folder, "config");
                 if (Directory.Exists(candidate)) return candidate;
@@ -185,7 +197,7 @@ namespace SWWerkplaats.Configurator.Application
             if (configFolder != null)
             {
                 var root = Directory.GetParent(configFolder);
-                if (root != null) return Path.Combine(root.FullName, "bin", "PortalData");
+                if (root != null) return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SWWerkplaats", "PortalData");
             }
 
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PortalData");

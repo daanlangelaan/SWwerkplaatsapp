@@ -14,6 +14,7 @@ namespace SWWerkplaats.Configurator.Application
 
     public static class HardwareLibraryRepository
     {
+        private static readonly object SaveLock = new object();
         public static RailTemplate[] DrawerRails()
         {
             return MergeRails(LibraryCatalog.DrawerRails(), Load().rails);
@@ -48,13 +49,27 @@ namespace SWWerkplaats.Configurator.Application
             var path = ConfigPath(true);
             if (string.IsNullOrEmpty(path)) return "";
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
             var data = new HardwareLibraryData
             {
                 rails = rails ?? new RailTemplate[0],
                 shelfSupports = shelfSupports ?? new ShelfSupportTemplate[0]
             };
-            File.WriteAllText(path, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(data));
+            lock (SaveLock)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                var tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
+                File.WriteAllText(tempPath, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(data));
+                if (File.Exists(path))
+                {
+                    var backupPath = path + ".previous";
+                    try { File.Replace(tempPath, path, backupPath, true); }
+                    finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                }
+                else
+                {
+                    File.Move(tempPath, path);
+                }
+            }
             return path;
         }
 

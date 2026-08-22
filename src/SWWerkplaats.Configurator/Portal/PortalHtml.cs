@@ -39,7 +39,7 @@ namespace SWWerkplaats.Configurator.Portal
 <body>
   <header>
     <div class=""brand""><div class=""mark""></div><h1>SW Werkplaats Portal</h1></div>
-    <div class=""headerTools""><div class=""topMeta"">Lokale MVP voor configuratie, prijs en freeswachtrij</div><button class=""stopPortal"" type=""button"" onclick=""stopPortal()"">Stop portal</button></div>
+    <div class=""headerTools""><div class=""topMeta"">Configuratie, prijs en freeswachtrij</div><button class=""stopPortal"" type=""button"" onclick=""location.href='/library'"">Bibliotheek</button><button class=""stopPortal"" type=""button"" onclick=""stopPortal()"">Stop portal</button></div>
   </header>
 
   <section class=""start"" id=""start"">

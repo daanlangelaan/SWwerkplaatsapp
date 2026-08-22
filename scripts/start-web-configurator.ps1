@@ -8,8 +8,8 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\SWWerkplaats.Configurator"
-$outDir = Join-Path $root "bin"
-$exe = Join-Path $project "bin\Debug\SWWerkplaats.Configurator.exe"
+$outDir = Join-Path $project "bin\Debug\net48\win-x64"
+$exe = Join-Path $outDir "SWWerkplaats.Configurator.exe"
 $url = "http://localhost:8088/"
 
 function Show-PortalError($message) {
@@ -44,63 +44,9 @@ function Stop-ExistingPortal {
 }
 
 function Build-CurrentPortal {
-    $projectFile = Join-Path $project "SWWerkplaats.Configurator.csproj"
-    & dotnet build $projectFile --nologo
+    & (Join-Path $PSScriptRoot "build-configurator.ps1") -Configuration Debug
     if ($LASTEXITCODE -ne 0) {
         throw "Build mislukt. Controleer de foutmelding in dit venster."
-    }
-    return
-
-    $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    $solidWorksInterop = "C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll"
-    if (-not (Test-Path $csc)) {
-        $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe"
-    }
-
-    if (-not (Test-Path $csc)) {
-        throw "csc.exe niet gevonden. Installeer Visual Studio 2022 of Visual Studio Build Tools."
-    }
-
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    $sources = Get-ChildItem -Path $project -Recurse -Filter *.cs |
-        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
-        Select-Object -ExpandProperty FullName
-
-    & $csc `
-        /nologo `
-        /target:winexe `
-        /out:$exe `
-        /reference:System.dll `
-        /reference:System.Core.dll `
-        /reference:System.Data.dll `
-        /reference:System.Drawing.dll `
-        /reference:System.IO.Compression.dll `
-        /reference:System.IO.Compression.FileSystem.dll `
-        /reference:Microsoft.CSharp.dll `
-        /reference:System.Web.Extensions.dll `
-        /reference:System.Windows.Forms.dll `
-        /reference:System.Xml.dll `
-        /reference:$solidWorksInterop `
-        $sources
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Build mislukt. Controleer de foutmelding in dit venster."
-    }
-
-    Copy-Item -LiteralPath $solidWorksInterop -Destination (Join-Path $outDir "SolidWorks.Interop.sldworks.dll") -Force
-
-    $portalAssets = Join-Path $outDir "PortalAssets"
-    $portalVendor = Join-Path $project "Portal\vendor"
-    $portalImages = Join-Path $project "Portal\images"
-
-    if (Test-Path $portalVendor) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $portalAssets "vendor") | Out-Null
-        Copy-Item -Path (Join-Path $portalVendor "*") -Destination (Join-Path $portalAssets "vendor") -Recurse -Force
-    }
-
-    if (Test-Path $portalImages) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $portalAssets "images") | Out-Null
-        Copy-Item -Path (Join-Path $portalImages "*") -Destination (Join-Path $portalAssets "images") -Recurse -Force
     }
 }
 

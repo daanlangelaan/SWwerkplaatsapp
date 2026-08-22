@@ -1,14 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <OutputType>WinExe</OutputType>
     <RootNamespace>SWWerkplaats.Configurator</RootNamespace>
     <AssemblyName>SWWerkplaats.Configurator</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <InstalledSolidWorksInteropPath Condition="'$(InstalledSolidWorksInteropPath)' == ''">C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll</InstalledSolidWorksInteropPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,10 +44,10 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
-    <Reference Include="SolidWorks.Interop.sldworks">
-      <HintPath>C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+    <PackageReference Include="SolidWorks.Interop.sldworks" Version="32.1.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Application\CatalogApplicationService.cs" />
@@ -55,9 +63,11 @@
     <Compile Include="Application\RobotCellProductBuilder.cs" />
     <Compile Include="Application\ShippingBoxProductBuilder.cs" />
     <Compile Include="Application\LexRevolutionProductBuilder.cs" />
+    <Compile Include="Application\MasterDataRuntimeCatalog.cs" />
     <Compile Include="Application\WorkbenchCabinetProductBuilder.cs" />
     <Compile Include="Application\IOrderRepository.cs" />
     <Compile Include="Application\OrderApplicationService.cs" />
+    <Compile Include="Application\SqliteOrderRepository.cs" />
     <Compile Include="Application\ProductDefaults.cs" />
     <Compile Include="Application\ProductFastenerStandards.cs" />
     <Compile Include="Application\ProductCatalogApplicationService.cs" />
@@ -130,6 +140,7 @@
     <Compile Include="Portal\PriceOverviewXlsxExporter.cs" />
     <Compile Include="Portal\PortalConfigurationFactory.cs" />
     <Compile Include="Portal\PortalHtml.cs" />
+    <Compile Include="Portal\PortalLibraryHtml.cs" />
     <Compile Include="Portal\PortalModels.cs" />
     <Compile Include="Portal\PortalPricingService.cs" />
     <Compile Include="Portal\PortalVisualizationService.cs" />
@@ -182,5 +193,7 @@
       <Link>SolidWorksAssets\Klantpresentatie-template.pptx</Link>
     </Content>
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="PreferInstalledSolidWorksInterop" AfterTargets="Build" Condition="Exists('$(InstalledSolidWorksInteropPath)')">
+    <Copy SourceFiles="$(InstalledSolidWorksInteropPath)" DestinationFiles="$(TargetDir)SolidWorks.Interop.sldworks.dll" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

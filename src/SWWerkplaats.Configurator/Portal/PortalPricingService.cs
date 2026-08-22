@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
@@ -399,7 +400,7 @@ namespace SWWerkplaats.Configurator.Portal
                 UnitPrice = fallbackUnitPrice,
                 MarkupPercent = fallbackMarkupPercent,
                 PriceStatus = "Fallback",
-                Note = "Fallback schatting; geen regel gevonden in config/product-master-data.xlsx of de compatibiliteits-CSV"
+                Note = "Fallback schatting; geen passende regel gevonden in de gevalideerde runtime-masterdata"
             };
         }
 
@@ -416,14 +417,12 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static Dictionary<string, List<PricingEstimate>> PricingEstimates()
         {
-            var workbookPath = ProductMasterWorkbookPath();
-            var csvPath = PricingConfigPath();
-            var preferredPath = !string.IsNullOrEmpty(workbookPath) && File.Exists(workbookPath) ? workbookPath : csvPath;
-            var preferredWriteTime = !string.IsNullOrEmpty(preferredPath) && File.Exists(preferredPath)
-                ? File.GetLastWriteTimeUtc(preferredPath)
+            var runtimePath = RuntimeMasterDataPath();
+            var preferredWriteTime = !string.IsNullOrEmpty(runtimePath) && File.Exists(runtimePath)
+                ? File.GetLastWriteTimeUtc(runtimePath)
                 : DateTime.MinValue;
             if (pricingEstimates != null
-                && string.Equals(pricingEstimatesSourcePath, preferredPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(pricingEstimatesSourcePath, runtimePath, StringComparison.OrdinalIgnoreCase)
                 && pricingEstimatesSourceWriteTimeUtc == preferredWriteTime)
             {
                 return pricingEstimates;
@@ -431,53 +430,10 @@ namespace SWWerkplaats.Configurator.Portal
 
             pricingEstimates = new Dictionary<string, List<PricingEstimate>>(StringComparer.OrdinalIgnoreCase);
             supplierPreferences = new List<SupplierPreference>();
-            if (!string.IsNullOrEmpty(workbookPath) && LoadPricingWorkbook(workbookPath, pricingEstimates) && pricingEstimates.Count > 0)
+            if (!string.IsNullOrEmpty(runtimePath) && LoadPricingRuntime(runtimePath, pricingEstimates) && pricingEstimates.Count > 0)
             {
-                RememberPricingSource(workbookPath);
-                return pricingEstimates;
+                RememberPricingSource(runtimePath);
             }
-
-            var path = csvPath;
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return pricingEstimates;
-
-            string[] lines;
-            try
-            {
-                lines = File.ReadAllLines(path);
-            }
-            catch
-            {
-                return pricingEstimates;
-            }
-
-            for (var i = 1; i < lines.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(lines[i])) continue;
-                var columns = SplitCsvLine(lines[i]);
-                if (columns.Length < 6) continue;
-
-                decimal unitPrice;
-                decimal markup;
-                if (!TryParseMoney(columns[4], out unitPrice)) continue;
-                if (!TryParseMoney(columns[5], out markup)) markup = 0;
-
-                var category = columns[0];
-                var key = columns[1];
-                if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
-
-                var fallbackEstimate = new PricingEstimate
-                {
-                    Category = category,
-                    Unit = columns.Length > 3 ? columns[3] : "",
-                    UnitPrice = unitPrice,
-                    MarkupPercent = markup,
-                    PriceStatus = "Compatibiliteits-CSV",
-                    Note = columns.Length > 6 && !string.IsNullOrWhiteSpace(columns[6]) ? columns[6] : "Uit compatibiliteitsbestand config/pricing-estimates.csv"
-                };
-                AddPricingEstimate(pricingEstimates, PriceKey(category, key), fallbackEstimate);
-            }
-
-            RememberPricingSource(path);
             return pricingEstimates;
         }
 
@@ -505,6 +461,101 @@ namespace SWWerkplaats.Configurator.Portal
             var fromBase = FindConfigFileUpwards(AppDomain.CurrentDomain.BaseDirectory, "product-master-data.xlsx");
             if (fromBase != null) return fromBase;
             return FindConfigFileUpwards(Environment.CurrentDirectory, "product-master-data.xlsx");
+        }
+
+        private static string RuntimeMasterDataPath()
+        {
+            var fromBase = FindRuntimeMasterDataUpwards(AppDomain.CurrentDomain.BaseDirectory);
+            return fromBase ?? FindRuntimeMasterDataUpwards(Environment.CurrentDirectory);
+        }
+
+        private static string FindRuntimeMasterDataUpwards(string startFolder)
+        {
+            if (string.IsNullOrEmpty(startFolder)) return null;
+            var folder = Path.GetFullPath(startFolder);
+            for (var i = 0; i < 8 && !string.IsNullOrEmpty(folder); i++)
+            {
+                var candidate = Path.Combine(folder, "config", "runtime", "masterdata-runtime.json");
+                if (File.Exists(candidate)) return candidate;
+                var parent = Directory.GetParent(folder);
+                if (parent == null) break;
+                folder = parent.FullName;
+            }
+            return null;
+        }
+
+        private static bool LoadPricingRuntime(string path, Dictionary<string, List<PricingEstimate>> target)
+        {
+            try
+            {
+                var catalog = MasterDataRuntimeCatalog.LoadRequired();
+                if (!string.Equals(Path.GetFullPath(catalog.SourcePath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase)) return false;
+
+                var supplierNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var supplier in catalog.Records("suppliers"))
+                {
+                    var id = MasterDataRuntimeCatalog.Value(supplier, "Leverancier-ID");
+                    var name = MasterDataRuntimeCatalog.Value(supplier, "Naam");
+                    if (!string.IsNullOrWhiteSpace(id)) supplierNames[id] = string.IsNullOrWhiteSpace(name) ? id : name;
+                }
+
+                supplierPreferences = new List<SupplierPreference>();
+                foreach (var row in catalog.Records("supplierPreferences"))
+                {
+                    int rank;
+                    if (!int.TryParse(MasterDataRuntimeCatalog.Value(row, "Rang"), NumberStyles.Integer, CultureInfo.InvariantCulture, out rank)) continue;
+                    supplierPreferences.Add(new SupplierPreference
+                    {
+                        PreferenceId = MasterDataRuntimeCatalog.Value(row, "Voorkeur-ID"),
+                        Category = MasterDataRuntimeCatalog.Value(row, "Categorie"),
+                        Subcategory = MasterDataRuntimeCatalog.Value(row, "Subcategorie"),
+                        SupplierId = MasterDataRuntimeCatalog.Value(row, "Leverancier-ID"),
+                        Rank = rank,
+                        ScopeType = MasterDataRuntimeCatalog.Value(row, "Scope-type"),
+                        ScopeId = MasterDataRuntimeCatalog.Value(row, "Scope-ID"),
+                        Status = MasterDataRuntimeCatalog.Value(row, "Status")
+                    });
+                }
+
+                foreach (var row in catalog.Records("offers"))
+                {
+                    var category = MasterDataRuntimeCatalog.Value(row, "Categorie");
+                    var key = MasterDataRuntimeCatalog.Value(row, "Interne-ID");
+                    decimal unitPrice;
+                    decimal markup;
+                    if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
+                    if (!TryParseMoney(MasterDataRuntimeCatalog.Value(row, "Inkoopprijs excl. btw"), out unitPrice)) continue;
+                    if (!TryParseMoney(MasterDataRuntimeCatalog.Value(row, "Opslag %"), out markup)) markup = 0;
+                    var supplierId = MasterDataRuntimeCatalog.Value(row, "Leverancier-ID");
+                    string supplierName;
+                    AddPricingEstimate(target, PriceKey(category, key), new PricingEstimate
+                    {
+                        OfferId = MasterDataRuntimeCatalog.Value(row, "Aanbieding-ID"),
+                        Category = category,
+                        Subcategory = MasterDataRuntimeCatalog.Value(row, "Subcategorie"),
+                        Unit = MasterDataRuntimeCatalog.Value(row, "Eenheid"),
+                        UnitPrice = unitPrice,
+                        MarkupPercent = markup,
+                        SupplierId = supplierId,
+                        Supplier = supplierNames.TryGetValue(supplierId ?? string.Empty, out supplierName) ? supplierName : supplierId,
+                        SupplierArticleCode = MasterDataRuntimeCatalog.Value(row, "Leveranciers-artikelcode"),
+                        OrderUrl = MasterDataRuntimeCatalog.Value(row, "Bestel-URL"),
+                        PriceDate = NormalizeExcelDate(MasterDataRuntimeCatalog.Value(row, "Prijsdatum")),
+                        PriceStatus = MasterDataRuntimeCatalog.Value(row, "Prijsstatus"),
+                        ImageId = MasterDataRuntimeCatalog.Value(row, "Afbeelding-ID"),
+                        ImageSourceUrl = MasterDataRuntimeCatalog.Value(row, "Afbeelding-bron-URL"),
+                        LocalImagePath = MasterDataRuntimeCatalog.Value(row, "Lokale afbeelding"),
+                        Note = MasterDataRuntimeCatalog.Value(row, "Notitie")
+                    });
+                }
+                return target.Count > 0;
+            }
+            catch
+            {
+                target.Clear();
+                supplierPreferences = new List<SupplierPreference>();
+                return false;
+            }
         }
 
         private static string FindPricingConfigUpwards(string startFolder)

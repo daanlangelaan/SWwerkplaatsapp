@@ -544,7 +544,7 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 DeleteFileIfPresent(workerResult);
                 var result = RunSolidWorksWorkerAttempt(workerInput, workerResult, serializer);
-                if (result != null && result.Ok && !string.IsNullOrWhiteSpace(result.AssemblyPath) && File.Exists(result.AssemblyPath))
+                if (result != null && result.ContractVersion == 1 && result.Ok && !string.IsNullOrWhiteSpace(result.AssemblyPath) && File.Exists(result.AssemblyPath))
                     return result.AssemblyPath;
 
                 lastResult = result;
@@ -613,13 +613,6 @@ namespace SWWerkplaats.Configurator.Portal
         private static string Q(string value)
         {
             return "\"" + (value ?? "").Replace("\"", "\\\"") + "\"";
-        }
-
-        private sealed class SolidWorksWorkerResult
-        {
-            public bool Ok { get; set; }
-            public string AssemblyPath { get; set; }
-            public string Error { get; set; }
         }
 
         private static string ExceptionDetails(Exception error)

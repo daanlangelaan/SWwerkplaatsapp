@@ -28,7 +28,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (request == null) throw new ArgumentNullException("request");
 
-            var orderId = "SW-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var orderId = "SW-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6).ToUpperInvariant();
             var orderFolder = repository.CreateOrderFolder(orderId);
             var output = production.GenerateOrderFiles(request, orderFolder);
             var price = pricing.Calculate(output.Model, output.NestingPlan);

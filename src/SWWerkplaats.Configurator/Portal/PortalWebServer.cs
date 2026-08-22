@@ -20,16 +20,29 @@ namespace SWWerkplaats.Configurator.Portal
         private bool disposed;
 
         public PortalWebServer(string rootFolder, string prefix)
+            : this(new PortalRuntimeOptions { RootFolder = rootFolder, Prefix = prefix, OrderStorageProvider = "sqlite", DatabasePath = Path.Combine(rootFolder, "portal-orders.sqlite") })
         {
-            Prefix = prefix;
-            RootFolder = rootFolder;
+        }
+
+        public PortalWebServer(PortalRuntimeOptions options)
+        {
+            if (options == null) throw new ArgumentNullException("options");
+            Prefix = options.Prefix;
+            RootFolder = options.RootFolder;
+            OrderStorageProvider = options.OrderStorageProvider;
+            DatabasePath = options.DatabasePath;
             serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-            orders = new OrderApplicationService(new FileOrderRepository(rootFolder));
+            var repository = string.Equals(options.OrderStorageProvider, "files", StringComparison.OrdinalIgnoreCase)
+                ? (IOrderRepository)new FileOrderRepository(RootFolder)
+                : new SqliteOrderRepository(RootFolder, options.DatabasePath);
+            orders = new OrderApplicationService(repository);
             health = new HealthApplicationService(DateTime.Now);
         }
 
         public string Prefix { get; private set; }
         public string RootFolder { get; private set; }
+        public string OrderStorageProvider { get; private set; }
+        public string DatabasePath { get; private set; }
         public bool IsRunning { get; private set; }
         public string LastError { get; private set; }
 
@@ -130,6 +143,12 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "GET" && path == "/library")
+            {
+                WriteHtml(stream, 200, PortalLibraryHtml.Page());
+                return;
+            }
+
             if (request.Method == "GET" && (path.StartsWith("/vendor/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/images/", StringComparison.OrdinalIgnoreCase)))
             {
                 WriteStaticFile(stream, path);
@@ -143,9 +162,33 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "GET" && path == "/api/library")
+            {
+                WriteJson(stream, 200, new HardwareLibraryData
+                {
+                    rails = HardwareLibraryRepository.DrawerRails(),
+                    shelfSupports = HardwareLibraryRepository.ShelfSupports()
+                });
+                return;
+            }
+
+            if (request.Method == "POST" && path == "/api/library")
+            {
+                var data = serializer.Deserialize<HardwareLibraryData>(request.Body) ?? new HardwareLibraryData();
+                var savedPath = HardwareLibraryRepository.Save(data.rails, data.shelfSupports);
+                WriteJson(stream, 200, new
+                {
+                    ok = true,
+                    path = savedPath,
+                    rails = HardwareLibraryRepository.DrawerRails(),
+                    shelfSupports = HardwareLibraryRepository.ShelfSupports()
+                });
+                return;
+            }
+
             if (request.Method == "GET" && path == "/api/health")
             {
-                WriteJson(stream, 200, health.GetHealth(RootFolder, Prefix));
+                WriteJson(stream, 200, health.GetHealth(RootFolder, Prefix, OrderStorageProvider, DatabasePath));
                 return;
             }
 
