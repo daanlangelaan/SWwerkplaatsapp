@@ -28,5 +28,8 @@ namespace SWWerkplaats.Configurator.Domain
         public AssemblyOrientation Orientation { get; set; }
         public string VisualKind { get; set; }
         public string Shape { get; set; }
+        public double RotationXDeg { get; set; }
+        public double RotationYDeg { get; set; }
+        public double RotationZDeg { get; set; }
     }
 }

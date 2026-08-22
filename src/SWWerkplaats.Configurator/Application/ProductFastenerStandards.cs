@@ -16,6 +16,7 @@ namespace SWWerkplaats.Configurator.Application
             new ProductFastenerStandard { ProductId = "machinebasis", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "robotcel", BaseProductId = "machinebasis" },
             new ProductFastenerStandard { ProductId = "materiaalwagen", BaseProductId = "werktafel" },
+            new ProductFastenerStandard { ProductId = "sim_rig_4080", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "werktafel_lex", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "werktafel_lex_revolution", BaseProductId = "werktafel_lex" }
         };

@@ -1,6 +1,6 @@
 ---
 name: detect-profile-assembly
-description: Reconstruct and verify aluminium T-slot profile assemblies from renders, photos, drawings, or assembly-coordinate data. Use when profile type, cross-section orientation, endpoints, joints, gaps, overlaps, or coplanar faces must be established per individual profile; especially for 40x40, 40x80, 80x80, and 40x160 constructions.
+description: Reconstruct and verify aluminium T-slot profile assemblies and their functional adapter plates from renders, photos, drawings, or assembly-coordinate data. Use when profile type, orientation, endpoints, joints, coplanar faces, plate interfaces, holes, slots, or simplified manufacturable plate contours must be established.
 ---
 
 # Detect profile assembly
@@ -15,6 +15,7 @@ Determine the construction per individual profile. A visually plausible overall 
 - Treat a single perspective view as provisional for hidden endpoints and depth orientation. Ask for or generate another view when those facts affect the model.
 
 Read [references/measurement-method.md](references/measurement-method.md) for image reconstruction. For SWwerkplaats data or portal renders, also read [references/project-integration.md](references/project-integration.md).
+When custom connection, mounting, hinge, or adjustment plates must be inferred or simplified, also read [references/adapter-plate-inference.md](references/adapter-plate-inference.md).
 
 ## Reference-to-candidate comparisons
 
@@ -68,6 +69,8 @@ Before generating geometry, store a versioned manifest with at least `layer`, `r
 Treat orientation as an executable geometry contract, not a prose label. For every `40x80 standing` member, assert that the model vertical extent is 80 mm and the transverse horizontal extent is 40 mm; for `40x80 flat`, assert the inverse. A candidate that matches the count but violates this axis mapping fails before visual approval. When evidence changes an orientation, revise the manifest first and then rebuild—never keep an obsolete manifest merely because the generated model matches it.
 
 Inventory every profile end as `joined`, `covered`, `machined/fastened`, or `exposed`. Every exposed end must either have a documented reason to remain open or receive a compatible end cap. Match caps by profile series/type and exact cross-section, not dimensions alone. Record cap article, quantity, and the exact profile end where it is placed. Count one cap per exposed end; an end hidden in the chosen view is still an end.
+
+Treat every custom plate as its own manifest member. Record the connected faces, constrained and adjustable degrees of freedom, required fastener or equipment interfaces, thickness status, contour confidence, physical quantity, mirror relationship, and every hole/slot with its functional owner. Do not copy decorative lightening cutouts unless they serve a demonstrated clearance, ventilation, access, weight, or load-path function.
 
 Use `scripts/profile_geometry_audit.py` for exact assembly JSON, `scripts/profile_geometry_compare.py` to regression-compare expected and actual audit JSON, and `scripts/profile_layer_manifest_check.py` to verify expected counts per layer/role including accessories. Use `scripts/profile_pixel_probe.py` only to produce line and intensity evidence from an image crop; interpret its candidates rather than accepting them as profile classifications.
 

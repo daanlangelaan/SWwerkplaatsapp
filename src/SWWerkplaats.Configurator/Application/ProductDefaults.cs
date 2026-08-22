@@ -62,6 +62,13 @@ namespace SWWerkplaats.Configurator.Application
         public const double MaterialCartTopShelfHeightMm = 950;
         public const int MaterialCartShelfCount = 3;
 
+        public const double SimRigOutsideWidthMm = 680;
+        public const double SimRigLengthMm = 1350;
+        public const double SimRigSteeringBridgeHeightMm = 660;
+        public const double SimRigSteeringBridgePositionMm = 610;
+        public const double SimRigPedalDeckPositionMm = 250;
+        public const double SimRigPedalAngleDeg = 12;
+
         public const double WorkbenchWidthMm = 1500;
         public const double WorkbenchDepthMm = 750;
         public const double WorkbenchHeightMm = 900;

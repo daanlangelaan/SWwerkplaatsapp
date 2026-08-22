@@ -131,7 +131,10 @@ namespace SWWerkplaats.Configurator.Portal
                     Zmm = placement.Zmm,
                     SizeXmm = Math.Max(2, sx),
                     SizeYmm = Math.Max(2, sy),
-                    SizeZmm = Math.Max(2, sz)
+                    SizeZmm = Math.Max(2, sz),
+                    RotationXDeg = placement.RotationXDeg,
+                    RotationYDeg = placement.RotationYDeg,
+                    RotationZDeg = placement.RotationZDeg
                 };
                 if (sheet != null) part.CornerRadiusMm = sheet.CornerRadiusMm;
                 AddOutline(part, sheet);

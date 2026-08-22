@@ -7,8 +7,9 @@ Lokale configurator en werkplaatsportal voor SW Werkplaats. De app rekent kast- 
 - Klantconfigurator via lokale webportal op `http://localhost:8088`.
 - Cabinet/kast generator met lades, legplanken, achterwand, groeven en montagegaten.
 - Werkbank met kastonderbouw: doorlopende bodem, deurparen met T-stijlen, stelpootgaten en losse voorzetplint.
-- Profielproducten: machinebasis, robotcel en modulaire materiaal-/gereedschapswagen met centrale TechXXL-leveranciersselectie.
+- Profielproducten: machinebasis, robotcel, modulaire materiaal-/gereedschapswagen en configureerbare 40×80-sim-rig met centrale leveranciersselectie.
 - Materiaalwagen: 600–1800 mm breed, 450–1000 mm diep, 700–1200 mm bovenbladhoogte, 2–4 legbordlagen, configureerbare duwbeugel en twee D100-wielopstellingen.
+- Sim-rig: 600–800 mm breed en 1200–1800 mm lang, verstelbare stuurbrug en pedaalhoek, CSL-DD- of blanco zijplaten en zes functioneel vereenvoudigde CNC-adapterplaten.
 - Nesting per plaatmateriaal met SVG-preview en CSV-controle.
 - Mach3 G-code voor geneste platen, inclusief toolwissel-stop (`M0`) en plaatwisseltekst.
 - Controle-output voor railgaten, tekencontracten, BOM, prijs en assemblage.
@@ -96,6 +97,8 @@ Handmatig bouwen via de canonieke route:
 GitHub Actions draait dezelfde build op Windows bij push en pull request.
 
 Het numerieke bouwcontract van de materiaalwagen staat in `config/material-cart-assembly-manifest.json`. Wijzig profielopbouw of parameters alleen samen met `MaterialCartEngine`, de masterdata en `ProductContracts.RegressionTests`, zodat portal, BOM, prijs en 3D-assembly gelijk blijven.
+
+Het beeld-afgeleide R1-contract van de sim-rig staat in `config/sim-rig-4080-assembly-manifest.json`. Profielaantallen, doorsnede-oriëntatie, custom plaatcontouren en functionele gaten/sleuven worden samen bewaakt door `SimRigEngine`, de masterdata en `ProductContracts.RegressionTests`. Definitieve serieproductie blijft geblokkeerd tot de fysieke proefbouw uit `docs/producten/sim-rig-4080.md` is afgerond.
 
 Voer vóór een uitrol of overdracht de volledige lokale controle uit:
 

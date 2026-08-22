@@ -96,6 +96,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
             if (request != null && string.Equals(request.Product, "materiaalwagen", StringComparison.OrdinalIgnoreCase)) return "Modulaire materiaal- en gereedschapswagen";
+            if (request != null && string.Equals(request.Product, "sim_rig_4080", StringComparison.OrdinalIgnoreCase)) return "Modulaire sim-racing-rig 40x80";
             if (request != null && string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)) return "Workstation";
             if (request != null && string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)) return "Workstation ontwikkelvariant";
             if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)) return "Werkbank met kastonderbouw";

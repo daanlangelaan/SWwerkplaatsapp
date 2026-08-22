@@ -39,7 +39,7 @@ internal static class Program
                         PhysicalSheetCount(item.Model), PhysicalProfileCount(item.Model),
                         PhysicalHardwareCount(item.Model), FootCount(item.Model), EndCapCount(item.Model),
                         FastenerCount(item.Model), item.Model.AssemblyPlacements.Count);
-                    if (item.Contract.ProductId == "robotcel" || item.Contract.ProductId == "machinebasis" || item.Contract.ProductId == "materiaalwagen")
+                    if (item.Contract.ProductId == "robotcel" || item.Contract.ProductId == "machinebasis" || item.Contract.ProductId == "materiaalwagen" || item.Contract.ProductId == "sim_rig_4080")
                     {
                         foreach (var placement in item.Model.AssemblyPlacements.Where(p => p.Kind == AssemblyComponentKind.Profile))
                             Console.WriteLine("  {0}|L={1:0.###}|W={2:0.###}|H={3:0.###}|X={4:0.###}|Y={5:0.###}|Z={6:0.###}",
@@ -55,6 +55,8 @@ internal static class Program
             VerifyMachineBaseGeometry(models.Single(item => item.Contract.ProductId == "machinebasis").Model);
             VerifyMaterialCartGeometry(models.Single(item => item.Contract.ProductId == "materiaalwagen").Model);
             VerifyMaterialCartVariants();
+            VerifySimRigGeometry(models.Single(item => item.Contract.ProductId == "sim_rig_4080").Model);
+            VerifySimRigVariants();
             Console.WriteLine("PASS  Productaantallen, voeten, eindkappen, bevestigingen, profieloriëntatie, coplanaire buitenvlakken en moduulbanen voldoen aan de contracten.");
             return 0;
         }
@@ -74,6 +76,7 @@ internal static class Program
             C("machinebasis", Request("machinebasis", 2000, 800, 2000, r => { r.MachineBaseWorktopHeightMm = 900; }), 14, 36, 718, 0, 4, 646, 129),
             C("robotcel", Request("robotcel", 1200, 800, 900, r => { r.RobotCellIntermediateBeamMaxSpacingMm = 700; }), 1, 15, 32, 4, 2, 26, 30),
             C("materiaalwagen", Request("materiaalwagen", 1000, 650, 950, r => { r.MaterialCartShelfCount = 3; r.MaterialCartShelfMaterialId = "hpl_10_lex"; r.MaterialCartHandleSide = "right"; r.MaterialCartSteeringMode = "fixed-and-swivel"; }), 3, 22, 40, 0, 0, 0, 33),
+            C("sim_rig_4080", Request("sim_rig_4080", 680, 1350, 660, r => { r.SimRigSteeringBridgePositionMm = 610; r.SimRigPedalDeckPositionMm = 250; r.SimRigPedalAngleDeg = 12; r.SimRigWheelMountPattern = "csl-dd"; }), 6, 11, 56, 0, 6, 50, 23),
             C("werktafel_lex", Request("werktafel_lex", 1650, 1000, 833, null), 6, 13, 212, 4, 8, 128, 66),
             C("werktafel_lex_revolution", Request("werktafel_lex_revolution", 1650, 1000, 833, null), 6, 13, 212, 4, 8, 128, 66),
             C("werkbankkast", Request("werkbankkast", 2400, 600, 900, r => { r.UnitCount = 4; r.DefaultShelfCount = 3; r.IncludeBackPanel = true; }), 28, 0, 64, 0, 0, 52, 28),
@@ -210,6 +213,59 @@ internal static class Program
             "Materiaalwagen maximum: iedere brede laag vereist één middenligger");
         Require(maximum.AssemblyPlacements.Count(p => p.PartName.StartsWith("Duwbeugel ", StringComparison.Ordinal)) == 3,
             "Materiaalwagen maximum: linker duwbeugel moet uit drie profielen bestaan");
+    }
+
+    private static void VerifySimRigGeometry(WorkbenchModel model)
+    {
+        var profiles = model.AssemblyPlacements.Where(p => p.Kind == AssemblyComponentKind.Profile).ToArray();
+        var longRails = profiles.Where(p => p.PartName.StartsWith("Basislangsligger", StringComparison.Ordinal)).ToArray();
+        Require(longRails.Length == 2 && longRails.All(p => Close(p.LengthMm, 80) && Close(p.HeightMm, 40)),
+            "Sim-rig: beide basislangsliggers moeten 40x80 vlak liggen met X=80 en Y=40");
+        var crossmembers = profiles.Where(p => p.PartName.StartsWith("Basisdwarsligger", StringComparison.Ordinal)).ToArray();
+        Require(crossmembers.Length == 3 && crossmembers.All(p => Close(p.HeightMm, 40) && Close(p.WidthMm, 80)),
+            "Sim-rig: exact drie basisdwarsliggers moeten 40x80 vlak liggen met Y=40 en Z=80");
+        var uprights = profiles.Where(p => p.PartName.StartsWith("Stuurstaander", StringComparison.Ordinal)).ToArray();
+        Require(uprights.Length == 2 && uprights.All(p => Close(p.LengthMm, 40) && Close(p.WidthMm, 80)),
+            "Sim-rig: twee verticale stuurstaanders met doorsnede X=40 en Z=80 vereist");
+        var bridge = profiles.Single(p => p.PartName.StartsWith("Stuurbrug", StringComparison.Ordinal));
+        Require(Close(bridge.HeightMm, 80) && Close(bridge.WidthMm, 40),
+            "Sim-rig: stuurbrug moet 40x80 staand liggen met Y=80 en Z=40");
+        Require(model.AssemblyPlacements.Count(p => p.PartName.StartsWith("Custom ", StringComparison.Ordinal)) == 6,
+            "Sim-rig: exact zes custom adapterplaten vereist");
+        Require(model.Sheets.Where(p => p.Name.StartsWith("Custom ", StringComparison.Ordinal)).All(p => p.CustomContour.Count >= 5),
+            "Sim-rig: custom platen moeten een expliciete vereenvoudigde contour hebben");
+        Require(model.Sheets.Where(p => p.Name.StartsWith("Custom ", StringComparison.Ordinal)).All(p => p.Pockets.Any(slot => slot.DepthMode == OperationDepthMode.Through)),
+            "Sim-rig: iedere custom plaatfamilie moet minstens één functionele doorlopende instelsleuf hebben");
+        Require(profiles.Count(p => p.PartName.StartsWith("Pedaalplatform profiel", StringComparison.Ordinal) && Close(p.RotationXDeg, 12)) == 3,
+            "Sim-rig: pedaalhoek moet op alle drie pedaalprofielen worden uitgevoerd");
+        Require(EndCapCount(model) == 6, "Sim-rig: vier basisuiteinden en twee staanderkoppen vereisen eindkappen");
+    }
+
+    private static void VerifySimRigVariants()
+    {
+        var compact = new ProductModelBuildService().Build(Request("sim_rig_4080", 600, 1200, 550, r =>
+        {
+            r.SimRigSteeringBridgePositionMm = 500;
+            r.SimRigPedalDeckPositionMm = 200;
+            r.SimRigPedalAngleDeg = 0;
+            r.SimRigWheelMountPattern = "blank";
+        }));
+        Require(compact.AssemblyPlacements.Count(p => p.PartName.StartsWith("Pedaalplatform profiel", StringComparison.Ordinal) && Close(p.RotationXDeg, 0)) == 3,
+            "Sim-rig compact: vlakke pedaalkeuze moet op alle drie profielen worden uitgevoerd");
+        Require(compact.Sheets.Single(p => p.Name.StartsWith("Custom stuurzijplaat", StringComparison.Ordinal)).Holes.Count == 0,
+            "Sim-rig compact: blanco stuurplaat mag geen productspecifieke CSL-DD-gaten krijgen");
+
+        var maximum = new ProductModelBuildService().Build(Request("sim_rig_4080", 800, 1800, 850, r =>
+        {
+            r.SimRigSteeringBridgePositionMm = 1000;
+            r.SimRigPedalDeckPositionMm = 600;
+            r.SimRigPedalAngleDeg = 25;
+            r.SimRigWheelMountPattern = "csl-dd";
+        }));
+        Require(maximum.AssemblyPlacements.Count(p => p.PartName.StartsWith("Pedaalplatform profiel", StringComparison.Ordinal) && Close(p.RotationXDeg, 25)) == 3,
+            "Sim-rig maximum: maximale pedaalhoek moet op alle drie profielen worden uitgevoerd");
+        Require(maximum.Sheets.Single(p => p.Name.StartsWith("Custom stuurzijplaat", StringComparison.Ordinal)).Holes.Count == 2,
+            "Sim-rig maximum: CSL-DD-zijplaat vereist twee M6-gaten per plaat");
     }
 
     private static int PhysicalSheetCount(WorkbenchModel model) { return model.Sheets.Sum(p => Math.Max(1, p.Quantity)); }

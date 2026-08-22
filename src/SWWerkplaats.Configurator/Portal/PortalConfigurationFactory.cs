@@ -146,6 +146,30 @@ namespace SWWerkplaats.Configurator.Portal
             };
         }
 
+        public SimRigConfig BuildSimRig(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var width = Clamp(request.WidthMm, 600, 800, ProductDefaults.SimRigOutsideWidthMm);
+            var length = Clamp(request.DepthMm, 1200, 1800, ProductDefaults.SimRigLengthMm);
+            var height = Clamp(request.HeightMm, 550, 850, ProductDefaults.SimRigSteeringBridgeHeightMm);
+            var bridgePosition = Clamp(request.SimRigSteeringBridgePositionMm, 350, length - 350, ProductDefaults.SimRigSteeringBridgePositionMm);
+            var pedalPosition = Clamp(request.SimRigPedalDeckPositionMm, 180, bridgePosition - 180, ProductDefaults.SimRigPedalDeckPositionMm);
+            return new SimRigConfig
+            {
+                ProjectName = "SIMRIG_4080_" + length.ToString("0") + "x" + width.ToString("0") + "x" + height.ToString("0"),
+                OutsideWidthMm = width,
+                LengthMm = length,
+                SteeringBridgeHeightMm = height,
+                SteeringBridgePositionMm = bridgePosition,
+                PedalDeckPositionMm = pedalPosition,
+                PedalAngleDeg = Math.Max(0, Math.Min(25, request.SimRigPedalAngleDeg)),
+                WheelMountPattern = string.Equals(request.SimRigWheelMountPattern, "blank", StringComparison.OrdinalIgnoreCase) ? "blank" : "csl-dd",
+                Profile4080 = CloneMaterial(FindProfile("alu_system_80x40")),
+                AdapterPlateMaterial = new Material { Id = "steel_s235_10_custom", Name = "S235 staalplaat 10 mm custom", Kind = MaterialKind.Sheet, ThicknessMm = 10, SheetLengthMm = 2000, SheetWidthMm = 1000 },
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+        }
+
         public ShippingBoxConfig BuildShippingBox(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();

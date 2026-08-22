@@ -57,6 +57,10 @@ namespace SWWerkplaats.Configurator.Portal
         public string MaterialCartShelfMaterialId { get; set; }
         public string MaterialCartHandleSide { get; set; }
         public string MaterialCartSteeringMode { get; set; }
+        public double SimRigSteeringBridgePositionMm { get; set; }
+        public double SimRigPedalDeckPositionMm { get; set; }
+        public double SimRigPedalAngleDeg { get; set; }
+        public string SimRigWheelMountPattern { get; set; }
         public int CubbyColumnCount { get; set; }
         public int CubbyRowCount { get; set; }
         public double CubbyCellWidthMm { get; set; }
@@ -136,6 +140,9 @@ namespace SWWerkplaats.Configurator.Portal
         public double BallDiameterMm { get; set; }
         public double WorkingHeightMm { get; set; }
         public double CornerRadiusMm { get; set; }
+        public double RotationXDeg { get; set; }
+        public double RotationYDeg { get; set; }
+        public double RotationZDeg { get; set; }
         public List<PortalAssemblyHole> Holes { get; private set; }
         public List<PortalAssemblyPocket> Pockets { get; private set; }
         public List<PortalAssemblyOutlinePoint> Outline { get; private set; }
