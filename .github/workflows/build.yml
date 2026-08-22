@@ -14,3 +14,6 @@ jobs:
 
       - name: Build configurator
         run: dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj --configuration Debug
+
+      - name: Verify G-code monitoring markers
+        run: dotnet run --project tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj --configuration Debug

@@ -8,8 +8,8 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\SWWerkplaats.Configurator"
-$outDir = Join-Path $project "bin\Debug"
-$exe = Join-Path $outDir "SWWerkplaats.Configurator.exe"
+$outDir = Join-Path $root "bin"
+$exe = Join-Path $project "bin\Debug\SWWerkplaats.Configurator.exe"
 $url = "http://localhost:8088/"
 
 function Show-PortalError($message) {
@@ -44,7 +44,15 @@ function Stop-ExistingPortal {
 }
 
 function Build-CurrentPortal {
+    $projectFile = Join-Path $project "SWWerkplaats.Configurator.csproj"
+    & dotnet build $projectFile --nologo
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build mislukt. Controleer de foutmelding in dit venster."
+    }
+    return
+
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    $solidWorksInterop = "C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll"
     if (-not (Test-Path $csc)) {
         $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe"
     }
@@ -54,7 +62,9 @@ function Build-CurrentPortal {
     }
 
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    $sources = Get-ChildItem -Path $project -Recurse -Filter *.cs | Select-Object -ExpandProperty FullName
+    $sources = Get-ChildItem -Path $project -Recurse -Filter *.cs |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+        Select-Object -ExpandProperty FullName
 
     & $csc `
         /nologo `
@@ -70,11 +80,14 @@ function Build-CurrentPortal {
         /reference:System.Web.Extensions.dll `
         /reference:System.Windows.Forms.dll `
         /reference:System.Xml.dll `
+        /reference:$solidWorksInterop `
         $sources
 
     if ($LASTEXITCODE -ne 0) {
         throw "Build mislukt. Controleer de foutmelding in dit venster."
     }
+
+    Copy-Item -LiteralPath $solidWorksInterop -Destination (Join-Path $outDir "SolidWorks.Interop.sldworks.dll") -Force
 
     $portalAssets = Join-Path $outDir "PortalAssets"
     $portalVendor = Join-Path $project "Portal\vendor"
