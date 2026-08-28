@@ -1,0 +1,64 @@
+{
+  "contractVersion": 1,
+  "sites": [
+    {
+      "siteId": "internal",
+      "name": "SW Werkplaats intern",
+      "status": "Actief",
+      "presentationProfile": "swwerkplaats",
+      "accentColorToken": "primaryAction",
+      "allowAllProducts": true,
+      "allowedProductIds": [],
+      "openData": []
+    },
+    {
+      "siteId": "general-public",
+      "name": "SW Werkplaats",
+      "status": "Concept",
+      "presentationProfile": "swwerkplaats",
+      "accentColorToken": "primaryAction",
+      "allowAllProducts": true,
+      "allowedProductIds": [],
+      "openData": [
+        "Definitief publiek domein ontbreekt",
+        "Contact- en juridische publicatieblokken ontbreken"
+      ]
+    },
+    {
+      "siteId": "shipping-boxes",
+      "name": "Verzendkisten",
+      "status": "Concept",
+      "presentationProfile": "shipping-boxes",
+      "accentColorToken": "primaryAction",
+      "allowAllProducts": false,
+      "allowedProductIds": ["shipping_box"],
+      "openData": ["Definitieve sitenaam, domein en merkassets ontbreken"]
+    },
+    {
+      "siteId": "workstations",
+      "name": "Workstations",
+      "status": "Concept",
+      "presentationProfile": "workstations",
+      "accentColorToken": "primaryAction",
+      "allowAllProducts": false,
+      "allowedProductIds": [
+        "werktafel",
+        "werktafel_lex",
+        "werktafel_lex_revolution",
+        "hoogteverstelbare_werktafel",
+        "werkbankkast"
+      ],
+      "openData": ["Definitief domein en merkassets ontbreken"]
+    },
+    {
+      "siteId": "robot-cells",
+      "name": "Robotcellen",
+      "status": "Concept",
+      "presentationProfile": "robot-cells",
+      "accentColorToken": "primaryAction",
+      "allowAllProducts": false,
+      "allowedProductIds": ["robotcel", "lineaire_robotcel"],
+      "openData": ["Definitief domein en merkassets ontbreken"]
+    }
+  ]
+}

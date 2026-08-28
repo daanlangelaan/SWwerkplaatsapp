@@ -5,6 +5,9 @@ namespace SWWerkplaats.Configurator.Portal
 {
     public sealed class PortalQuoteRequest
     {
+        public string SourceSiteId { get; set; }
+        public string OrganizationId { get; set; }
+        public string RequestedByUserId { get; set; }
         public string Product { get; set; }
         public double WidthMm { get; set; }
         public double DepthMm { get; set; }
@@ -228,6 +231,11 @@ namespace SWWerkplaats.Configurator.Portal
 
     public sealed class PortalOrderRecord
     {
+        public string ProjectId { get; set; }
+        public string SourceSiteId { get; set; }
+        public string OrganizationId { get; set; }
+        public string ProductId { get; set; }
+        public string ProjectName { get; set; }
         public string OrderId { get; set; }
         public string Status { get; set; }
         public string CreatedAt { get; set; }
@@ -238,11 +246,15 @@ namespace SWWerkplaats.Configurator.Portal
         public decimal PriceIncVat { get; set; }
         public string OutputFolder { get; set; }
         public string QueueFolder { get; set; }
-        public List<string> Files { get; private set; }
+        public List<string> Files { get; set; }
+        public List<PortalPurchaseSnapshotLine> PurchaseLines { get; set; }
+        public List<PortalProductionAreaSnapshot> ProductionAreas { get; set; }
 
         public PortalOrderRecord()
         {
             Files = new List<string>();
+            PurchaseLines = new List<PortalPurchaseSnapshotLine>();
+            ProductionAreas = new List<PortalProductionAreaSnapshot>();
         }
     }
 

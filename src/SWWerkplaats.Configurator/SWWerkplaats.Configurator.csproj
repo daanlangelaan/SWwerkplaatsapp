@@ -118,6 +118,10 @@
     <Compile Include="Application\ProfileProjectConfigurationService.cs" />
     <Compile Include="Application\ProductRegistry.cs" />
     <Compile Include="Application\PortalRuntimeOptions.cs" />
+    <Compile Include="Application\PortalRolePolicy.cs" />
+    <Compile Include="Application\PortalSiteCatalog.cs" />
+    <Compile Include="Application\PortalWorkspaceRepository.cs" />
+    <Compile Include="Application\PortalWorkspaceApplicationService.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />
     <Compile Include="Application\WorkflowApplicationService.cs" />
     <Compile Include="Program.cs" />
@@ -210,6 +214,8 @@
     <Compile Include="Portal\PortalHtml.cs" />
     <Compile Include="Portal\PortalLibraryHtml.cs" />
     <Compile Include="Portal\PortalModels.cs" />
+    <Compile Include="Portal\PortalWorkspaceModels.cs" />
+    <Compile Include="Portal\PortalWorkspaceHtml.cs" />
     <Compile Include="Portal\PortalMotionContractService.cs" />
     <Compile Include="Portal\PortalPresentationContract.cs" />
     <Compile Include="Portal\PortalPricingService.cs" />
@@ -230,6 +236,10 @@
     <Compile Include="UI\MainForm.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Portal\portal-workspace.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\portal-workspace.html</Link>
+    </Content>
     <Content Include="Portal\vendor\three\three.module.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>PortalAssets\vendor\three\three.module.js</Link>

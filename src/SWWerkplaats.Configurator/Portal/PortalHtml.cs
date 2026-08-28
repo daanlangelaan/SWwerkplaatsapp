@@ -58,7 +58,7 @@ namespace SWWerkplaats.Configurator.Portal
 <body>
   <header>
     <div class=""brand""><div class=""mark""></div><h1>SW Werkplaats Portal</h1></div>
-    <div class=""headerTools""><div class=""topMeta"">Configuratie, prijs en freeswachtrij</div><button class=""stopPortal"" type=""button"" onclick=""location.href='/library'"">Bibliotheek</button><button class=""stopPortal"" type=""button"" onclick=""stopPortal()"">Stop portal</button></div>
+    <div class=""headerTools""><div class=""topMeta"">Configuratie, prijs en freeswachtrij</div><button class=""stopPortal"" type=""button"" onclick=""location.href='/app'"">Portaloverzicht</button><button class=""stopPortal"" type=""button"" onclick=""location.href='/library'"">Bibliotheek</button><button class=""stopPortal"" type=""button"" onclick=""stopPortal()"">Stop portal</button></div>
   </header>
 
   <section class=""start"" id=""start"">
@@ -205,7 +205,8 @@ namespace SWWerkplaats.Configurator.Portal
   <script>
     let lastRequest=null,lastQuote=null,assemblyParts=[],motionContract=null,motionHorizontal=0,motionVertical=0,hideDoors=false,ghostLexTop=false,assemblyViewMode='iso',assemblyColorMode='realistic',rotationDeg=215,dragging=false,lastDragX=0,threePromise=null,threeApi=null,threeState=null,instructionThreeState=null,instructionOverviewState=null,instructionOverviewCollapsed=false,instructionOverviewStepKey='',instructionLinked3d=false,instructionCameraSyncing=false,instructionSlideSequenceToken=0,instructionSlideOverviewDone=false,instructionSlideOverviewRunning=false,instructionSlidePendingDetail=null,modalSource=null,nestingZoom=1,nestingBaseWidth=0,nestingBaseHeight=0,catalogData=null,presentationData=null,instructionPlan=null,instructionStepIndex=0;
     const $=id=>document.getElementById(id);
-    async function api(path,opts){const r=await fetch(path,opts),text=await r.text();let data=null;try{data=text?JSON.parse(text):null;}catch(e){}if(!r.ok)throw new Error((data&&(data.error||data.Error||data.message||data.Message))||text||('HTTP-fout '+r.status));return data;}
+    function portalActorHeaders(){return{'X-SW-Test-Role':localStorage.getItem('sw.portal.role')||'','X-SW-Test-Site':localStorage.getItem('sw.portal.site')||'','X-SW-Test-Organization':localStorage.getItem('sw.portal.organization')||''};}
+    async function api(path,opts){opts=opts||{};opts.headers=Object.assign({},opts.headers||{},portalActorHeaders());const r=await fetch(path,opts),text=await r.text();let data=null;try{data=text?JSON.parse(text):null;}catch(e){}if(!r.ok)throw new Error((data&&(data.error||data.Error||data.message||data.Message))||text||('HTTP-fout '+r.status));return data;}
     function presentationObject(value,pascal,camel){return value&&(value[pascal]||value[camel])||null;}
     function presentationSection(name){const root=presentationObject(presentationData,'Assembly','assembly'),value=presentationObject(root,name[0].toUpperCase()+name.slice(1),name);if(!value)throw new Error('UI-presentatiecontract mist assembly.'+name+'.');return value;}
     function presentationNumber(section,key){const values=presentationSection(section),value=Number(values[key[0].toUpperCase()+key.slice(1)]??values[key]);if(!Number.isFinite(value)||value<=0)throw new Error('UI-presentatiecontract mist '+section+'.'+key+'.');return value;}

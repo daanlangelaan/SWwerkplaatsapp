@@ -1,12 +1,15 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using SWWerkplaats.Configurator.Application;
+using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
 {
@@ -15,6 +18,10 @@ namespace SWWerkplaats.Configurator.Portal
         private readonly JavaScriptSerializer serializer;
         private readonly OrderApplicationService orders;
         private readonly HealthApplicationService health;
+        private readonly PortalSiteCatalog sites;
+        private readonly PortalRolePolicy rolePolicy;
+        private readonly PortalActorContextResolver actorResolver;
+        private readonly PortalWorkspaceApplicationService workspace;
         private TcpListener listener;
         private Thread worker;
         private bool disposed;
@@ -37,6 +44,13 @@ namespace SWWerkplaats.Configurator.Portal
                 : new SqliteOrderRepository(RootFolder, options.DatabasePath);
             orders = new OrderApplicationService(repository);
             health = new HealthApplicationService(DateTime.Now);
+            sites = new PortalSiteCatalog();
+            rolePolicy = new PortalRolePolicy();
+            actorResolver = new PortalActorContextResolver(rolePolicy, sites);
+            var workspaceDatabasePath = string.IsNullOrWhiteSpace(options.DatabasePath)
+                ? Path.Combine(RootFolder, "portal-orders.sqlite")
+                : options.DatabasePath;
+            workspace = new PortalWorkspaceApplicationService(new SqlitePortalWorkspaceRepository(workspaceDatabasePath), orders, rolePolicy, sites);
         }
 
         public string Prefix { get; private set; }
@@ -92,24 +106,33 @@ namespace SWWerkplaats.Configurator.Portal
                     var request = ReadRequest(stream);
                     Handle(request, stream);
                 }
+                catch (PortalAccessDeniedException ex)
+                {
+                    WriteClientError(client, stream, 403, ex);
+                }
+                catch (ArgumentException ex)
+                {
+                    WriteClientError(client, stream, 400, ex);
+                }
                 catch (Exception ex)
                 {
                     if (IsClientDisconnect(ex)) return;
-
-                    LastError = ex.Message;
-                    try
-                    {
-                        if (stream == null) stream = client.GetStream();
-                        WriteJson(stream, 500, new { ok = false, error = ex.Message });
-                    }
-                    catch (Exception writeEx)
-                    {
-                        if (!IsClientDisconnect(writeEx))
-                        {
-                            LastError = writeEx.Message;
-                        }
-                    }
+                    WriteClientError(client, stream, 500, ex);
                 }
+            }
+        }
+
+        private void WriteClientError(TcpClient client, NetworkStream stream, int status, Exception error)
+        {
+            LastError = error.Message;
+            try
+            {
+                if (stream == null) stream = client.GetStream();
+                WriteJson(stream, status, new { ok = false, error = error.Message });
+            }
+            catch (Exception writeError)
+            {
+                if (!IsClientDisconnect(writeError)) LastError = writeError.Message;
             }
         }
 
@@ -136,6 +159,7 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var path = request.Path.TrimEnd('/');
             if (path == "") path = "/";
+            var actor = actorResolver.Resolve(request.Headers);
 
             if (request.Method == "GET" && path == "/")
             {
@@ -145,7 +169,14 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (request.Method == "GET" && path == "/library")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.Configure);
                 WriteHtml(stream, 200, PortalLibraryHtml.Page());
+                return;
+            }
+
+            if (request.Method == "GET" && (path == "/app" || path.StartsWith("/app/", StringComparison.OrdinalIgnoreCase)))
+            {
+                WriteHtml(stream, 200, PortalWorkspaceHtml.Page());
                 return;
             }
 
@@ -158,12 +189,93 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "GET" && path == "/api/catalog")
             {
                 var catalog = new CatalogApplicationService().GetCatalog();
-                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, rails = catalog.Rails, linearGuides = catalog.LinearGuides, liftColumns = catalog.LiftColumns, shelfSupports = catalog.ShelfSupports, statuses = catalog.Statuses, products = catalog.Products, presentation = catalog.Presentation });
+                var site = sites.GetRequired(actor.SiteId);
+                var products = site.AllowAllProducts
+                    ? catalog.Products
+                    : catalog.Products.Where(product => site.AllowedProductIds.Any(id => string.Equals(id, product.Product, StringComparison.OrdinalIgnoreCase))).ToArray();
+                WriteJson(stream, 200, new { sheets = catalog.Sheets, profiles = catalog.Profiles, rails = catalog.Rails, linearGuides = catalog.LinearGuides, liftColumns = catalog.LiftColumns, shelfSupports = catalog.ShelfSupports, statuses = catalog.Statuses, products = products, presentation = catalog.Presentation, site = site });
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/context")
+            {
+                WriteJson(stream, 200, workspace.GetContext(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/dashboard")
+            {
+                WriteJson(stream, 200, workspace.GetDashboard(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/projects")
+            {
+                WriteJson(stream, 200, workspace.ListProjects(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path.StartsWith("/api/workspace/projects/", StringComparison.OrdinalIgnoreCase))
+            {
+                var projectId = path.Substring("/api/workspace/projects/".Length);
+                WriteJson(stream, 200, workspace.GetProject(actor, Uri.UnescapeDataString(projectId)));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/jobs")
+            {
+                WriteJson(stream, 200, workspace.ListJobs(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/purchasing")
+            {
+                WriteJson(stream, 200, workspace.ListPurchaseRequirements(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/inventory")
+            {
+                WriteJson(stream, 200, workspace.ListInventory(actor));
+                return;
+            }
+
+            if (request.Method == "GET" && path == "/api/workspace/inventory-candidates")
+            {
+                WriteJson(stream, 200, workspace.ListInventoryCandidates(actor));
+                return;
+            }
+
+            if (request.Method == "POST" && path == "/api/workspace/inventory")
+            {
+                WriteJson(stream, 200, workspace.SaveInventoryItem(actor, serializer.Deserialize<PortalInventoryItem>(request.Body)));
+                return;
+            }
+
+            if (request.Method == "POST" && path.StartsWith("/api/workspace/inventory/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/movement", StringComparison.OrdinalIgnoreCase))
+            {
+                var itemId = ExtractResourceId(path, "/api/workspace/inventory/", "/movement");
+                WriteJson(stream, 200, workspace.ApplyInventoryMovement(actor, Uri.UnescapeDataString(itemId), serializer.Deserialize<PortalInventoryMovementRequest>(request.Body)));
+                return;
+            }
+
+            if (request.Method == "POST" && path.StartsWith("/api/workspace/jobs/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/status", StringComparison.OrdinalIgnoreCase))
+            {
+                var jobId = ExtractResourceId(path, "/api/workspace/jobs/", "/status");
+                WriteJson(stream, 200, workspace.ChangeJobStatus(actor, Uri.UnescapeDataString(jobId), serializer.Deserialize<PortalJobStatusRequest>(request.Body)));
+                return;
+            }
+
+            if (request.Method == "POST" && path.StartsWith("/api/workspace/projects/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/publication", StringComparison.OrdinalIgnoreCase))
+            {
+                var projectId = ExtractResourceId(path, "/api/workspace/projects/", "/publication");
+                WriteJson(stream, 200, workspace.SetCustomerPublication(actor, Uri.UnescapeDataString(projectId), serializer.Deserialize<PortalProjectPublicationRequest>(request.Body)));
                 return;
             }
 
             if (request.Method == "GET" && path == "/api/library")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.Configure);
                 WriteJson(stream, 200, new HardwareLibraryData
                 {
                     rails = HardwareLibraryRepository.DrawerRails(),
@@ -174,6 +286,7 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (request.Method == "POST" && path == "/api/library")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.LibraryUpdate);
                 var data = serializer.Deserialize<HardwareLibraryData>(request.Body) ?? new HardwareLibraryData();
                 var savedPath = HardwareLibraryRepository.Save(data.rails, data.shelfSupports);
                 WriteJson(stream, 200, new
@@ -188,6 +301,7 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (request.Method == "GET" && path == "/api/health")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.SystemControl);
                 WriteJson(stream, 200, health.GetHealth(RootFolder, Prefix, OrderStorageProvider, DatabasePath));
                 return;
             }
@@ -200,6 +314,7 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (request.Method == "POST" && path == "/api/shutdown")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.SystemControl);
                 WriteJson(stream, 200, new { ok = true, message = "Portal stopt. Start de configurator opnieuw om verse code te laden." });
                 ThreadPool.QueueUserWorkItem(delegate
                 {
@@ -212,6 +327,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "POST" && path == "/api/quote")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
+                PrepareQuoteRequest(quoteRequest, actor);
                 WriteJson(stream, 200, new QuoteApplicationService().BuildQuote(quoteRequest));
                 return;
             }
@@ -219,12 +335,14 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "POST" && path == "/api/solidworks/export")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
+                PrepareQuoteRequest(quoteRequest, actor);
                 WriteJson(stream, 200, new ProductionOutputService().GenerateSolidWorksControlFiles(quoteRequest, RootFolder));
                 return;
             }
 
             if (request.Method == "POST" && path == "/api/output/open-folder")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.ProjectReadAll);
                 var openRequest = serializer.Deserialize<OpenOutputFolderRequest>(request.Body);
                 var openedFolder = OpenOutputFolder(openRequest == null ? null : openRequest.Path);
                 WriteJson(stream, 200, new { ok = true, folder = openedFolder });
@@ -234,13 +352,16 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "POST" && path == "/api/orders")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
+                PrepareQuoteRequest(quoteRequest, actor);
                 var record = orders.CreateOrder(quoteRequest);
+                workspace.Sync();
                 WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Order ontvangen en klaargezet voor controle.", Order = record });
                 return;
             }
 
             if (request.Method == "GET" && path == "/api/orders")
             {
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.ProjectReadAll);
                 WriteJson(stream, 200, orders.ListOrders());
                 return;
             }
@@ -249,7 +370,8 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var orderId = ExtractOrderId(path, "/status");
                 var statusRequest = serializer.Deserialize<PortalOrderStatusRequest>(request.Body);
-                var record = orders.ChangeStatus(Uri.UnescapeDataString(orderId), statusRequest.Status, statusRequest.Role);
+                var record = orders.ChangeStatus(Uri.UnescapeDataString(orderId), statusRequest.Status, WorkflowRole(actor, statusRequest.Status));
+                workspace.Sync();
                 WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Orderstatus bijgewerkt.", Order = record });
                 return;
             }
@@ -257,7 +379,10 @@ namespace SWWerkplaats.Configurator.Portal
             if (request.Method == "POST" && path.StartsWith("/api/orders/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/release", StringComparison.OrdinalIgnoreCase))
             {
                 var orderId = ExtractOrderId(path, "/release");
-                WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Order naar freeswachtrij gezet.", Order = orders.ReleaseToQueue(Uri.UnescapeDataString(orderId)) });
+                PortalRolePolicy.Ensure(actor, PortalCapabilities.JobsUpdateAll);
+                var record = orders.ReleaseToQueue(Uri.UnescapeDataString(orderId));
+                workspace.Sync();
+                WriteJson(stream, 200, new PortalOrderResponse { Ok = true, Message = "Order naar freeswachtrij gezet.", Order = record });
                 return;
             }
 
@@ -283,12 +408,15 @@ namespace SWWerkplaats.Configurator.Portal
             var lines = headerText.Split(new[] { "\r\n" }, StringSplitOptions.None);
             var first = lines[0].Split(' ');
             var contentLength = 0;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 1; i < lines.Length; i++)
             {
-                if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-                {
-                    int.TryParse(lines[i].Substring("Content-Length:".Length).Trim(), out contentLength);
-                }
+                var separator = lines[i].IndexOf(':');
+                if (separator <= 0) continue;
+                var name = lines[i].Substring(0, separator).Trim();
+                var value = lines[i].Substring(separator + 1).Trim();
+                headers[name] = value;
+                if (string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase)) int.TryParse(value, out contentLength);
             }
 
             var bodyStart = headerEnd + 4;
@@ -300,13 +428,41 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             var body = contentLength > 0 ? Encoding.UTF8.GetString(buffer, bodyStart, Math.Min(contentLength, total - bodyStart)) : "";
-            return new HttpRequest { Method = first[0], Path = first.Length > 1 ? first[1].Split('?')[0] : "/", Body = body };
+            return new HttpRequest { Method = first[0], Path = first.Length > 1 ? first[1].Split('?')[0] : "/", Body = body, Headers = headers };
+        }
+
+        private void PrepareQuoteRequest(PortalQuoteRequest request, PortalActorContext actor)
+        {
+            if (request == null) throw new ArgumentNullException("request");
+            PortalRolePolicy.Ensure(actor, PortalCapabilities.Configure);
+            var site = sites.GetRequired(actor.SiteId);
+            sites.EnsureProductAllowed(site, request.Product);
+            request.SourceSiteId = actor.SiteId;
+            request.OrganizationId = actor.OrganizationId;
+            request.RequestedByUserId = actor.UserId;
+        }
+
+        private static OrderWorkflowRole WorkflowRole(PortalActorContext actor, string nextStatus)
+        {
+            if (PortalRolePolicy.Has(actor, PortalCapabilities.JobsUpdateAll))
+                return string.Equals(nextStatus, OrderWorkflowStatus.InProductie, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(nextStatus, OrderWorkflowStatus.Gereed, StringComparison.OrdinalIgnoreCase)
+                    ? OrderWorkflowRole.Uitvoerder
+                    : OrderWorkflowRole.Werkvoorbereider;
+            if (PortalRolePolicy.Has(actor, PortalCapabilities.JobsReadAll)) return OrderWorkflowRole.Uitvoerder;
+            throw new PortalAccessDeniedException("De gekozen portalrol mag de orderstatus niet wijzigen.");
         }
 
         private static string ExtractOrderId(string path, string suffix)
         {
             var orderId = path.Substring("/api/orders/".Length);
             return orderId.Substring(0, orderId.Length - suffix.Length);
+        }
+
+        private static string ExtractResourceId(string path, string prefix, string suffix)
+        {
+            var value = path.Substring(prefix.Length);
+            return value.Substring(0, value.Length - suffix.Length);
         }
 
         private string OpenOutputFolder(string requestedPath)
@@ -430,6 +586,8 @@ namespace SWWerkplaats.Configurator.Portal
         {
             if (status == 200) return "OK";
             if (status == 404) return "Not Found";
+            if (status == 400) return "Bad Request";
+            if (status == 403) return "Forbidden";
             if (status == 500) return "Internal Server Error";
             return "OK";
         }
@@ -446,6 +604,7 @@ namespace SWWerkplaats.Configurator.Portal
             public string Method { get; set; }
             public string Path { get; set; }
             public string Body { get; set; }
+            public Dictionary<string, string> Headers { get; set; }
         }
 
         private sealed class OpenOutputFolderRequest
