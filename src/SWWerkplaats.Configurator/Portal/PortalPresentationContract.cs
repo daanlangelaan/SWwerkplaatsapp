@@ -38,13 +38,27 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static void Validate(PortalPresentationContract value)
         {
-            if (value == null || value.ContractVersion != 1)
-                throw new InvalidOperationException("UI-presentatiecontract heeft geen ondersteunde contractVersion 1.");
+            if (value == null || value.ContractVersion != 2)
+                throw new InvalidOperationException("UI-presentatiecontract heeft geen ondersteunde contractVersion 2.");
             if (value.DesignTokens == null || value.DesignTokens.Colors == null || value.DesignTokens.Colors.Count == 0)
                 throw new InvalidOperationException("UI-presentatiecontract mist designTokens.colors.");
             var invalidColor = value.DesignTokens.Colors.FirstOrDefault(pair => !IsHexColor(pair.Value));
             if (!string.IsNullOrWhiteSpace(invalidColor.Key))
                 throw new InvalidOperationException("UI-presentatiecontract bevat een ongeldige kleur voor " + invalidColor.Key + ".");
+            if (value.DesignTokens.Typography == null || string.IsNullOrWhiteSpace(value.DesignTokens.Typography.FontFamily))
+                throw new InvalidOperationException("UI-presentatiecontract mist designTokens.typography.fontFamily.");
+            RequirePositive(value.DesignTokens.Typography.FontSizesPx, "designTokens.typography.fontSizesPx");
+            RequirePositive(value.DesignTokens.Typography.FontWeights, "designTokens.typography.fontWeights");
+            RequirePositive(value.DesignTokens.Typography.LineHeights, "designTokens.typography.lineHeights");
+            RequirePositive(value.DesignTokens.SpacingPx, "designTokens.spacingPx");
+            RequirePositive(value.DesignTokens.RadiiPx, "designTokens.radiiPx");
+            RequirePositive(value.DesignTokens.LayoutPx, "designTokens.layoutPx");
+            RequirePositive(value.DesignTokens.ControlsPx, "designTokens.controlsPx");
+            RequirePositive(value.DesignTokens.BreakpointsPx, "designTokens.breakpointsPx");
+            RequirePositive(value.DesignTokens.MotionMs, "designTokens.motionMs");
+            if (value.DesignTokens.Shadows == null || value.DesignTokens.Shadows.Count == 0
+                || value.DesignTokens.Shadows.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value)))
+                throw new InvalidOperationException("UI-presentatiecontract bevat een ontbrekende waarde in designTokens.shadows.");
             if (value.Assembly == null || value.Assembly.Animation == null || value.Assembly.Camera == null || value.Assembly.Markers == null || value.Assembly.Materials == null)
                 throw new InvalidOperationException("UI-presentatiecontract mist assembly.animation, assembly.camera, assembly.markers of assembly.materials.");
             RequirePositive(value.Assembly.Animation, "assembly.animation");
@@ -85,6 +99,22 @@ namespace SWWerkplaats.Configurator.Portal
     public sealed class PortalDesignTokens
     {
         public Dictionary<string, string> Colors { get; set; }
+        public PortalTypographyTokens Typography { get; set; }
+        public Dictionary<string, double> SpacingPx { get; set; }
+        public Dictionary<string, double> RadiiPx { get; set; }
+        public Dictionary<string, double> LayoutPx { get; set; }
+        public Dictionary<string, double> ControlsPx { get; set; }
+        public Dictionary<string, double> BreakpointsPx { get; set; }
+        public Dictionary<string, double> MotionMs { get; set; }
+        public Dictionary<string, string> Shadows { get; set; }
+    }
+
+    public sealed class PortalTypographyTokens
+    {
+        public string FontFamily { get; set; }
+        public Dictionary<string, double> FontSizesPx { get; set; }
+        public Dictionary<string, double> FontWeights { get; set; }
+        public Dictionary<string, double> LineHeights { get; set; }
     }
 
     public sealed class PortalAssemblyPresentation

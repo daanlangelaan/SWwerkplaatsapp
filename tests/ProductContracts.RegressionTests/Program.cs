@@ -563,15 +563,19 @@ internal static class Program
     private static void VerifyPortalPresentationBoundary()
     {
         var catalog = new CatalogApplicationService().GetCatalog();
-        Require(catalog.Presentation != null && catalog.Presentation.ContractVersion == 1,
+        Require(catalog.Presentation != null && catalog.Presentation.ContractVersion == 2,
             "Portal: het versieerbare UI-presentatiecontract moet via /api/catalog beschikbaar zijn");
         Require(catalog.Presentation.DesignTokens != null
             && catalog.Presentation.DesignTokens.Colors.ContainsKey("assemblyActive")
             && catalog.Presentation.DesignTokens.Colors.ContainsKey("plywoodFaceBase")
+            && catalog.Presentation.DesignTokens.Typography.FontSizesPx.ContainsKey("body")
+            && catalog.Presentation.DesignTokens.SpacingPx.ContainsKey("large")
+            && catalog.Presentation.DesignTokens.ControlsPx["minimumTarget"] == 44
+            && catalog.Presentation.DesignTokens.BreakpointsPx.ContainsKey("compact")
             && catalog.Presentation.Assembly.Animation.ContainsKey("hardwareMoveMs")
             && catalog.Presentation.Assembly.Camera.ContainsKey("detailWidthFill")
             && catalog.Presentation.Assembly.Materials.ContainsKey("plywoodLayerBands"),
-            "Portal: kleuren, animatietijden en camerafit moeten centraal in het presentatiecontract staan");
+            "Portal: kleur, typografie, spacing, bediening, animatie en camerafit moeten centraal in het presentatiecontract staan");
 
         var portalHtml = PortalHtml.Page();
         Require(portalHtml.Contains("id=\"exportIncludeInteractiveCustomerModel\"")
