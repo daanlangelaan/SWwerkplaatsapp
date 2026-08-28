@@ -106,7 +106,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
             const double elevationCanvasHeight = 460;
             const double frontCanvasWidth = 1000;
             const double sideCanvasWidth = 650;
-            var heightTravel = profile.ShowHeightAdjustment && motion != null
+            var heightTravel = profile.ShowHeightAdjustment && motion != null && motion.Vertical != null
                 ? Math.Max(0, motion.Vertical.Maximum - motion.Vertical.Minimum)
                 : 0;
             var sharedElevationScale = Math.Min(
@@ -122,16 +122,18 @@ namespace SWWerkplaats.Configurator.SolidWorks
             var ballPatternDetailPath = profile.ShowBallTransferDetails && ballPattern != null
                 ? BuildBallTransferPatternDetailSvg(ballPattern, temporaryFolder, "klant-kogelpotpatroon-detail.svg")
                 : null;
-            var heightRangePath = profile.ShowHeightAdjustment && motion != null
+            var heightRangePath = profile.ShowHeightAdjustment && motion != null && motion.Vertical != null
                 ? WriteUtf8(Path.Combine(temporaryFolder, "klant-bewegingsbereik-hoogte.svg"), ProductionOutputService.BuildMotionRangeSvg(parts, motion, true))
                 : null;
-            var horizontalRangePath = profile.ShowSlidingMovement && motion != null
+            var horizontalRangePath = profile.ShowSlidingMovement && motion != null && motion.Horizontal != null
                 ? WriteUtf8(Path.Combine(temporaryFolder, "klant-bewegingsbereik-links-midden-rechts.svg"), ProductionOutputService.BuildMotionRangeSvg(parts, motion, false))
                 : null;
 
             dynamic slide = presentation.Slides.Item(5);
             DeleteShapesWithPrefixes(slide, "DRAWING_GENERAL", "DRAWING_VIEW_", "BALL_");
-            var movementRange = motion == null ? 0 : motion.Horizontal.Maximum - motion.Horizontal.Minimum;
+            var movementRange = profile.ShowSlidingMovement && motion != null && motion.Horizontal != null
+                ? motion.Horizontal.Maximum - motion.Horizontal.Minimum
+                : 0;
             var topLabel = profile.ShowSlidingMovement ? "BOVENAANZICHT EN VERPLAATSING" : "BOVENAANZICHT";
             var topDimension = Millimetres(request.WidthMm) + " x " + Millimetres(request.DepthMm) + " mm";
             if (profile.ShowSlidingMovement) topDimension += " · slag " + Millimetres(movementRange) + " mm";
@@ -341,7 +343,9 @@ namespace SWWerkplaats.Configurator.SolidWorks
             Func<PortalAssemblyPart, double> verticalSize = item => mode == "top" ? item.SizeZmm : item.SizeYmm;
             Func<PortalAssemblyPart, double> depth = item => mode == "front" ? item.Zmm : (mode == "side" ? item.Xmm : item.Ymm);
 
-            var movementRange = DetermineMovementRange(list);
+            var movementRange = request != null && IsLex(request.Product)
+                ? DetermineMovementRange(list)
+                : 0;
             var movementHalf = movementRange / 2.0;
             var baseMinH = list.Min(item => horizontalCenter(item) - horizontalSize(item) / 2.0);
             var baseMaxH = list.Max(item => horizontalCenter(item) + horizontalSize(item) / 2.0);

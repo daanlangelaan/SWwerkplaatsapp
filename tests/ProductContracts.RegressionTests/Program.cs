@@ -71,6 +71,9 @@ internal static class Program
             VerifyMachineBaseAssemblyInstructions(models.Single(item => item.Contract.ProductId == "machinebasis").Model);
             VerifyMachineBaseStickerPolicy(models.Single(item => item.Contract.ProductId == "machinebasis").Model);
             VerifyProfileProjectOutput(models.Single(item => item.Contract.ProductId == "machinebasis").Contract.Request);
+            VerifyGenericCustomerPresentationDrawing(
+                models.Single(item => item.Contract.ProductId == "machinebasis").Contract.Request,
+                models.Single(item => item.Contract.ProductId == "machinebasis").Model);
             VerifyMaterialCartGeometry(models.Single(item => item.Contract.ProductId == "materiaalwagen").Model);
             VerifyMaterialCartVariants();
             VerifySimRigGeometry(models.Single(item => item.Contract.ProductId == "sim_rig_4080").Model);
@@ -110,6 +113,35 @@ internal static class Program
                 && response.NestingSvg.StartsWith("<svg", StringComparison.OrdinalIgnoreCase)
                 && !response.Files.Contains("Profieltappen-werkplaatslijst.xlsx"),
             "Werktafelpreview: prijs, nesting en 12 getraceerde profielen moeten zonder niet-vrijgegeven CAM-taplijst renderen");
+    }
+
+    private static void VerifyGenericCustomerPresentationDrawing(PortalQuoteRequest request, WorkbenchModel model)
+    {
+        var exporterType = typeof(SolidWorksCustomerPresentation).Assembly.GetType(
+            "SWWerkplaats.Configurator.SolidWorks.SolidWorksCustomerPowerPointExporter",
+            true);
+        var method = exporterType.GetMethod(
+            "BuildOrthographicSvg",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Require(method != null, "Klantpresentatie: orthografische SVG-export ontbreekt");
+
+        var parts = new PortalAssembly3DService().Build(model, request);
+        var folder = Path.Combine(Path.GetTempPath(), "sww-customer-presentation-regression-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var path = (string)method.Invoke(null, new object[]
+            {
+                parts, request, folder, "machinebasis-voor.svg", "front",
+                1000d, 460d, false, 0d, 0d
+            });
+            Require(File.Exists(path) && File.ReadAllText(path).StartsWith("<svg", StringComparison.OrdinalIgnoreCase),
+                "Klantpresentatie: een product zonder LEX-beweging moet een vooraanzicht kunnen exporteren");
+        }
+        finally
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
     }
 
     private static void VerifySolidWorksGlbDeliveryContract()
