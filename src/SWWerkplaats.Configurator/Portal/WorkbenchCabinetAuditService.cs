@@ -269,7 +269,9 @@ namespace SWWerkplaats.Configurator.Portal
         private static void CheckNestedGCodeContract(WorkbenchModel model, NestingPlan nestingPlan, WorkbenchCabinetAuditResult result)
         {
             if (nestingPlan == null) return;
-            var expectedCounts = model.Sheets.ToDictionary(s => s.Name, s => Math.Max(1, s.Quantity), StringComparer.OrdinalIgnoreCase);
+            var expectedCounts = model.Sheets
+                .Where(s => s.Material == null || !s.Material.IsAdditiveManufactured)
+                .ToDictionary(s => s.Name, s => Math.Max(1, s.Quantity), StringComparer.OrdinalIgnoreCase);
             var actualCounts = nestingPlan.StockSheets.SelectMany(s => s.Placements).GroupBy(p => p.Part.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
             foreach (var expectedCount in expectedCounts)
             {
@@ -431,20 +433,37 @@ namespace SWWerkplaats.Configurator.Portal
         {
             var parts = new PortalAssembly3DService().Build(model, request);
             var allowedTop = request.HeightMm;
+            var allowedHalfWidth = request.WidthMm / 2.0 + 25.0;
+            var allowedHalfDepth = request.DepthMm / 2.0;
             if (IsLexProduct(request.Product))
-                allowedTop += new PortalConfigurationFactory().BuildLexWorkbench(request).BallTransferWorkingHeightMm;
+            {
+                var config = new PortalConfigurationFactory().BuildLexWorkbench(request);
+                var latch = config.SwingLatch;
+                var upperProjection = latch.OverallProjectionMm - latch.BaseProjectionMm;
+                var capThickness = upperProjection / 8.0;
+                var renderedCapThickness = Math.Max(2.0, capThickness);
+                var latchOutboardEnvelope = latch.OverallProjectionMm + capThickness / 2.0 + renderedCapThickness / 2.0;
+                var latchPivotY = config.HeightMm - config.TopSheet.ThicknessMm - config.MovingFrameSlotAxisEdgeOffsetMm;
+                var latchTop = latchPivotY + latch.NoseCenterDistanceMm + latch.WidthMm / 2.0;
+
+                allowedHalfWidth = request.WidthMm / 2.0 + latchOutboardEnvelope;
+                allowedHalfDepth = request.DepthMm / 2.0 + latchOutboardEnvelope;
+                allowedTop = Math.Max(
+                    request.HeightMm + config.BallTransferWorkingHeightMm,
+                    latchTop);
+            }
             foreach (var part in parts)
             {
                 if (part.SizeXmm <= 0 || part.SizeYmm <= 0 || part.SizeZmm <= 0) result.Errors.Add("Ongeldige 3D-maat bij " + part.Name + ".");
                 var xMin = part.Xmm - part.SizeXmm / 2.0;
                 var xMax = part.Xmm + part.SizeXmm / 2.0;
-                if (xMin < -request.WidthMm / 2.0 - 25.0 || xMax > request.WidthMm / 2.0 + 25.0)
+                if (xMin < -allowedHalfWidth - ToleranceMm || xMax > allowedHalfWidth + ToleranceMm)
                     result.Errors.Add("Onderdeel buiten breedte-envelope: " + part.Name + ".");
                 if (IsLexProduct(request.Product))
                 {
                     var zMin = part.Zmm - part.SizeZmm / 2.0;
                     var zMax = part.Zmm + part.SizeZmm / 2.0;
-                    if (zMin < -request.DepthMm / 2.0 - ToleranceMm || zMax > request.DepthMm / 2.0 + ToleranceMm)
+                    if (zMin < -allowedHalfDepth - ToleranceMm || zMax > allowedHalfDepth + ToleranceMm)
                         result.Errors.Add("Onderdeel buiten diepte-envelope: " + part.Name + ".");
                 }
                 if (part.Ymm - part.SizeYmm / 2.0 < -ToleranceMm || part.Ymm + part.SizeYmm / 2.0 > allowedTop + ToleranceMm)
@@ -498,7 +517,8 @@ namespace SWWerkplaats.Configurator.Portal
                 result.Errors.Add("LEX BOM-sync: vier HSR15R-adapterplaten vereist.");
 
             var holders = model.Profiles.FirstOrDefault(p => string.Equals(p.Name, "Bewegende werkbladhouder horizontaal", StringComparison.OrdinalIgnoreCase));
-            var holderPlacements = model.AssemblyPlacements.Count(p => p.PartName != null && p.PartName.StartsWith("Werkbladhouder ", StringComparison.OrdinalIgnoreCase));
+            var holderPlacements = model.AssemblyPlacements.Count(p => p.Kind == AssemblyComponentKind.Profile
+                && p.PartName != null && p.PartName.StartsWith("Werkbladhouder ", StringComparison.OrdinalIgnoreCase));
             if (holders == null || holders.Quantity != 3 || holderPlacements != 3)
                 result.Errors.Add("LEX BOM-sync: drie horizontale werkbladhouders moeten zowel in profiel-BOM als 3D-model staan.");
             var centerHolder = model.AssemblyPlacements.FirstOrDefault(p => string.Equals(p.PartName, "Werkbladhouder middenligger", StringComparison.OrdinalIgnoreCase));
@@ -518,21 +538,58 @@ namespace SWWerkplaats.Configurator.Portal
             RequireLexHardware(model, "Maunsystem Stellfusssockel 8 D80 hoekadapter M16", 4, result);
             RequireLexHardware(model, "Bevestigingsset Nut 8 voor ZI-1744 hoekadapter", 16, result);
             RequireLexHardware(model, "HSR15-compatible lineaire geleidingsset, 2x 1500 mm + 4 wagens", 1, result);
-            RequireLexHardware(model, "HSR15R M4 verzonken wagenschroef", 16, result);
+            RequireLexHardware(model, "HSR15R M4x12 verzonken wagenschroef", 16, result);
             RequireLexHardware(model, "Adapterplaat M8 bout met inschuifmoer", 8, result);
-            RequireLexHardware(model, "Railmontage met inschuifmoeren", 50, result);
-            RequireLexHardware(model, "Standaard profielverbinder serie 8 inclusief bout", 28, result);
+            var railPlacements = model.AssemblyPlacements
+                .Where(p => Starts(p.PartName, "HSR15 rail "))
+                .ToList();
+            if (railPlacements.Count != config.LinearGuide.RailQuantity)
+            {
+                result.Errors.Add("LEX geometrie-sync: verwacht "
+                    + config.LinearGuide.RailQuantity.ToString(CultureInfo.InvariantCulture)
+                    + " geplaatste HSR15-rails; gevonden "
+                    + railPlacements.Count.ToString(CultureInfo.InvariantCulture) + ".");
+            }
+            else
+            {
+                var expectedRailMountCount = railPlacements.Sum(placement =>
+                    (int)Math.Floor((placement.LengthMm - 2.0 * config.LinearGuide.RailEndDistanceMm)
+                        / config.LinearGuide.RailMountingPitchMm) + 1);
+                RequireLexHardware(model, "Railmontage met inschuifmoeren", expectedRailMountCount, result);
+            }
+            RequireLexHardware(model, "TechXXL standaardverbinder 8 40", 26, result);
+            RequireLexHardware(model, "TechXXL bolkop-inbusbout ISO 7380 M8x25", 26, result);
             RequireLexHardware(model, "HTE2 eindplaat M8 bout met inschuifmoer", 8, result);
             RequireLexHardware(model, "Kogelpot / ball transfer unit", 53, result);
             RequireLexHardware(model, "Kogelpot / ball transfer unit - reserve", 4, result);
-            RequireLexHardware(model, "Plunjerborging lineaire verschuiving", 3, result);
+            RequireLexHardware(model, "VCN226 indexeerplunjer M10 voor lineaire verschuiving", 3, result);
             RequireLexHardware(model, "Mechanische eindstop HSR15", 4, result);
-            RequireLexHardware(model, "Bevestigingsset HPL-kogelpotblad aan bewegend frame", 1, result);
+            RequireLexHardware(model, "TechXXL montagebeugel 40×40×20 ZN", 10, result);
+            RequireLexHardware(model, "M6×12 verzonken inbusbout voor profielzijde werkbladbeugel", 10, result);
+            RequireLexHardware(model, "T-moer 8 met brug M6 voor werkbladbeugel", 10, result);
+            RequireLexHardware(model, "M6 werkblad-doorsteekset voor TIN 100391", 10, result);
             RequireLexHardware(model, "Bevestigingsset HPL-stabilisatieplaat 6 mm", 1, result);
             RequireLexHardware(model, "Kabelmanagement en trekontlasting", 1, result);
             RequireLexHardware(model, "Typeplaat en veiligheidslabels", 1, result);
             RequireLexHardware(model, "Afdekkap 8 80x80 zwart", 4, result);
-            RequireLexHardware(model, "Afdekkap 8 80x40 zwart", 4, result);
+            RequireLexHardware(model, "Afdekkap 8 40x40 zwart", 4, result);
+            RequireLexHardware(model, config.SwingLatch.Name, 6, result);
+
+            var swingLatches = model.AssemblyPlacements.Where(p => string.Equals(p.Shape, "swing-latch", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (swingLatches.Count != 6)
+                result.Errors.Add("LEX werkstukaanslagen: exact zes Item Schwenkriegel 8 Pi 54 PA vereist.");
+            else
+            {
+                var front = swingLatches.Count(p => Math.Abs(p.Zmm + config.DepthMm / 2.0) <= ToleranceMm);
+                var back = swingLatches.Count(p => Math.Abs(p.Zmm - config.DepthMm / 2.0) <= ToleranceMm);
+                var left = swingLatches.Count(p => Math.Abs(p.Xmm + config.WidthMm / 2.0) <= ToleranceMm);
+                var right = swingLatches.Count(p => Math.Abs(p.Xmm - config.WidthMm / 2.0) <= ToleranceMm);
+                if (front != 2 || back != 2 || left != 1 || right != 1)
+                    result.Errors.Add("LEX werkstukaanslagen: verdeling moet 2 voor, 2 achter, 1 links en 1 rechts zijn.");
+                var stopTopY = swingLatches[0].Ymm + config.SwingLatch.NoseCenterDistanceMm + config.SwingLatch.WidthMm / 2.0;
+                if (stopTopY <= config.HeightMm + ToleranceMm)
+                    result.Errors.Add("LEX werkstukaanslagen steken uitgeklapt niet boven het HPL-werkvlak uit.");
+            }
 
             var footAdaptersInModel = model.AssemblyPlacements.Count(p => Starts(p.PartName, "Stelpoot hoekadapter ZI-1744 "));
             var footDishesInModel = model.AssemblyPlacements.Count(p => string.Equals(p.PartName, "Stelvoet D80 schotel ZI-1415-S", StringComparison.OrdinalIgnoreCase));
@@ -542,6 +599,9 @@ namespace SWWerkplaats.Configurator.Portal
                 result.Errors.Add("LEX voetprofielkoppen hebben nog een afdekkap terwijl de ZI-1744 adapter die kop volledig afdekt.");
 
             var assembly = new PortalAssembly3DService().Build(model, request);
+            var swingLatchBodies = assembly.Where(p => Starts(p.Name, config.SwingLatch.Name + " ")).ToList();
+            if (swingLatchBodies.Count != 30)
+                result.Errors.Add("LEX Schwenkriegel 3D-opbouw moet per aanslag uit vijf herkenbare bodies bestaan.");
             var adapterBodies = assembly.Where(p => Starts(p.Name, "Stelpoot hoekadapter ZI-1744 ")).ToList();
             if (adapterBodies.Count != 20)
                 result.Errors.Add("LEX ZI-1744 3D-opbouw moet per hoek uit montageplaat, draagarm, afgeronde opname en twee ribben bestaan.");
@@ -564,7 +624,7 @@ namespace SWWerkplaats.Configurator.Portal
                     result.Warnings.Add("LEX open BOM-punt: " + item.Name + " - " + item.BomStatus + ".");
             }
 
-            result.Checks.Add("LEX BOM-sync gecontroleerd: modeldelen, ZI-1744 hoekadapters, D80/M16x130-stelvoeten, 1000-mm diepte-envelope, 6 mm tussenplaat, bevestigingen, reserves en open punten.");
+            result.Checks.Add("LEX BOM-sync gecontroleerd: modeldelen, zes draaibare Item-aanslagen, ZI-1744 hoekadapters, D80/M16x130-stelvoeten, 1000-mm diepte-envelope, 6 mm tussenplaat, bevestigingen, reserves en open punten.");
         }
 
         private static void RequireLexHardware(WorkbenchModel model, string name, int expectedQuantity, WorkbenchCabinetAuditResult result)

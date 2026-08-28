@@ -25,6 +25,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
         private const int MsoTrue = -1;
         private const int PpSaveAsOpenXmlPresentation = 24;
         private const int PpSaveAsPdf = 32;
+        private const int PpLayoutBlank = 12;
         private const int PpShapeFormatPng = 2;
         private const int MsoShapeRoundedRectangle = 5;
         private const int MsoTextOrientationHorizontal = 1;
@@ -101,10 +102,13 @@ namespace SWWerkplaats.Configurator.SolidWorks
         private static void BuildDrawingPages(dynamic presentation, SolidWorksCustomerDrawingOutput drawingOutput, string temporaryFolder, PortalQuoteRequest request, WorkbenchModel model, SolidWorksCustomerPresentationProfile profile)
         {
             var parts = new PortalAssembly3DService().Build(model, request);
+            var motion = new PortalMotionContractService().Build(model, request, parts);
             const double elevationCanvasHeight = 460;
             const double frontCanvasWidth = 1000;
             const double sideCanvasWidth = 650;
-            var heightTravel = profile.ShowHeightAdjustment ? Math.Max(0, profile.HeightTravelMm) : 0;
+            var heightTravel = profile.ShowHeightAdjustment && motion != null && motion.Vertical != null
+                ? Math.Max(0, motion.Vertical.Maximum - motion.Vertical.Minimum)
+                : 0;
             var sharedElevationScale = Math.Min(
                 CalculateOrthographicFitScale(parts, "front", frontCanvasWidth, elevationCanvasHeight, heightTravel),
                 CalculateOrthographicFitScale(parts, "side", sideCanvasWidth, elevationCanvasHeight, heightTravel));
@@ -118,16 +122,24 @@ namespace SWWerkplaats.Configurator.SolidWorks
             var ballPatternDetailPath = profile.ShowBallTransferDetails && ballPattern != null
                 ? BuildBallTransferPatternDetailSvg(ballPattern, temporaryFolder, "klant-kogelpotpatroon-detail.svg")
                 : null;
+            var heightRangePath = profile.ShowHeightAdjustment && motion != null && motion.Vertical != null
+                ? WriteUtf8(Path.Combine(temporaryFolder, "klant-bewegingsbereik-hoogte.svg"), ProductionOutputService.BuildMotionRangeSvg(parts, motion, true))
+                : null;
+            var horizontalRangePath = profile.ShowSlidingMovement && motion != null && motion.Horizontal != null
+                ? WriteUtf8(Path.Combine(temporaryFolder, "klant-bewegingsbereik-links-midden-rechts.svg"), ProductionOutputService.BuildMotionRangeSvg(parts, motion, false))
+                : null;
 
             dynamic slide = presentation.Slides.Item(5);
             DeleteShapesWithPrefixes(slide, "DRAWING_GENERAL", "DRAWING_VIEW_", "BALL_");
-            var movementRange = DetermineMovementRange(parts);
+            var movementRange = profile.ShowSlidingMovement && motion != null && motion.Horizontal != null
+                ? motion.Horizontal.Maximum - motion.Horizontal.Minimum
+                : 0;
             var topLabel = profile.ShowSlidingMovement ? "BOVENAANZICHT EN VERPLAATSING" : "BOVENAANZICHT";
             var topDimension = Millimetres(request.WidthMm) + " x " + Millimetres(request.DepthMm) + " mm";
             if (profile.ShowSlidingMovement) topDimension += " · slag " + Millimetres(movementRange) + " mm";
             var frontLabel = profile.ShowHeightAdjustment ? "HOOGTEVERSTELLING" : "VOORAANZICHT";
             var frontDimension = profile.ShowHeightAdjustment
-                ? Millimetres(request.HeightMm) + "–" + Millimetres(request.HeightMm + profile.HeightTravelMm) + " mm"
+                ? Millimetres(motion.Vertical.ReferenceValueMm + motion.Vertical.Minimum) + "–" + Millimetres(motion.Vertical.ReferenceValueMm + motion.Vertical.Maximum) + " mm"
                 : "Hoogte " + Millimetres(request.HeightMm) + " mm";
             AddTechnicalSvgView(slide, topPath, 42, 132, 558, 326, topLabel, topDimension, true);
             AddSharedScaleTechnicalSvgView(slide, frontPath, 616, 130, 312, 168, frontCanvasWidth, elevationCanvasHeight, frontLabel, frontDimension);
@@ -156,6 +168,37 @@ namespace SWWerkplaats.Configurator.SolidWorks
                     11f, false, OfficeRgb(82, 82, 88));
             }
             else if (presentation.Slides.Count >= 6) presentation.Slides.Item(6).Delete();
+
+            if (!string.IsNullOrWhiteSpace(heightRangePath))
+                AddMotionRangeSlide(presentation, heightRangePath, 1200, 720,
+                    "Werkhoogte in de laagste en hoogste stand");
+            if (!string.IsNullOrWhiteSpace(horizontalRangePath))
+                AddMotionRangeSlide(presentation, horizontalRangePath, 1200, 650,
+                    "Werkblad volledig links, in het midden en volledig rechts");
+        }
+
+        private static string WriteUtf8(string path, string content)
+        {
+            File.WriteAllText(path, content ?? "", new UTF8Encoding(false));
+            return path;
+        }
+
+        private static void AddMotionRangeSlide(dynamic presentation, string imagePath, double sourceWidth, double sourceHeight, string alternativeText)
+        {
+            dynamic slide = presentation.Slides.Add(presentation.Slides.Count + 1, PpLayoutBlank);
+            var slideWidth = Convert.ToDouble(presentation.PageSetup.SlideWidth, CultureInfo.InvariantCulture);
+            var slideHeight = Convert.ToDouble(presentation.PageSetup.SlideHeight, CultureInfo.InvariantCulture);
+            const double margin = 10;
+            var scale = Math.Min((slideWidth - 2 * margin) / sourceWidth, (slideHeight - 2 * margin) / sourceHeight);
+            var width = sourceWidth * scale;
+            var height = sourceHeight * scale;
+            var left = (slideWidth - width) / 2.0;
+            var top = (slideHeight - height) / 2.0;
+            dynamic image = slide.Shapes.AddPicture(imagePath, MsoFalse, MsoTrue, (float)left, (float)top, (float)width, (float)height);
+            image.Name = "DRAWING_MOTION_RANGE";
+            image.AlternativeText = alternativeText;
+            AddText(slide, "DRAWING_MOTION_PAGE", (float)(slideWidth - 42), 18, 24, 12,
+                ((int)presentation.Slides.Count).ToString("00", CultureInfo.InvariantCulture), 7f, false, OfficeRgb(101, 111, 118));
         }
 
         private static string CropDrawingView(string sourcePath, string folder, string fileName, double x, double y, double width, double height)
@@ -300,7 +343,9 @@ namespace SWWerkplaats.Configurator.SolidWorks
             Func<PortalAssemblyPart, double> verticalSize = item => mode == "top" ? item.SizeZmm : item.SizeYmm;
             Func<PortalAssemblyPart, double> depth = item => mode == "front" ? item.Zmm : (mode == "side" ? item.Xmm : item.Ymm);
 
-            var movementRange = DetermineMovementRange(list);
+            var movementRange = request != null && IsLex(request.Product)
+                ? DetermineMovementRange(list)
+                : 0;
             var movementHalf = movementRange / 2.0;
             var baseMinH = list.Min(item => horizontalCenter(item) - horizontalSize(item) / 2.0);
             var baseMaxH = list.Max(item => horizontalCenter(item) + horizontalSize(item) / 2.0);
@@ -635,7 +680,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
                 .Select(item => item.Xmm)
                 .ToArray();
             if (positions.Length >= 2) return Math.Max(0, positions.Max() - positions.Min());
-            return 440;
+            throw new InvalidOperationException("De horizontale bewegingsgrenzen ontbreken in de LEX-assemblydata.");
         }
 
         private static BallTransferPatternInfo BuildBallTransferPattern(IEnumerable<PortalAssemblyPart> parts)

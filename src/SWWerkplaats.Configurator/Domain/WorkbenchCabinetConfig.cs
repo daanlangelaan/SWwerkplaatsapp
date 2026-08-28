@@ -32,6 +32,10 @@ namespace SWWerkplaats.Configurator.Domain
         public double DrawerSideClearanceMm { get; set; }
         public double DrawerBackClearanceMm { get; set; }
         public bool IncludeBackPanel { get; set; }
+        public double BackPanelGrooveDepthMm { get; set; }
+        public double BackPanelGrooveClearanceMm { get; set; }
+        public double BackPanelFastenerEndInsetMm { get; set; }
+        public double BackPanelFastenerMaxSpacingMm { get; set; }
         public Material CarcassMaterial { get; set; }
         public Material WorktopMaterial { get; set; }
         public Material FrontMaterial { get; set; }

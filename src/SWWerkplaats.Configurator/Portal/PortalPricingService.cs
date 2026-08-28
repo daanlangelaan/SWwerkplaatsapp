@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Portal
@@ -73,7 +74,7 @@ namespace SWWerkplaats.Configurator.Portal
                 if (line.Category == "Machine") price.Machine += line.SalesTotal;
                 else if (line.Category == "Arbeid") price.Labour += line.SalesTotal;
                 else if (line.Category == "Materiaal") price.Material += line.PurchaseTotal;
-                else if (line.Category == "Beslag") price.Hardware += line.PurchaseTotal;
+                else if (line.Category == "Beslag" || line.Category == "Veiligheid") price.Hardware += line.PurchaseTotal;
                 price.Margin += line.SalesTotal - line.PurchaseTotal;
             }
 
@@ -145,7 +146,7 @@ namespace SWWerkplaats.Configurator.Portal
             sb.AppendLine("Btw 21%: EUR " + M(price.Vat));
             sb.AppendLine("Totaal incl. btw: EUR " + M(price.IncVat));
             sb.AppendLine();
-            sb.AppendLine("Let op: prijsstatus, prijsdatum en leverancier komen uit de centrale masterdata. Regels met status Schatting, Voorlopig of Offerte nodig moeten vóór bestellen worden bevestigd.");
+            sb.AppendLine("Let op: prijsstatus, prijsdatum en leverancier komen uit de centrale masterdata. Regels met status Ontbrekende inkoopdata, Schatting, Voorlopig of Offerte nodig moeten vóór bestellen worden bevestigd.");
             return sb.ToString();
         }
 
@@ -158,6 +159,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (value.Contains("hsr15") || value.Contains("rail") || value.Contains("lineair")) return "Lineaire geleiding en montage";
             if (value.Contains("kogelpot")) return "Kogelpotten voor het werkvlak";
             if (value.Contains("hpl")) return "HPL-werkvlak";
+            if (value.Contains("pa-cf") || value.Contains("3d-print")) return "PA-CF montageadapters";
             if (value.Contains("adapterplaat") || value.Contains("en aw")) return "Aluminium montageplaten";
             if (value.Contains("profiel") || value.Contains("80x") || value.Contains("40x")) return "Geanodiseerde aluminium profielconstructie";
             return description;
@@ -167,19 +169,54 @@ namespace SWWerkplaats.Configurator.Portal
         {
             if (nestingPlan != null && nestingPlan.StockSheets.Count > 0)
             {
-                AddNestedStockSheetLines(price, model.ProductId, nestingPlan);
+                var customPricedMaterialIds = AddDimensionSpecificSheetLines(price, model);
+                AddNestedStockSheetLines(price, model.ProductId, nestingPlan, customPricedMaterialIds);
                 return;
             }
 
             AddNetSheetPartLines(price, model);
         }
 
-        private static void AddNestedStockSheetLines(PortalPrice price, string productId, NestingPlan nestingPlan)
+        private static HashSet<string> AddDimensionSpecificSheetLines(PortalPrice price, WorkbenchModel model)
+        {
+            var customPricedMaterialIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sheet in model.Sheets)
+            {
+                if (sheet.Material == null) continue;
+                var estimate = PriceEstimate(
+                    model.ProductId,
+                    "Materiaal",
+                    sheet.Material.Id,
+                    EstimatedSheetM2Price(sheet.Material),
+                    35,
+                    (decimal)sheet.LengthMm,
+                    (decimal)sheet.WidthMm,
+                    (decimal)sheet.Material.ThicknessMm);
+                if (!estimate.HasExactDimensions) continue;
+
+                customPricedMaterialIds.Add(sheet.Material.Id);
+                AddLine(
+                    price,
+                    "Materiaal",
+                    sheet.Material.Id,
+                    sheet.Name + " - " + sheet.LengthMm.ToString("0.###", CultureInfo.InvariantCulture) + "x" + sheet.WidthMm.ToString("0.###", CultureInfo.InvariantCulture) + " mm",
+                    Math.Max(1, sheet.Quantity),
+                    string.IsNullOrWhiteSpace(estimate.Unit) ? "st" : estimate.Unit,
+                    estimate.UnitPrice,
+                    estimate.MarkupPercent,
+                    estimate.Note,
+                    estimate);
+            }
+            return customPricedMaterialIds;
+        }
+
+        private static void AddNestedStockSheetLines(PortalPrice price, string productId, NestingPlan nestingPlan, HashSet<string> customPricedMaterialIds)
         {
             var totals = new Dictionary<string, MaterialAmount>();
             foreach (var stock in nestingPlan.StockSheets)
             {
                 if (stock.Material == null) continue;
+                if (customPricedMaterialIds != null && customPricedMaterialIds.Contains(stock.Material.Id)) continue;
                 var key = stock.Material.Id + "|" + stock.Material.ThicknessMm.ToString("0.###", CultureInfo.InvariantCulture)
                     + "|" + stock.StockLengthMm.ToString("0.###", CultureInfo.InvariantCulture)
                     + "|" + stock.StockWidthMm.ToString("0.###", CultureInfo.InvariantCulture);
@@ -261,9 +298,10 @@ namespace SWWerkplaats.Configurator.Portal
         {
             foreach (var item in model.Hardware)
             {
+                var category = string.IsNullOrWhiteSpace(item.PricingCategory) ? "Beslag" : item.PricingCategory;
                 var key = HardwarePriceKey(item);
-                var estimate = PriceEstimate(model.ProductId, "Beslag", key, EstimatedHardwareUnitPrice(item), 45);
-                AddLine(price, "Beslag", key, item.Name, Math.Max(0, item.Quantity), item.Unit ?? "st", estimate.UnitPrice, estimate.MarkupPercent, estimate.Note, estimate, item.ArticleNumber);
+                var estimate = PriceEstimate(model.ProductId, category, key, EstimatedHardwareUnitPrice(item), 45);
+                AddLine(price, category, key, item.Name, Math.Max(0, item.Quantity), item.Unit ?? "st", estimate.UnitPrice, estimate.MarkupPercent, estimate.Note, estimate, item.ArticleNumber);
             }
         }
 
@@ -362,45 +400,136 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static string HardwarePriceKey(HardwareItem item)
         {
+            if (item != null && !string.IsNullOrWhiteSpace(item.PricingKey)) return item.PricingKey;
             var name = (item == null ? "" : item.Name ?? "").ToLowerInvariant();
+            var article = item == null ? "" : item.ArticleNumber ?? "";
             if (item != null && string.Equals(item.ArticleNumber, "905.560.71", StringComparison.OrdinalIgnoreCase)) return "ikea_sektion_90556071";
+            if (article.IndexOf("geming_hte2_o1_400", StringComparison.OrdinalIgnoreCase) >= 0) return "geming_hte2_o1_400";
+            if (article.IndexOf("ZI-1415-S", StringComparison.OrdinalIgnoreCase) >= 0 || article.IndexOf("1003339", StringComparison.OrdinalIgnoreCase) >= 0) return "maunsystem_zi_1415_s";
+            if (article.IndexOf("ZI-1744", StringComparison.OrdinalIgnoreCase) >= 0 || article.IndexOf("1009657", StringComparison.OrdinalIgnoreCase) >= 0) return "maunsystem_zi_1744";
+            if (article.IndexOf("MAUNSYSTEM_NUT8_M8X22_SET", StringComparison.OrdinalIgnoreCase) >= 0) return "mounting_set_nut8_zi1744_candidate";
+            if (article.IndexOf("lex_hsr15_2x1500_4carts", StringComparison.OrdinalIgnoreCase) >= 0) return "lex_hsr15_2x1500_4carts";
+            if (article.IndexOf("VCN226", StringComparison.OrdinalIgnoreCase) >= 0 || article.IndexOf("836926179", StringComparison.OrdinalIgnoreCase) >= 0) return "vcn226_indexing_plunger_m10_candidate";
+            if (article.IndexOf("VCN310-30", StringComparison.OrdinalIgnoreCase) >= 0 || article.IndexOf("1005008611039159", StringComparison.OrdinalIgnoreCase) >= 0) return "vcn310_30_ball_transfer";
+            if (article.IndexOf("879-3725", StringComparison.OrdinalIgnoreCase) >= 0) return "rspro_cable_trunking_8793725_4x1m_set";
+            if (article.IndexOf("LEX-LABEL-SET", StringComparison.OrdinalIgnoreCase) >= 0) return "lex_label_set_estimate";
+            if (article.IndexOf("LEX_HSR15_ADAPTER_M4X12_CSUNK_FABORY", StringComparison.OrdinalIgnoreCase) >= 0) return "lex_hsr15_adapter_m4x12_csunk_fabory";
+            if (article.IndexOf("LEX_HSR15_ADAPTER_M8_TNUT", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_t_nut_8_m8";
+            if (article.IndexOf("LEX_HSR15_RAIL_TNUT_M4", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_t_nut_8_sliding_m4";
+            if (article.IndexOf("LEX_HTE2_ENDPLATE_M8_TNUT", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_t_nut_8_m8";
+            if (article.IndexOf("100193", StringComparison.OrdinalIgnoreCase) >= 0) return "end_cap_8_80x80_black_candidate";
+            if (article.IndexOf("100192", StringComparison.OrdinalIgnoreCase) >= 0) return "end_cap_8_80x40_black_candidate";
+            if (article.IndexOf("100184", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_end_cap_8_40x40_black";
+            if (article.IndexOf("0.0.700.81", StringComparison.OrdinalIgnoreCase) >= 0) return "item_schwenkriegel_8_pi_54_pa_70081";
+            if (name.IndexOf("afdekkap 8 80x80", StringComparison.OrdinalIgnoreCase) >= 0) return "end_cap_8_80x80_black_candidate";
+            if (name.IndexOf("afdekkap 8 80x40", StringComparison.OrdinalIgnoreCase) >= 0) return "end_cap_8_80x40_black_candidate";
+            if (name.IndexOf("afdekkap 8 40x40", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_end_cap_8_40x40_black";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("101445", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_footplate_10_80x80_m16";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("101219", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_leveling_foot_d80_m16x150";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("101245", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_corner_bracket_set_10_40x80";
             if (item != null && (item.ArticleNumber ?? "").IndexOf("100199", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_end_cap_8_160x40_black";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100184", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_end_cap_8_40x40_black";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100342", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_standard_connector_8_40";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100673", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_button_head_iso7380_m8x25";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100360", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_corner_bracket_set_8_40x40";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100391", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_mounting_bracket_8_40x40x20_zn";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100691", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_countersunk_socket_m6x12_galvanized";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("100242", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_t_slot_nut_8_bridge_m6";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101068", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_fixed_d100";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101074", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_swivel_d100";
+            if (item != null && (item.ArticleNumber ?? "").IndexOf("101076", StringComparison.OrdinalIgnoreCase) >= 0) return "techxxl_caster_swivel_brake_d100";
             if (name.IndexOf("schroef") >= 0 || name.IndexOf("bout") >= 0 || name.IndexOf("ring") >= 0) return "cost_fastener_generic";
             if (name.IndexOf("rail") >= 0 || name.IndexOf("ladegeleider") >= 0) return "measured_500_r2";
             if (name.IndexOf("scharnier") >= 0) return "komplement_hinge_r2";
             return name;
         }
 
-        private static PricingEstimate PriceEstimate(string productId, string category, string key, decimal fallbackUnitPrice, decimal fallbackMarkupPercent)
+        private static PricingEstimate PriceEstimate(
+            string productId,
+            string category,
+            string key,
+            decimal fallbackUnitPrice,
+            decimal fallbackMarkupPercent,
+            decimal? lengthMm = null,
+            decimal? widthMm = null,
+            decimal? thicknessMm = null)
         {
             List<PricingEstimate> candidates;
             if (!string.IsNullOrEmpty(key) && PricingEstimates().TryGetValue(PriceKey(category, key), out candidates) && candidates.Count > 0)
             {
                 PricingEstimate selected = null;
                 var selectedRank = int.MaxValue;
+                var selectedSpecificity = -1;
                 foreach (var candidate in candidates)
                 {
+                    int specificity;
+                    if (!OfferApplies(candidate, productId, lengthMm, widthMm, thicknessMm, out specificity)) continue;
                     var rank = SupplierPreferenceRank(SupplierPreferences(), productId, candidate.Category, candidate.Subcategory, candidate.SupplierId);
-                    if (selected == null || rank < selectedRank || (rank == selectedRank && string.Compare(candidate.OfferId, selected.OfferId, StringComparison.OrdinalIgnoreCase) < 0))
+                    if (selected == null
+                        || specificity > selectedSpecificity
+                        || (specificity == selectedSpecificity && rank < selectedRank)
+                        || (specificity == selectedSpecificity && rank == selectedRank && string.Compare(candidate.OfferId, selected.OfferId, StringComparison.OrdinalIgnoreCase) < 0))
                     {
                         selected = candidate;
                         selectedRank = rank;
+                        selectedSpecificity = specificity;
                     }
                 }
-                selected.SupplierRank = selectedRank;
-                return selected;
+                if (selected != null)
+                {
+                    selected.SupplierRank = selectedRank;
+                    return selected;
+                }
             }
 
+            var strictLexPricing = string.Equals(productId, "werktafel_lex", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(productId, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase);
             return new PricingEstimate
             {
-                UnitPrice = fallbackUnitPrice,
+                UnitPrice = strictLexPricing ? 0m : fallbackUnitPrice,
                 MarkupPercent = fallbackMarkupPercent,
-                PriceStatus = "Fallback",
-                Note = "Fallback schatting; geen regel gevonden in config/product-master-data.xlsx of de compatibiliteits-CSV"
+                PriceStatus = strictLexPricing ? "Ontbrekende inkoopdata" : "Fallback",
+                Note = strictLexPricing
+                    ? "Geen passende leveranciersregel in de gevalideerde runtime-masterdata; bedrag bewust niet geschat"
+                    : "Fallback schatting; geen passende regel gevonden in de gevalideerde runtime-masterdata"
             };
+        }
+
+        private static bool OfferApplies(PricingEstimate candidate, string productId, decimal? lengthMm, decimal? widthMm, decimal? thicknessMm, out int specificity)
+        {
+            specificity = 0;
+            if (!ProductScopeMatches(candidate.ProductIds, productId)) return false;
+            if (!string.IsNullOrWhiteSpace(candidate.ProductIds)) specificity += 1;
+
+            var hasDimensions = candidate.LengthMm.HasValue || candidate.WidthMm.HasValue || candidate.ThicknessMm.HasValue;
+            var requestedDimensions = lengthMm.HasValue || widthMm.HasValue || thicknessMm.HasValue;
+            if (hasDimensions && !requestedDimensions) return false;
+            if (!hasDimensions) return true;
+            if (!lengthMm.HasValue || !widthMm.HasValue || !thicknessMm.HasValue) return false;
+
+            var direct = MatchesDimension(candidate.LengthMm, lengthMm.Value)
+                && MatchesDimension(candidate.WidthMm, widthMm.Value);
+            var rotated = MatchesDimension(candidate.LengthMm, widthMm.Value)
+                && MatchesDimension(candidate.WidthMm, lengthMm.Value);
+            if ((!direct && !rotated) || !MatchesDimension(candidate.ThicknessMm, thicknessMm.Value)) return false;
+            specificity += 10;
+            candidate.HasExactDimensions = true;
+            return true;
+        }
+
+        private static bool ProductScopeMatches(string scope, string productId)
+        {
+            if (string.IsNullOrWhiteSpace(scope)) return true;
+            foreach (var value in scope.Split(new[] { ';', ',', '|' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (string.Equals(value.Trim(), productId ?? "", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        private static bool MatchesDimension(decimal? expected, decimal actual)
+        {
+            return !expected.HasValue || Math.Abs(expected.Value - actual) <= 0.01m;
         }
 
         private static bool SheetPriceIsPerPlate(string unit)
@@ -416,14 +545,12 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static Dictionary<string, List<PricingEstimate>> PricingEstimates()
         {
-            var workbookPath = ProductMasterWorkbookPath();
-            var csvPath = PricingConfigPath();
-            var preferredPath = !string.IsNullOrEmpty(workbookPath) && File.Exists(workbookPath) ? workbookPath : csvPath;
-            var preferredWriteTime = !string.IsNullOrEmpty(preferredPath) && File.Exists(preferredPath)
-                ? File.GetLastWriteTimeUtc(preferredPath)
+            var runtimePath = RuntimeMasterDataPath();
+            var preferredWriteTime = !string.IsNullOrEmpty(runtimePath) && File.Exists(runtimePath)
+                ? File.GetLastWriteTimeUtc(runtimePath)
                 : DateTime.MinValue;
             if (pricingEstimates != null
-                && string.Equals(pricingEstimatesSourcePath, preferredPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(pricingEstimatesSourcePath, runtimePath, StringComparison.OrdinalIgnoreCase)
                 && pricingEstimatesSourceWriteTimeUtc == preferredWriteTime)
             {
                 return pricingEstimates;
@@ -431,53 +558,10 @@ namespace SWWerkplaats.Configurator.Portal
 
             pricingEstimates = new Dictionary<string, List<PricingEstimate>>(StringComparer.OrdinalIgnoreCase);
             supplierPreferences = new List<SupplierPreference>();
-            if (!string.IsNullOrEmpty(workbookPath) && LoadPricingWorkbook(workbookPath, pricingEstimates) && pricingEstimates.Count > 0)
+            if (!string.IsNullOrEmpty(runtimePath) && LoadPricingRuntime(runtimePath, pricingEstimates) && pricingEstimates.Count > 0)
             {
-                RememberPricingSource(workbookPath);
-                return pricingEstimates;
+                RememberPricingSource(runtimePath);
             }
-
-            var path = csvPath;
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return pricingEstimates;
-
-            string[] lines;
-            try
-            {
-                lines = File.ReadAllLines(path);
-            }
-            catch
-            {
-                return pricingEstimates;
-            }
-
-            for (var i = 1; i < lines.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(lines[i])) continue;
-                var columns = SplitCsvLine(lines[i]);
-                if (columns.Length < 6) continue;
-
-                decimal unitPrice;
-                decimal markup;
-                if (!TryParseMoney(columns[4], out unitPrice)) continue;
-                if (!TryParseMoney(columns[5], out markup)) markup = 0;
-
-                var category = columns[0];
-                var key = columns[1];
-                if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
-
-                var fallbackEstimate = new PricingEstimate
-                {
-                    Category = category,
-                    Unit = columns.Length > 3 ? columns[3] : "",
-                    UnitPrice = unitPrice,
-                    MarkupPercent = markup,
-                    PriceStatus = "Compatibiliteits-CSV",
-                    Note = columns.Length > 6 && !string.IsNullOrWhiteSpace(columns[6]) ? columns[6] : "Uit compatibiliteitsbestand config/pricing-estimates.csv"
-                };
-                AddPricingEstimate(pricingEstimates, PriceKey(category, key), fallbackEstimate);
-            }
-
-            RememberPricingSource(path);
             return pricingEstimates;
         }
 
@@ -505,6 +589,106 @@ namespace SWWerkplaats.Configurator.Portal
             var fromBase = FindConfigFileUpwards(AppDomain.CurrentDomain.BaseDirectory, "product-master-data.xlsx");
             if (fromBase != null) return fromBase;
             return FindConfigFileUpwards(Environment.CurrentDirectory, "product-master-data.xlsx");
+        }
+
+        private static string RuntimeMasterDataPath()
+        {
+            var fromBase = FindRuntimeMasterDataUpwards(AppDomain.CurrentDomain.BaseDirectory);
+            return fromBase ?? FindRuntimeMasterDataUpwards(Environment.CurrentDirectory);
+        }
+
+        private static string FindRuntimeMasterDataUpwards(string startFolder)
+        {
+            if (string.IsNullOrEmpty(startFolder)) return null;
+            var folder = Path.GetFullPath(startFolder);
+            for (var i = 0; i < 8 && !string.IsNullOrEmpty(folder); i++)
+            {
+                var candidate = Path.Combine(folder, "config", "runtime", "masterdata-runtime.json");
+                if (File.Exists(candidate)) return candidate;
+                var parent = Directory.GetParent(folder);
+                if (parent == null) break;
+                folder = parent.FullName;
+            }
+            return null;
+        }
+
+        private static bool LoadPricingRuntime(string path, Dictionary<string, List<PricingEstimate>> target)
+        {
+            try
+            {
+                var catalog = MasterDataRuntimeCatalog.LoadRequired();
+                if (!string.Equals(Path.GetFullPath(catalog.SourcePath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase)) return false;
+
+                var supplierNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var supplier in catalog.Records("suppliers"))
+                {
+                    var id = MasterDataRuntimeCatalog.Value(supplier, "Leverancier-ID");
+                    var name = MasterDataRuntimeCatalog.Value(supplier, "Naam");
+                    if (!string.IsNullOrWhiteSpace(id)) supplierNames[id] = string.IsNullOrWhiteSpace(name) ? id : name;
+                }
+
+                supplierPreferences = new List<SupplierPreference>();
+                foreach (var row in catalog.Records("supplierPreferences"))
+                {
+                    int rank;
+                    if (!int.TryParse(MasterDataRuntimeCatalog.Value(row, "Rang"), NumberStyles.Integer, CultureInfo.InvariantCulture, out rank)) continue;
+                    supplierPreferences.Add(new SupplierPreference
+                    {
+                        PreferenceId = MasterDataRuntimeCatalog.Value(row, "Voorkeur-ID"),
+                        Category = MasterDataRuntimeCatalog.Value(row, "Categorie"),
+                        Subcategory = MasterDataRuntimeCatalog.Value(row, "Subcategorie"),
+                        SupplierId = MasterDataRuntimeCatalog.Value(row, "Leverancier-ID"),
+                        Rank = rank,
+                        ScopeType = MasterDataRuntimeCatalog.Value(row, "Scope-type"),
+                        ScopeId = MasterDataRuntimeCatalog.Value(row, "Scope-ID"),
+                        Status = MasterDataRuntimeCatalog.Value(row, "Status")
+                    });
+                }
+
+                foreach (var row in catalog.Records("offers"))
+                {
+                    var category = MasterDataRuntimeCatalog.Value(row, "Categorie");
+                    var key = MasterDataRuntimeCatalog.Value(row, "Interne-ID");
+                    decimal unitPrice;
+                    decimal markup;
+                    if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
+                    var hasUnitPrice = TryParseMoney(MasterDataRuntimeCatalog.Value(row, "Inkoopprijs excl. btw"), out unitPrice);
+                    if (!TryParseMoney(MasterDataRuntimeCatalog.Value(row, "Opslag %"), out markup)) markup = 0;
+                    var supplierId = MasterDataRuntimeCatalog.Value(row, "Leverancier-ID");
+                    string supplierName;
+                    AddPricingEstimate(target, PriceKey(category, key), new PricingEstimate
+                    {
+                        OfferId = MasterDataRuntimeCatalog.Value(row, "Aanbieding-ID"),
+                        Category = category,
+                        Subcategory = MasterDataRuntimeCatalog.Value(row, "Subcategorie"),
+                        Unit = MasterDataRuntimeCatalog.Value(row, "Eenheid"),
+                        UnitPrice = unitPrice,
+                        HasUnitPrice = hasUnitPrice,
+                        MarkupPercent = markup,
+                        SupplierId = supplierId,
+                        Supplier = supplierNames.TryGetValue(supplierId ?? string.Empty, out supplierName) ? supplierName : supplierId,
+                        SupplierArticleCode = MasterDataRuntimeCatalog.Value(row, "Leveranciers-artikelcode"),
+                        OrderUrl = MasterDataRuntimeCatalog.Value(row, "Bestel-URL"),
+                        PriceDate = NormalizeExcelDate(MasterDataRuntimeCatalog.Value(row, "Prijsdatum")),
+                        PriceStatus = MasterDataRuntimeCatalog.Value(row, "Prijsstatus"),
+                        ImageId = MasterDataRuntimeCatalog.Value(row, "Afbeelding-ID"),
+                        ImageSourceUrl = MasterDataRuntimeCatalog.Value(row, "Afbeelding-bron-URL"),
+                        LocalImagePath = MasterDataRuntimeCatalog.Value(row, "Lokale afbeelding"),
+                        Note = MasterDataRuntimeCatalog.Value(row, "Notitie"),
+                        ProductIds = MasterDataRuntimeCatalog.Value(row, "Product-ID"),
+                        LengthMm = ParseOptionalDecimal(MasterDataRuntimeCatalog.Value(row, "Lengte mm")),
+                        WidthMm = ParseOptionalDecimal(MasterDataRuntimeCatalog.Value(row, "Breedte mm")),
+                        ThicknessMm = ParseOptionalDecimal(MasterDataRuntimeCatalog.Value(row, "Dikte mm"))
+                    });
+                }
+                return target.Count > 0;
+            }
+            catch
+            {
+                target.Clear();
+                supplierPreferences = new List<SupplierPreference>();
+                return false;
+            }
         }
 
         private static string FindPricingConfigUpwards(string startFolder)
@@ -559,7 +743,7 @@ namespace SWWerkplaats.Configurator.Portal
                         if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key)) continue;
                         decimal unitPrice;
                         decimal markup;
-                        if (!TryParseMoney(Cell(row, headers, "Inkoopprijs excl. btw"), out unitPrice)) continue;
+                        var hasUnitPrice = TryParseMoney(Cell(row, headers, "Inkoopprijs excl. btw"), out unitPrice);
                         if (!TryParseMoney(Cell(row, headers, "Opslag %"), out markup)) markup = 0;
 
                         var candidate = new PricingEstimate
@@ -569,6 +753,7 @@ namespace SWWerkplaats.Configurator.Portal
                             Subcategory = Cell(row, headers, "Subcategorie"),
                             Unit = Cell(row, headers, "Eenheid"),
                             UnitPrice = unitPrice,
+                            HasUnitPrice = hasUnitPrice,
                             MarkupPercent = markup,
                             SupplierId = Cell(row, headers, "Leverancier-ID"),
                             SupplierArticleCode = Cell(row, headers, "Leveranciers-artikelcode"),
@@ -578,7 +763,11 @@ namespace SWWerkplaats.Configurator.Portal
                             ImageId = Cell(row, headers, "Afbeelding-ID"),
                             ImageSourceUrl = Cell(row, headers, "Afbeelding-bron-URL"),
                             LocalImagePath = Cell(row, headers, "Lokale afbeelding"),
-                            Note = Cell(row, headers, "Notitie")
+                            Note = Cell(row, headers, "Notitie"),
+                            ProductIds = Cell(row, headers, "Product-ID"),
+                            LengthMm = ParseOptionalDecimal(Cell(row, headers, "Lengte mm")),
+                            WidthMm = ParseOptionalDecimal(Cell(row, headers, "Breedte mm")),
+                            ThicknessMm = ParseOptionalDecimal(Cell(row, headers, "Dikte mm"))
                         };
                         string supplierName;
                         candidate.Supplier = supplierData.Names.TryGetValue(candidate.SupplierId ?? "", out supplierName) ? supplierName : candidate.SupplierId;
@@ -807,6 +996,12 @@ namespace SWWerkplaats.Configurator.Portal
             return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
         }
 
+        private static decimal? ParseOptionalDecimal(string value)
+        {
+            decimal parsed;
+            return TryParseMoney(value, out parsed) ? parsed : (decimal?)null;
+        }
+
         private static string[] SplitCsvLine(string line)
         {
             var columns = new List<string>();
@@ -847,6 +1042,9 @@ namespace SWWerkplaats.Configurator.Portal
         {
             if (request != null && string.Equals(request.Product, "machinebasis", StringComparison.OrdinalIgnoreCase)) return "Parametrische machinebasis";
             if (request != null && string.Equals(request.Product, "robotcel", StringComparison.OrdinalIgnoreCase)) return "Robot cel";
+            if (request != null && string.Equals(request.Product, "lineaire_robotcel", StringComparison.OrdinalIgnoreCase)) return "Lineaire robotcel";
+            if (request != null && string.Equals(request.Product, "materiaalwagen", StringComparison.OrdinalIgnoreCase)) return "Modulaire materiaal- en gereedschapswagen";
+            if (request != null && string.Equals(request.Product, "sim_rig_4080", StringComparison.OrdinalIgnoreCase)) return "Modulaire sim-racing-rig 40x80";
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
             if (request != null && string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)) return "Workstation";
             if (request != null && string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)) return "Workstation ontwikkelvariant";
@@ -912,6 +1110,12 @@ namespace SWWerkplaats.Configurator.Portal
             public string LocalImagePath { get; set; }
             public string Note { get; set; }
             public int SupplierRank { get; set; }
+            public string ProductIds { get; set; }
+            public decimal? LengthMm { get; set; }
+            public decimal? WidthMm { get; set; }
+            public decimal? ThicknessMm { get; set; }
+            public bool HasExactDimensions { get; set; }
+            public bool HasUnitPrice { get; set; }
         }
 
         private sealed class SupplierPreference

@@ -7,6 +7,9 @@ Lokale configurator en werkplaatsportal voor SW Werkplaats. De app rekent kast- 
 - Klantconfigurator via lokale webportal op `http://localhost:8088`.
 - Cabinet/kast generator met lades, legplanken, achterwand, groeven en montagegaten.
 - Werkbank met kastonderbouw: doorlopende bodem, deurparen met T-stijlen, stelpootgaten en losse voorzetplint.
+- Profielproducten: machinebasis, robotcel, modulaire materiaal-/gereedschapswagen en configureerbare 40×80-sim-rig met centrale leveranciersselectie.
+- Materiaalwagen: 600–1800 mm breed, 450–1000 mm diep, 700–1200 mm bovenbladhoogte, 2–4 legbordlagen, configureerbare duwbeugel en twee D100-wielopstellingen.
+- Sim-rig: 600–800 mm breed en 1200–1800 mm lang, verstelbare stuurbrug en pedaalhoek, CSL-DD- of blanco zijplaten en zes functioneel vereenvoudigde CNC-adapterplaten.
 - Nesting per plaatmateriaal met SVG-preview en CSV-controle.
 - Mach3 G-code voor geneste platen, inclusief toolwissel-stop (`M0`) en plaatwisseltekst.
 - Controle-output voor railgaten, tekencontracten, BOM, prijs en assemblage.
@@ -81,17 +84,34 @@ Invoke-RestMethod http://localhost:8088/api/health
 4. Open daarna `http://localhost:8088`.
 
 Gebruik `.\Web configurator stoppen.cmd` als de app oud lijkt of als een build faalt omdat `SWWerkplaats.Configurator.exe` nog draait. Gebruik daarna `rebuild`.
-Gebruik `.\SW configurator rebuild.cmd` alleen voor de nog niet gemigreerde desktopfuncties zoals de rail-/dragereditor. De webportal is de voorkeursinterface. De twee startroutes worden in een volgende fase samengevoegd.
+De webportal is de standaardinterface. De rail-/dragereditor staat op `http://localhost:8088/library`. De desktopstart blijft alleen als tijdelijke compatibiliteitsschil; alle routes gebruiken dezelfde `dotnet`/MSBuild-build.
 
 ## Build check
 
-Handmatig bouwen:
+Handmatig bouwen via de canonieke route:
 
 ```powershell
-dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj
+.\scripts\build-configurator.ps1
 ```
 
 GitHub Actions draait dezelfde build op Windows bij push en pull request.
+
+Het numerieke bouwcontract van de materiaalwagen staat in `config/material-cart-assembly-manifest.json`. Wijzig profielopbouw of parameters alleen samen met `MaterialCartEngine`, de masterdata en `ProductContracts.RegressionTests`, zodat portal, BOM, prijs en 3D-assembly gelijk blijven.
+
+Het beeld-afgeleide R1-contract van de sim-rig staat in `config/sim-rig-4080-assembly-manifest.json`. Profielaantallen, doorsnede-oriëntatie, custom plaatcontouren en functionele gaten/sleuven worden samen bewaakt door `SimRigEngine`, de masterdata en `ProductContracts.RegressionTests`. Definitieve serieproductie blijft geblokkeerd tot de fysieke proefbouw uit `docs/producten/sim-rig-4080.md` is afgerond.
+
+Voer vóór een uitrol of overdracht de volledige lokale controle uit:
+
+```powershell
+.\Web configurator stoppen.cmd
+python .\scripts\validate-master-data.py
+python .\scripts\generate-masterdata-runtime.py --check
+python .\scripts\check-repository.py
+.\scripts\build-configurator.ps1 -Configuration Release
+dotnet run --configuration Release --project .\tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj
+dotnet run --configuration Release --project .\tests\ProductContracts.RegressionTests\ProductContracts.RegressionTests.csproj
+dotnet run --configuration Release --project .\tests\OrderStorage.IntegrationTests\OrderStorage.IntegrationTests.csproj
+```
 
 Snelle portal-check na wijzigingen:
 
@@ -127,7 +147,7 @@ Invoke-RestMethod -Uri http://localhost:8088/api/quote -Method Post -ContentType
 
 ## Lokale data
 
-De portal schrijft orders, freeswachtrij en gegenereerde bestanden standaard naar de externe operationele map:
+De portal schrijft orders, freeswachtrij en gegenereerde bestanden standaard naar de externe operationele map. Ordermetadata staat in SQLite; JSON-orderbestanden blijven als export- en herstelmirror bestaan:
 
 ```text
 C:\SWWerkplaats\PortalData
@@ -152,14 +172,21 @@ src/SWWerkplaats.Configurator/
   Engine/         Productberekeningen voor kast/werkbank
   Manufacturing/ Nesting, G-code en productie-export
   Portal/         Lokale webportal, visualisaties en outputservice
-  SolidWorks/     Voorbereiding voor SolidWorks-export
+  SolidWorks/     Export, klantoutput en geïsoleerde SolidWorks-worker
   UI/             WinForms shell
-config/           Voorbeeldconfiguratie en lokale instellingen
-docs/             Ontwerpnotities
+config/
+  product-master-data.xlsx        Menselijke beheerbron
+  master-data-schema.json         Tabel-, sleutel- en relatiecontract
+  catalog-images/                 Versiebeheerde leveranciersafbeeldingen
+  runtime/masterdata-runtime.json Gegenereerde applicatiesnapshot
+  portal-runtime.example.json     Installatievoorbeeld; lokale override blijft buiten Git
+docs/             Actuele contracten, productafspraken, toekomst en archief
 scripts/          Start/build scripts
 .codex/skills/    Projectskills; geen gegenereerde Python-caches
-artifacts/        Gegenereerde tijdelijke QA- en exportresultaten
+tests/            Uitvoerbare rook-, productcontract- en opslagtests
 ```
+
+Begin voor beheer- of architectuurwerk bij `AGENTS.md` en `docs/README.md`. Oude iteratieverslagen onder `docs/archive/` zijn context en geen actueel runtimecontract.
 
 ## Git workflow
 
@@ -182,7 +209,9 @@ Het leidende beheerregister voor productregels, materialen, componenten, verbind
 config\product-master-data.xlsx
 ```
 
-De portal leest het tabblad `Prijs & inkoop` rechtstreeks. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus. `config\pricing-estimates.csv` blijft tijdelijk uitsluitend als compatibiliteits-terugval bestaan wanneer de hoofdwerkmap ontbreekt of niet leesbaar is. Verwijder deze terugval pas nadat alle masterdataconsumenten naar één gevalideerde runtime-snapshot zijn gemigreerd.
+Excel is de menselijke beheerbron. `python scripts\generate-masterdata-runtime.py` compileert de werkmap en afbeeldingscatalogus naar `config\runtime\masterdata-runtime.json`; pricing, leveranciersvoorkeuren en CAM lezen deze snapshot. De kolom `Interne-ID` koppelt een BOM-regel aan aanbieding, leverancier, artikelcode, bestel-URL, afbeelding en prijsstatus.
+
+De binaire catalogusafbeeldingen staan in `config\catalog-images\<leverancier>\` en hun stabiele koppelingen in `config\catalog-images\image-catalog.json`. Excel bevat alleen previews. Voeg geen losse leveranciers- of cataloguswerkbladen toe; de vaste indeling en wijzigingsprocedure staan in `docs\Masterdata-beheer.md`.
 
 Rails en legplankdragers staan in:
 
@@ -190,7 +219,15 @@ Rails en legplankdragers staan in:
 config\hardware-library.json
 ```
 
-In de desktop configurator kun je deze aanpassen via tab `Library` en daarna `Library opslaan`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
+In de portal kun je deze aanpassen via `/library`. `Kast posities ;` en `Lade posities ;` zijn puntkomma-gescheiden X-posities in mm, bijvoorbeeld `34;98;226;354;418`. Als deze posities leeg zijn gebruikt de app `1e gat + gatpas * aantal`.
+
+## Uitrollen
+
+De huidige ondersteunde uitrolvorm is één volledige repository-checkout op een Windows-server of werkstation. Bouw en start vanuit die map. Kopieer **niet alleen** `SWWerkplaats.Configurator.exe`: de app verwacht ook de versiebeheerde `config/runtime/masterdata-runtime.json`, catalogusassets en overige configuratie in de repositorystructuur.
+
+Operationele orderdata hoort niet in Git en staat per installatie onder `C:\SWWerkplaats\PortalData`. Maak op een nieuwe installatie `config\portal-runtime.json` vanuit het voorbeeldbestand en houd dit lokale bestand buiten versiebeheer.
+
+Voor meerdere gebruikers draait één portalproces met SQLite/WAL. Publiceer de ingebouwde listener niet rechtstreeks op internet; gebruik bij externe toegang een HTTPS-reverse-proxy met authenticatie en logging. De volledige installatie-, update-, back-up- en rollbackprocedure staat in `docs\deployment\Lokale-server.md`.
 
 ## Huidige technische afspraken
 

@@ -28,7 +28,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (request == null) throw new ArgumentNullException("request");
 
-            var orderId = "SW-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var orderId = "SW-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6).ToUpperInvariant();
             var orderFolder = repository.CreateOrderFolder(orderId);
             var output = production.GenerateOrderFiles(request, orderFolder);
             var price = pricing.Calculate(output.Model, output.NestingPlan);
@@ -95,8 +95,11 @@ namespace SWWerkplaats.Configurator.Application
         private static string ProductName(PortalQuoteRequest request)
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
+            if (request != null && string.Equals(request.Product, "materiaalwagen", StringComparison.OrdinalIgnoreCase)) return "Modulaire materiaal- en gereedschapswagen";
+            if (request != null && string.Equals(request.Product, "sim_rig_4080", StringComparison.OrdinalIgnoreCase)) return "Modulaire sim-racing-rig 40x80";
             if (request != null && string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)) return "Workstation";
             if (request != null && string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)) return "Workstation ontwikkelvariant";
+            if (request != null && string.Equals(request.Product, "hoogteverstelbare_werktafel", StringComparison.OrdinalIgnoreCase)) return "Hoogteverstelbare werktafel";
             if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)) return "Werkbank met kastonderbouw";
             return "Cabinet";
         }

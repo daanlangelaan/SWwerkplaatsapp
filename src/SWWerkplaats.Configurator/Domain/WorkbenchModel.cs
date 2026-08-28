@@ -14,6 +14,9 @@ namespace SWWerkplaats.Configurator.Domain
         public List<SheetPart> Sheets { get; private set; }
         public List<HardwareItem> Hardware { get; private set; }
         public List<AssemblyPlacement> AssemblyPlacements { get; private set; }
+        public List<AssemblyConnection> AssemblyConnections { get; private set; }
+        public List<ProfileFastenerCalculation> ProfileFastenerCalculations { get; private set; }
+        public StructuralCalculationReport StructuralCalculation { get; set; }
         public ProfileSawingMode SawingMode { get; set; }
         public List<string> DesignNotes { get; private set; }
 
@@ -24,6 +27,8 @@ namespace SWWerkplaats.Configurator.Domain
             Sheets = new List<SheetPart>();
             Hardware = new List<HardwareItem>();
             AssemblyPlacements = new List<AssemblyPlacement>();
+            AssemblyConnections = new List<AssemblyConnection>();
+            ProfileFastenerCalculations = new List<ProfileFastenerCalculation>();
             DesignNotes = new List<string>();
         }
     }

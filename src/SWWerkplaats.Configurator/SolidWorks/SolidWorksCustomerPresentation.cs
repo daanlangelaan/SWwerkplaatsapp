@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Web.Script.Serialization;
 using SolidWorks.Interop.sldworks;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Portal;
@@ -115,10 +116,18 @@ namespace SWWerkplaats.Configurator.SolidWorks
             model.Extension.UpdateRenderMaterialsInSceneGraph(true);
         }
 
-        public string ExportGlb(ModelDoc2 model, string controlPath)
+        public string ExportGlb(ModelDoc2 model, string controlPath, bool expectsProfileTexture)
         {
             if (model == null) throw new ArgumentNullException("model");
             if (string.IsNullOrWhiteSpace(controlPath)) throw new ArgumentException("Pad van het SolidWorks-controlemodel ontbreekt.");
+
+            var sourcePath = model.GetPathName();
+            if (string.IsNullOrWhiteSpace(sourcePath) ||
+                !string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(controlPath), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("De GLB-exportbron is niet het opgeslagen SolidWorks-controlemodel: " +
+                    (string.IsNullOrWhiteSpace(sourcePath) ? model.GetTitle() : sourcePath));
+            }
 
             var glbPath = CustomerModelPath(controlPath);
             var errors = 0;
@@ -132,9 +141,92 @@ namespace SWWerkplaats.Configurator.SolidWorks
             }
 
             SolidWorksGlbTextureMapper.ApplyBetonplexEdgeMapping(glbPath);
+            ValidateGlbForDelivery(glbPath, controlPath, expectsProfileTexture);
             SolidWorksCustomerHtmlExporter.Export(glbPath);
 
             return glbPath;
+        }
+
+        public static void ValidateGlbForDelivery(string glbPath, string controlPath, bool expectsProfileTexture)
+        {
+            if (string.IsNullOrWhiteSpace(glbPath) || !File.Exists(glbPath))
+                throw new InvalidDataException("Het GLB-klantmodel ontbreekt: " + glbPath);
+            if (string.IsNullOrWhiteSpace(controlPath))
+                throw new ArgumentException("Pad van het SolidWorks-controlemodel ontbreekt.", "controlPath");
+
+            var bytes = File.ReadAllBytes(glbPath);
+            const int headerLength = 12;
+            const int chunkHeaderLength = 8;
+            const uint jsonChunkType = 0x4E4F534A;
+            if (bytes.Length < headerLength + chunkHeaderLength || Encoding.ASCII.GetString(bytes, 0, 4) != "glTF")
+                throw new InvalidDataException("Het HD-klantmodel is geen geldig GLB-bestand.");
+
+            var jsonLength = BitConverter.ToInt32(bytes, headerLength);
+            var jsonType = BitConverter.ToUInt32(bytes, headerLength + 4);
+            var jsonStart = headerLength + chunkHeaderLength;
+            if (jsonType != jsonChunkType || jsonLength <= 0 || jsonStart + jsonLength > bytes.Length)
+                throw new InvalidDataException("De JSON-chunk van het HD-klantmodel is ongeldig.");
+
+            var json = Encoding.UTF8.GetString(bytes, jsonStart, jsonLength).TrimEnd(' ', '\0');
+            var root = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json)
+                as IDictionary<string, object>;
+            if (root == null) throw new InvalidDataException("De GLB-root van het HD-klantmodel is ongeldig.");
+
+            object nodeValue;
+            var nodes = root.TryGetValue("nodes", out nodeValue) ? nodeValue as object[] : null;
+            var expectedRootName = Path.GetFileNameWithoutExtension(controlPath);
+            var hasExpectedRoot = false;
+            if (nodes != null)
+            {
+                foreach (var nodeItem in nodes)
+                {
+                    var node = nodeItem as IDictionary<string, object>;
+                    object nameValue;
+                    var name = node != null && node.TryGetValue("name", out nameValue) ? nameValue as string : null;
+                    if (string.Equals(name, expectedRootName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasExpectedRoot = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasExpectedRoot)
+                throw new InvalidDataException(
+                    "SolidWorks exporteerde niet het opgeslagen controlemodel naar GLB; verwachte root ontbreekt: " + expectedRootName + ".");
+
+            if (!expectsProfileTexture) return;
+
+            object materialValue;
+            var materials = root.TryGetValue("materials", out materialValue) ? materialValue as object[] : null;
+            var hasProfileTexture = false;
+            if (materials != null)
+            {
+                foreach (var materialItem in materials)
+                {
+                    var material = materialItem as IDictionary<string, object>;
+                    object nameValue;
+                    var name = material != null && material.TryGetValue("name", out nameValue) ? nameValue as string : null;
+                    if (string.IsNullOrWhiteSpace(name) ||
+                        !name.StartsWith("Aluminium_profiel_sleuf_", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    object pbrValue;
+                    var pbr = material.TryGetValue("pbrMetallicRoughness", out pbrValue)
+                        ? pbrValue as IDictionary<string, object>
+                        : null;
+                    object textureValue;
+                    if (pbr != null && pbr.TryGetValue("baseColorTexture", out textureValue) &&
+                        textureValue is IDictionary<string, object>)
+                    {
+                        hasProfileTexture = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasProfileTexture)
+                throw new InvalidDataException(
+                    "Het HD-klantmodel bevat systeemprofielen, maar de sleufappearance/textuur ontbreekt. De generieke SolidWorks-export is afgekeurd.");
         }
 
         public static string CustomerModelPath(string controlPath)

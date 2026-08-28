@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "dependencies": {
+    ".NETFramework,Version=v4.8": {
+      "Microsoft.Data.Sqlite": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "7je7UELzm131GiLYc4PpZvfKXIgIyzPM+v+tjcd/nbnuWRfgcONYKzDTqJlURxwVCFsVnlpmq6y6yn4qvR8QXQ==",
+        "dependencies": {
+          "Microsoft.Data.Sqlite.Core": "10.0.11",
+          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.12",
+          "SQLitePCLRaw.core": "2.1.12"
+        }
+      },
+      "Microsoft.Data.Sqlite.Core": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "hubA20AGenQ4Sx0ElWaPpB8DISjXpdx463+1zOGRslsT0e/t/06ITv+pHsop8CcJ0d8PZLfgnT7juCDVD79Dkw==",
+        "dependencies": {
+          "SQLitePCLRaw.core": "2.1.12"
+        }
+      },
+      "SolidWorks.Interop.sldworks": {
+        "type": "Transitive",
+        "resolved": "32.1.0",
+        "contentHash": "lq3QmJwBbVE3K+pN5JFSGn1Bj7J1vUyTr4TtT23UAOtd8MXLElZROm9Iee2N8SP8AXsLTpXdBXGs7xYeJT53qw=="
+      },
+      "SQLitePCLRaw.bundle_e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "mAgscpQMLw5/nfA1Q5oJVAT29yROUo1ifZGbbTpx/lwZpSxMUGoYbKfmvdm8oXER+RzxqBmmQzeBEVKfeHv2nw==",
+        "dependencies": {
+          "SQLitePCLRaw.lib.e_sqlite3": "2.1.12",
+          "SQLitePCLRaw.provider.dynamic_cdecl": "2.1.12"
+        }
+      },
+      "SQLitePCLRaw.core": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "ETpNw9DY3ckWLgRRAeCHj+GKOuPi61aeczkXhgHexUvqoZBAYg8RYESE2J7O1M7+o6QbdSEZwrw9bfqztUVWXg==",
+        "dependencies": {
+          "System.Memory": "4.5.3"
+        }
+      },
+      "SQLitePCLRaw.lib.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+      },
+      "SQLitePCLRaw.provider.dynamic_cdecl": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "13p8v7G8YXOaDah2E4uhf4zVj1rgWGxOCG2c8EBGQuP7jb+MKO1lZ/mrpP6UTCZq+aS+J56JhmPwxnv/Pc01RA==",
+        "dependencies": {
+          "SQLitePCLRaw.core": "2.1.12"
+        }
+      },
+      "System.Buffers": {
+        "type": "Transitive",
+        "resolved": "4.4.0",
+        "contentHash": "AwarXzzoDwX6BgrhjoJsk6tUezZEozOT5Y9QKF94Gl4JK91I4PIIBkBco9068Y9/Dra8Dkbie99kXB8+1BaYKw=="
+      },
+      "System.Memory": {
+        "type": "Transitive",
+        "resolved": "4.5.3",
+        "contentHash": "3oDzvc/zzetpTKWMShs1AADwZjQ/36HnsufHRPcOjyRAAMLDlu2iD33MBI2opxnezcVUtXyqDXXjoFMOU9c7SA==",
+        "dependencies": {
+          "System.Buffers": "4.4.0",
+          "System.Numerics.Vectors": "4.4.0",
+          "System.Runtime.CompilerServices.Unsafe": "4.5.2"
+        }
+      },
+      "System.Numerics.Vectors": {
+        "type": "Transitive",
+        "resolved": "4.4.0",
+        "contentHash": "UiLzLW+Lw6HLed1Hcg+8jSRttrbuXv7DANVj0DkL9g6EnnzbL75EB7EWsw5uRbhxd/4YdG8li5XizGWepmG3PQ=="
+      },
+      "System.Runtime.CompilerServices.Unsafe": {
+        "type": "Transitive",
+        "resolved": "4.5.2",
+        "contentHash": "wprSFgext8cwqymChhrBLu62LMg/1u92bU+VOwyfBimSPVFXtsNqEWC92Pf9ofzJFlk4IHmJA75EDJn1b2goAQ=="
+      },
+      "swwerkplaats.configurator": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.11, )",
+          "SolidWorks.Interop.sldworks": "[32.1.0, )"
+        }
+      }
+    },
+    ".NETFramework,Version=v4.8/win-x64": {
+      "SQLitePCLRaw.lib.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "2.1.12",
+        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+      }
+    }
+  }
+}

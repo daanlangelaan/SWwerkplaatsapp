@@ -1,5 +1,7 @@
 # Lade-pocket visualisatie - iteraties en lessen
 
+Status: **archief / ervaringslog**. Controleer conclusies altijd tegen de actuele portalcode.
+
 Dit document legt vast wat geprobeerd is bij de 3D visualisatie van ladepockets/rabatten, zodat we deze route later niet opnieuw doorlopen.
 
 ## Stand van zaken

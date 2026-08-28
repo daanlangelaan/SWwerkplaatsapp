@@ -40,7 +40,7 @@ namespace SWWerkplaats.Configurator
                     }
                     else
                     {
-                        portal = new PortalWebServer(portalOptions.RootFolder, portalOptions.Prefix);
+                        portal = new PortalWebServer(portalOptions);
                         portal.Start();
                         if (portalOptions.PortalOnly)
                         {
@@ -100,12 +100,12 @@ namespace SWWerkplaats.Configurator
                 var factory = new PortalConfigurationFactory();
                 var model = new ProductModelBuildService().Build(factory, request);
                 var assemblyPath = new SolidWorksComPartExporter().ExportPartsAndAssembly(model, Path.GetDirectoryName(resultPath), request);
-                File.WriteAllText(resultPath, serializer.Serialize(new { Ok = true, AssemblyPath = assemblyPath }));
+                File.WriteAllText(resultPath, serializer.Serialize(new SolidWorksWorkerResult { ContractVersion = 1, Ok = true, AssemblyPath = assemblyPath }));
                 Environment.ExitCode = 0;
             }
             catch (Exception ex)
             {
-                try { File.WriteAllText(resultPath, new JavaScriptSerializer().Serialize(new { Ok = false, Error = ex.ToString() })); } catch { }
+                try { File.WriteAllText(resultPath, new JavaScriptSerializer().Serialize(new SolidWorksWorkerResult { ContractVersion = 1, Ok = false, Error = ex.ToString() })); } catch { }
                 Environment.ExitCode = 2;
             }
             return true;

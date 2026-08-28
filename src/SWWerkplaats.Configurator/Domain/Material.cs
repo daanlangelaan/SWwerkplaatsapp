@@ -19,5 +19,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double StockLengthMm { get; set; }
         public double SheetLengthMm { get; set; }
         public double SheetWidthMm { get; set; }
+        public string RenderAppearance { get; set; }
+        public bool IsAdditiveManufactured { get; set; }
     }
 }

@@ -1,0 +1,138 @@
+{
+  "contractVersion": 2,
+  "designTokens": {
+    "colors": {
+      "pageBackground": "#f5f5f7",
+      "panel": "#ffffff",
+      "surfaceSubtle": "#f5f6f8",
+      "surfaceSelected": "#eaf3fc",
+      "text": "#1d1d1f",
+      "mutedText": "#6e6e73",
+      "divider": "#d8d8de",
+      "primaryAction": "#0071e3",
+      "primaryActionHover": "#005ea8",
+      "focusRing": "#005fcc",
+      "infoText": "#005ea8",
+      "success": "#1d7f5f",
+      "warning": "#bf5b00",
+      "warningText": "#9a4d00",
+      "danger": "#b42318",
+      "assemblyActive": "#4b9bd3",
+      "assemblyReceiver": "#c4cbd0",
+      "assemblyTarget": "#e9b46a",
+      "assemblyContext": "#e3e7e9",
+      "assemblyHardware": "#c96f5b",
+      "assemblyMotion": "#1677ff",
+      "assemblyToolAxis": "#26323d",
+      "plywoodFaceBase": "#d8bd94",
+      "plywoodFaceGrain": "#966b43",
+      "plywoodEdgeLight": "#d9b27b",
+      "plywoodEdgeDark": "#8b5a36"
+    },
+    "typography": {
+      "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+      "fontSizesPx": {
+        "caption": 12,
+        "bodySmall": 13,
+        "body": 15,
+        "bodyLarge": 17,
+        "sectionTitle": 20,
+        "pageTitle": 24,
+        "display": 40
+      },
+      "fontWeights": {
+        "regular": 400,
+        "medium": 600,
+        "semibold": 700,
+        "bold": 800
+      },
+      "lineHeights": {
+        "compact": 1.25,
+        "body": 1.5,
+        "reading": 1.6
+      }
+    },
+    "spacingPx": {
+      "twoExtraSmall": 4,
+      "extraSmall": 8,
+      "small": 12,
+      "medium": 16,
+      "large": 24,
+      "extraLarge": 32,
+      "twoExtraLarge": 48,
+      "threeExtraLarge": 64
+    },
+    "radiiPx": {
+      "small": 8,
+      "medium": 12,
+      "large": 18,
+      "panel": 24,
+      "pill": 999
+    },
+    "layoutPx": {
+      "contentMaxWidth": 1480,
+      "readingMaxWidth": 720,
+      "formMaxWidth": 720,
+      "defaultSidebarWidth": 360,
+      "headerHeight": 72,
+      "desktopGutter": 24,
+      "mobileGutter": 16
+    },
+    "controlsPx": {
+      "minimumTarget": 44,
+      "comfortableTarget": 48,
+      "compactControl": 36,
+      "fieldHeight": 44,
+      "tableRowMinimum": 44,
+      "focusRingThickness": 3,
+      "focusRingOffset": 2
+    },
+    "breakpointsPx": {
+      "compact": 680,
+      "medium": 960,
+      "wide": 1180
+    },
+    "motionMs": {
+      "micro": 120,
+      "feedback": 180,
+      "panel": 240
+    },
+    "shadows": {
+      "panel": "0 10px 35px rgba(20,24,33,.07)",
+      "floating": "0 18px 55px rgba(20,24,33,.10)"
+    }
+  },
+  "assembly": {
+    "animation": {
+      "hardwareIntroMs": 360,
+      "hardwareMoveMs": 820,
+      "betweenItemsMs": 170,
+      "endHoldMs": 620,
+      "returnMs": 560,
+      "flashFrequencyPerMs": 0.0062
+    },
+    "camera": {
+      "minimumZoom": 0.025,
+      "maximumZoom": 5.0,
+      "overviewWidthFill": 0.78,
+      "overviewHeightFill": 0.80,
+      "gatherWidthFill": 0.78,
+      "gatherHeightFill": 0.74,
+      "detailWidthFill": 0.90,
+      "detailHeightFill": 0.86,
+      "toolWidthFill": 0.78,
+      "toolHeightFill": 0.68
+    },
+    "markers": {
+      "profileStickerWidthPx": 129,
+      "profileStickerHeightPx": 41,
+      "profileStickerRadiusPx": 8
+    },
+    "materials": {
+      "plywoodLayerBands": 11,
+      "plywoodTextureWidthPx": 512,
+      "plywoodTextureHeightPx": 128,
+      "plywoodGrainLines": 18
+    }
+  }
+}

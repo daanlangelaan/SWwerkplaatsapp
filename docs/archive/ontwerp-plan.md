@@ -1,5 +1,7 @@
 # Ontwerpplan
 
+Status: **archief**. Dit oorspronkelijke WinForms/Add-in-plan is geen actuele architectuurinstructie.
+
 ## Keuze
 
 De configurator wordt opgezet als C# WinForms/SolidWorks Add-in basis. De werkplaatslogica staat los van SolidWorks, zodat afkortlijsten, boorlijsten en Mach3 G-code testbaar blijven zonder CAD-sessie.

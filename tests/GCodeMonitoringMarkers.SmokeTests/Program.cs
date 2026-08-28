@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Manufacturing;
@@ -82,6 +83,32 @@ internal static class Program
         var commandsWithoutMarkers = Lines(withoutMarkers).Where(line => !IsMarker(line)).ToArray();
         Require(commandsWithMarkers.SequenceEqual(commandsWithoutMarkers, StringComparer.Ordinal),
             "Monitoring aan/uit wijzigde andere regels dan RD-commentaar.");
+        VerifySafeRapidMoves(withMarkers, 15);
+    }
+
+    private static void VerifySafeRapidMoves(string program, double safeZmm)
+    {
+        double? modalZ = null;
+        var lines = Lines(program);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].Trim();
+            if (!line.StartsWith("G0 ", StringComparison.Ordinal) && !line.StartsWith("G1 ", StringComparison.Ordinal)) continue;
+
+            foreach (var token in line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token.Length > 1 && token[0] == 'Z'
+                    && double.TryParse(token.Substring(1), NumberStyles.Float, CultureInfo.InvariantCulture, out var z))
+                    modalZ = z;
+            }
+
+            var rapidXY = line.StartsWith("G0 ", StringComparison.Ordinal)
+                && line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Any(token => token.StartsWith("X", StringComparison.Ordinal) || token.StartsWith("Y", StringComparison.Ordinal));
+            Require(!rapidXY || (modalZ.HasValue && modalZ.Value >= safeZmm - 0.001),
+                "Onveilige X/Y-snelverplaatsing op regel " + (index + 1).ToString(CultureInfo.InvariantCulture)
+                + ": " + line + " bij modal Z" + (modalZ.HasValue ? modalZ.Value.ToString("0.###", CultureInfo.InvariantCulture) : " onbekend") + ".");
+        }
     }
 
     private static Fixture CreateFixture()

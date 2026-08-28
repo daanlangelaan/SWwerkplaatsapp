@@ -1,0 +1,19 @@
+{
+  "version": "R1",
+  "product_id": "sim_rig_4080",
+  "source": "Seven supplied reference views plus Aluxprofiel product dimensions 1350x680x660 mm",
+  "scope_note": "Wheel base, pedals and seat are customer equipment and excluded.",
+  "members": [
+    { "layer": "base", "role": "base-long-rail", "section": "40x80", "orientation": "flat", "axis": "Z", "expected_count": 2, "confidence": "probable" },
+    { "layer": "base", "role": "base-crossmember", "section": "40x80", "orientation": "flat", "axis": "X", "expected_count": 3, "confidence": "probable" },
+    { "layer": "steering", "role": "steering-upright", "section": "40x80", "orientation": "Z=80", "axis": "Y", "expected_count": 2, "confidence": "confirmed" },
+    { "layer": "steering", "role": "steering-bridge", "section": "40x80", "orientation": "standing Y=80", "axis": "X", "expected_count": 1, "confidence": "confirmed" },
+    { "layer": "pedal", "role": "pedal-deck-profile", "section": "40x80", "orientation": "flat", "axis": "X", "expected_count": 3, "confidence": "probable" }
+  ],
+  "custom_plates": [
+    { "role": "steering-side-plate", "expected_count": 2, "thickness_mm": 10, "required_features": ["profile height slot", "bridge angle slot", "two M6 side-mount holes"], "confidence": "probable" },
+    { "role": "upright-base-t-plate", "expected_count": 2, "thickness_mm": 10, "required_features": ["two base-rail slots", "one upright slot"], "confidence": "confirmed" },
+    { "role": "pedal-angle-plate", "expected_count": 2, "thickness_mm": 10, "required_features": ["M8 pivot", "angle adjustment slot", "M8 deck attachment"], "confidence": "probable" }
+  ],
+  "simplification_rule": "Retain load path, interface planes and required holes/slots; omit decorative lightening cutouts."
+}

@@ -27,6 +27,9 @@ tmp/
 # Test and logs
 TestResults/
 *.log
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 
 # Local generated production data
 backups/

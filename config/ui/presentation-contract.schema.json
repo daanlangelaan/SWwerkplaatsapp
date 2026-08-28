@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SW Werkplaats presentation contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "designTokens", "assembly"],
+  "properties": {
+    "contractVersion": { "type": "integer", "const": 1 },
+    "designTokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["colors"],
+      "properties": {
+        "colors": {
+          "type": "object",
+          "minProperties": 7,
+          "additionalProperties": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+        }
+      }
+    },
+    "assembly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["animation", "camera", "markers"],
+      "properties": {
+        "animation": { "type": "object", "additionalProperties": { "type": "number", "exclusiveMinimum": 0 } },
+        "camera": { "type": "object", "additionalProperties": { "type": "number", "exclusiveMinimum": 0 } },
+        "markers": { "type": "object", "additionalProperties": { "type": "number", "exclusiveMinimum": 0 } }
+      }
+    }
+  }
+}

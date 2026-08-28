@@ -4,6 +4,36 @@ using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Application
 {
+    public enum ProfileAttachmentKind
+    {
+        ProfileToProfile,
+        ComponentOrPlateToProfile,
+        LinearRailToProfile
+    }
+
+    public enum ProfileNutRetentionKind
+    {
+        StandardConnector,
+        ClickNutWithSpringBall,
+        SlidingNut
+    }
+
+    public static class ProfileFastenerPolicy
+    {
+        public static ProfileNutRetentionKind NutFor(ProfileAttachmentKind attachment)
+        {
+            switch (attachment)
+            {
+                case ProfileAttachmentKind.ProfileToProfile:
+                    return ProfileNutRetentionKind.StandardConnector;
+                case ProfileAttachmentKind.LinearRailToProfile:
+                    return ProfileNutRetentionKind.SlidingNut;
+                default:
+                    return ProfileNutRetentionKind.ClickNutWithSpringBall;
+            }
+        }
+    }
+
     public static class ProductFastenerStandards
     {
         private static readonly ProductFastenerStandard[] Standards =
@@ -15,8 +45,12 @@ namespace SWWerkplaats.Configurator.Application
             new ProductFastenerStandard { ProductId = "werktafel", StructuralFastenerId = "M8_ISO4762" },
             new ProductFastenerStandard { ProductId = "machinebasis", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "robotcel", BaseProductId = "machinebasis" },
+            new ProductFastenerStandard { ProductId = "lineaire_robotcel", BaseProductId = "machinebasis" },
+            new ProductFastenerStandard { ProductId = "materiaalwagen", BaseProductId = "werktafel" },
+            new ProductFastenerStandard { ProductId = "sim_rig_4080", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "werktafel_lex", BaseProductId = "werktafel" },
-            new ProductFastenerStandard { ProductId = "werktafel_lex_revolution", BaseProductId = "werktafel_lex" }
+            new ProductFastenerStandard { ProductId = "werktafel_lex_revolution", BaseProductId = "werktafel_lex" },
+            new ProductFastenerStandard { ProductId = "hoogteverstelbare_werktafel", BaseProductId = "werktafel_lex" }
         };
 
         public static ProductFastenerStandard Resolve(string productId)
@@ -84,6 +118,37 @@ namespace SWWerkplaats.Configurator.Application
             if (firstPenetrationMm < 0) throw new ArgumentOutOfRangeException("firstPenetrationMm");
             if (secondPenetrationMm < 0) throw new ArgumentOutOfRangeException("secondPenetrationMm");
             return receivingThicknessMm - firstPenetrationMm - secondPenetrationMm;
+        }
+
+        public static double SelectTSlotBoltLength(
+            FastenerDefinition bolt,
+            double passingStackMm,
+            double threadInletOffsetMm,
+            double minimumThreadEngagementMm,
+            double maximumInsertionDepthMm,
+            double bottomClearanceMm)
+        {
+            if (bolt == null || bolt.UsageKind != FastenerUsageKind.StructuralBolt)
+                throw new ArgumentException("Constructieboutfamilie ontbreekt.");
+            if (passingStackMm < 0) throw new ArgumentOutOfRangeException("passingStackMm");
+            if (threadInletOffsetMm < 0) throw new ArgumentOutOfRangeException("threadInletOffsetMm");
+            if (minimumThreadEngagementMm <= 0) throw new ArgumentOutOfRangeException("minimumThreadEngagementMm");
+            if (maximumInsertionDepthMm <= threadInletOffsetMm)
+                throw new ArgumentOutOfRangeException("maximumInsertionDepthMm");
+            if (bottomClearanceMm < 0 || bottomClearanceMm >= maximumInsertionDepthMm - threadInletOffsetMm)
+                throw new ArgumentOutOfRangeException("bottomClearanceMm");
+
+            var minimum = passingStackMm + threadInletOffsetMm + minimumThreadEngagementMm;
+            var maximum = passingStackMm + maximumInsertionDepthMm - bottomClearanceMm;
+            var selected = 0.0;
+            foreach (var length in SortedLengths(bolt))
+            {
+                if (length + 0.001 >= minimum && length <= maximum + 0.001) selected = length;
+            }
+            if (selected <= 0)
+                throw new InvalidOperationException("Geen verkrijgbare T-slotbout past tussen minimale draadaangrijping "
+                    + minimum.ToString("0.###") + " mm en de sleufbodemgrens " + maximum.ToString("0.###") + " mm.");
+            return selected;
         }
 
         private static double[] SortedLengths(FastenerDefinition screw)

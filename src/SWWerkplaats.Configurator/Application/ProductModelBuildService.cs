@@ -31,9 +31,23 @@ namespace SWWerkplaats.Configurator.Application
             var builder = products.Resolve(request);
             var model = builder.Build(factory, request);
             model.ProductId = builder.ProductId;
+            new ProfileFastenerCalculationService().Assign(model);
             ValidateProductFastenerStandard(builder.ProductId, model);
             ApplyOptionalVBitFinishing(builder.ProductId, model, request);
+            new ProfileMemberIdentityService().Assign(model);
             ApplyOrderQuantity(model, request);
+            var orderQuantity = request == null ? 1 : Math.Max(1, request.Quantity);
+            new ProfileTraceabilityService().Assign(model, builder.ProductId, orderQuantity);
+            new ProfileStickerPlacementService().Assign(model, orderQuantity);
+            // Fysieke eindvlak-op-sleufcontacten zijn de enige bron voor aantallen,
+            // BOM, bewerkingen, rendergaten en assemblage-instructies.
+            new ProfileAssemblyConnectionDerivationService().Assign(model);
+            new ProfileConnectionHardwareSynchronizationService().Assign(model, orderQuantity);
+            // De gekozen kernboring wordt afgeleid van het bestaande fysieke stickervlak.
+            // Stickerplaatsing moet daarom gereed zijn voordat verbindingstappen worden vertaald naar tapbewerkingen.
+            new ProfileConnectionTapOperationService().Assign(model, orderQuantity);
+            new ProfileConnectionGeometryService().Assign(model);
+            new ProfileConnectionAccessHoleOperationService().Assign(model, orderQuantity);
             return model;
         }
 

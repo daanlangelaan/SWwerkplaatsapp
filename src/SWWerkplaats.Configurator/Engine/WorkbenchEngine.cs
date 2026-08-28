@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Engine
@@ -63,6 +64,8 @@ namespace SWWerkplaats.Configurator.Engine
                 model.Profiles.Add(TappedFrameProfile("Tussenframe links/rechts", profile, sideLength, 2, "Lengte over Y-as", config));
             }
 
+            AddFramePlacements(model, config, profileSize, legLength, frontBackLength, sideLength);
+
             var top = new SheetPart
             {
                 Name = "Werkblad",
@@ -89,7 +92,76 @@ namespace SWWerkplaats.Configurator.Engine
 
             BuildProfileOperations(model, config.SawingMode);
             AddHardware(model);
+            ValidateAssemblyManifest(model, config);
             return model;
+        }
+
+        private static void AddFramePlacements(WorkbenchModel model, WorkbenchConfig config, double profileSize,
+            double legLength, double frontBackLength, double sideLength)
+        {
+            var x = config.WidthMm / 2.0 - profileSize / 2.0;
+            var z = config.DepthMm / 2.0 - profileSize / 2.0;
+            AddProfilePlacement(model, "workbench-leg-front-left", "Poot linksvoor", profileSize, profileSize, legLength, -x, legLength / 2.0, -z);
+            AddProfilePlacement(model, "workbench-leg-front-right", "Poot rechtsvoor", profileSize, profileSize, legLength, x, legLength / 2.0, -z);
+            AddProfilePlacement(model, "workbench-leg-back-left", "Poot linksachter", profileSize, profileSize, legLength, -x, legLength / 2.0, z);
+            AddProfilePlacement(model, "workbench-leg-back-right", "Poot rechtsachter", profileSize, profileSize, legLength, x, legLength / 2.0, z);
+
+            AddFrameLayerPlacements(model, "workbench-top", "Bovenframe", frontBackLength, sideLength,
+                profileSize, x, z, legLength - profileSize / 2.0);
+            if (config.IncludeLowerFrame || config.IncludeLowerShelf)
+                AddFrameLayerPlacements(model, "workbench-lower", "Onderframe", frontBackLength, sideLength,
+                    profileSize, x, z, config.LowerFrameHeightMm);
+            if (config.IncludeMiddleLayer || config.IncludeMiddleShelf)
+                AddFrameLayerPlacements(model, "workbench-middle", "Tussenframe", frontBackLength, sideLength,
+                    profileSize, x, z, config.MiddleLayerHeightMm);
+        }
+
+        private static void AddFrameLayerPlacements(WorkbenchModel model, string idPrefix, string namePrefix,
+            double frontBackLength, double sideLength, double profileSize, double x, double z, double y)
+        {
+            AddProfilePlacement(model, idPrefix + "-front", namePrefix + " voor", frontBackLength, profileSize, profileSize, 0, y, -z);
+            AddProfilePlacement(model, idPrefix + "-back", namePrefix + " achter", frontBackLength, profileSize, profileSize, 0, y, z);
+            AddProfilePlacement(model, idPrefix + "-left", namePrefix + " links", profileSize, sideLength, profileSize, -x, y, 0);
+            AddProfilePlacement(model, idPrefix + "-right", namePrefix + " rechts", profileSize, sideLength, profileSize, x, y, 0);
+        }
+
+        private static void AddProfilePlacement(WorkbenchModel model, string memberId, string partName,
+            double length, double width, double height, double x, double y, double z)
+        {
+            model.AssemblyPlacements.Add(new AssemblyPlacement
+            {
+                MemberId = memberId,
+                Kind = AssemblyComponentKind.Profile,
+                PartName = partName,
+                LengthMm = length,
+                WidthMm = width,
+                HeightMm = height,
+                Xmm = x,
+                Ymm = y,
+                Zmm = z,
+                Orientation = AssemblyOrientation.Default,
+                VisualKind = "profile",
+                Shape = "box"
+            });
+        }
+
+        private static void ValidateAssemblyManifest(WorkbenchModel model, WorkbenchConfig config)
+        {
+            var expectedLayers = 1
+                + ((config.IncludeLowerFrame || config.IncludeLowerShelf) ? 1 : 0)
+                + ((config.IncludeMiddleLayer || config.IncludeMiddleShelf) ? 1 : 0);
+            var profiles = model.AssemblyPlacements.FindAll(item => item.Kind == AssemblyComponentKind.Profile);
+            var expectedProfiles = 4 + expectedLayers * 4;
+            if (profiles.Count != expectedProfiles)
+                throw new InvalidOperationException("Werktafel-assemblagemanifest: verwacht " + expectedProfiles + " profielleden, gevonden " + profiles.Count + ".");
+            if (profiles.FindAll(item => item.MemberId != null && item.MemberId.StartsWith("workbench-leg-", StringComparison.Ordinal)).Count != 4)
+                throw new InvalidOperationException("Werktafel-assemblagemanifest: vier afzonderlijke hoekpoten zijn verplicht.");
+            if (profiles.FindAll(item => item.MemberId != null && item.MemberId.StartsWith("workbench-top-", StringComparison.Ordinal)).Count != 4)
+                throw new InvalidOperationException("Werktafel-assemblagemanifest: het bovenframe moet vier afzonderlijke liggers bevatten.");
+            if (profiles.Exists(item => item.LengthMm <= 0 || item.WidthMm <= 0 || item.HeightMm <= 0))
+                throw new InvalidOperationException("Werktafel-assemblagemanifest: iedere profielplaatsing moet een positieve as- en doorsnedemaat hebben.");
+            if (model.Profiles.Sum(item => item.Quantity) != profiles.Count)
+                throw new InvalidOperationException("Werktafel-assemblagemanifest: BOM en profielplaatsingen hebben verschillende fysieke aantallen.");
         }
 
         private static void AddHorizontalSheet(WorkbenchModel model, SheetPart sheet)
@@ -147,9 +219,13 @@ namespace SWWerkplaats.Configurator.Engine
                         ProfileLengthMm = profile.LengthMm,
                         Sequence = sequence++,
                         Kind = kind,
+                        FaceId = drill.FaceId,
+                        SlotIndex = drill.SlotIndex,
+                        SlotAxisOffsetMm = drill.SlotAxisOffsetMm,
                         Side = drill.Side,
                         PositionFromEndAMm = drill.PositionFromEndAMm,
                         DiameterMm = drill.DiameterMm,
+                        DepthMm = drill.DepthMm,
                         ThroughHole = drill.ThroughHole,
                         SawAngleDeg = 0,
                         WorkOrigin = "Kop A",

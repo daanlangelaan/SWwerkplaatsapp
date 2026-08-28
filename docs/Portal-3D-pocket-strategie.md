@@ -1,5 +1,7 @@
 # Portal 3D pocket strategie
 
+Status: **actueel visualisatiecontract**.
+
 Deze notitie is leidend bij wijzigingen aan de 3D visualisatie van pockets, rabatten en verdiepingen in het klantportaal.
 
 ## Doel

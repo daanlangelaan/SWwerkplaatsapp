@@ -57,6 +57,18 @@ namespace SWWerkplaats.Configurator.Application
         public const double RobotCellWorktopHeightMm = 900;
         public const double RobotCellIntermediateBeamMaxSpacingMm = 500;
 
+        public const double MaterialCartWidthMm = 1000;
+        public const double MaterialCartDepthMm = 650;
+        public const double MaterialCartTopShelfHeightMm = 950;
+        public const int MaterialCartShelfCount = 3;
+
+        public const double SimRigOutsideWidthMm = 680;
+        public const double SimRigLengthMm = 1350;
+        public const double SimRigSteeringBridgeHeightMm = 660;
+        public const double SimRigSteeringBridgePositionMm = 610;
+        public const double SimRigPedalDeckPositionMm = 250;
+        public const double SimRigPedalAngleDeg = 12;
+
         public const double WorkbenchWidthMm = 1500;
         public const double WorkbenchDepthMm = 750;
         public const double WorkbenchHeightMm = 900;
@@ -66,7 +78,7 @@ namespace SWWerkplaats.Configurator.Application
 
         public const double LexWorkbenchWidthMm = 1650;
         public const double LexWorkbenchDepthMm = 1000;
-        public const double LexWorkbenchHeightMm = 833;
+        public const double LexWorkbenchHeightMm = 848;
         public const double LexWorkbenchColumnCenterDistanceMm = 890;
 
         public static LinearGuideTemplate LexHsr15LinearGuide()

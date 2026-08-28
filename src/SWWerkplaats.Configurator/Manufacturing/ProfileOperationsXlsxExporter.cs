@@ -30,7 +30,8 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var headers = new[]
             {
                 "ProfielId", "Onderdeel", "Aantal", "Materiaal", "Profielmaat mm", "Lengte mm", "Volgorde",
-                "Bewerking", "Nulpunt", "Zijde", "Positie mm", "Diameter mm", "Doorlopend", "Uitvoerder", "MachineHint", "Opmerking"
+                "Bewerking", "Nulpunt", "Zijde", "CNC-vlak", "Sleuf", "Sleufas Y mm", "Positie mm", "Diameter mm",
+                "Diepte mm", "Doorlopend", "Uitvoerder", "MachineHint", "Opmerking"
             };
 
             rows.Append(Row(1, headers, 1));
@@ -49,10 +50,11 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 "<cols>" +
                 Col(1, 1, 24) + Col(2, 2, 25) + Col(3, 3, 9) + Col(4, 4, 19) + Col(5, 5, 16) +
                 Col(6, 6, 12) + Col(7, 7, 10) + Col(8, 8, 16) + Col(9, 9, 12) + Col(10, 10, 18) +
-                Col(11, 11, 18) + Col(12, 12, 14) + Col(13, 13, 12) + Col(14, 14, 20) + Col(15, 15, 16) + Col(16, 16, 58) +
+                Col(11, 11, 11) + Col(12, 12, 9) + Col(13, 13, 15) + Col(14, 14, 18) + Col(15, 15, 14)
+                + Col(16, 16, 12) + Col(17, 17, 12) + Col(18, 18, 20) + Col(19, 19, 16) + Col(20, 20, 58) +
                 "</cols>" +
                 "<sheetData>" + rows + "</sheetData>" +
-                "<autoFilter ref=\"A1:P" + (rowIndex - 1).ToString(CultureInfo.InvariantCulture) + "\"/>" +
+                "<autoFilter ref=\"A1:T" + (rowIndex - 1).ToString(CultureInfo.InvariantCulture) + "\"/>" +
                 "</worksheet>";
         }
 
@@ -70,8 +72,12 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 OperationText(operation.Kind),
                 operation.WorkOrigin,
                 operation.Side,
+                operation.FaceId,
+                operation.SlotIndex > 0 ? "S" + operation.SlotIndex.ToString(CultureInfo.InvariantCulture) : "",
+                operation.SlotAxisOffsetMm > 0 ? F(operation.SlotAxisOffsetMm) : "",
                 PositionText(operation),
                 operation.DiameterMm > 0 ? F(operation.DiameterMm) : "",
+                operation.DepthMm > 0 ? F(operation.DepthMm) : "",
                 operation.DiameterMm > 0 ? (operation.ThroughHole ? "ja" : "nee") : "",
                 operation.ExecutionParty,
                 operation.MachineHint,

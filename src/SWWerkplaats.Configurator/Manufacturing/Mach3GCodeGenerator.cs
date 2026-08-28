@@ -209,6 +209,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             if (hole.DiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Gatdiameter gelijk/kleiner dan frees: peck boren, niet in een keer door)");
+                sb.AppendLine("G0 Z" + F(machine.SafeZmm));
                 sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
                 DrillPeck(sb, tool, machine, cutDepth);
                 return;
@@ -232,6 +233,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             if (hole.CountersinkDiameterMm <= tool.DiameterMm + 0.05)
             {
                 sb.AppendLine("(Kopkamerdiameter gelijk/kleiner dan frees: peck boren, niet in een keer door)");
+                sb.AppendLine("G0 Z" + F(machine.SafeZmm));
                 sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
                 DrillPeck(sb, tool, machine, hole.CountersinkDepthMm);
                 return;
@@ -246,6 +248,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             if (maximumRadius <= 0)
             {
                 sb.AppendLine("(Circulaire bewerking gelijk/kleiner dan frees: peck boren, niet in een keer door)");
+                sb.AppendLine("G0 Z" + F(machine.SafeZmm));
                 sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
                 DrillPeck(sb, tool, machine, depthMm);
                 return;
@@ -255,6 +258,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             // overlap tussen de banen zodat een scharnierpot/tegenboring echt wordt leeggefreesd.
             var radialStep = Math.Max(0.5, tool.DiameterMm * 0.4);
             sb.AppendLine("(Circulaire pocket volledig uitfrezen: diameter " + F(diameterMm) + ", baanradius max " + F(maximumRadius) + ", radiale stap " + F(radialStep) + ")");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
             var depth = 0.0;
             while (depth > -depthMm)
@@ -325,6 +329,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine();
             var operationName = pocket.DepthMode == OperationDepthMode.Through ? "door-uitsparing" : "pocket";
             sb.AppendLine("(" + pocket.Name + " " + operationName + " X" + F(pocket.Xmm) + " Y" + F(pocket.Ymm) + " " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(cutDepth) + ")");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(x0) + " Y" + F(y0));
             var depth = 0.0;
             while (depth > -cutDepth)
@@ -353,6 +358,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
 
             sb.AppendLine();
             sb.AppendLine("(" + pocket.Name + " capsule " + (pocket.DepthMode == OperationDepthMode.Through ? "door-uitsparing" : "pocket") + " X" + F(pocket.Xmm) + " Y" + F(pocket.Ymm) + " " + F(pocket.LengthMm) + "x" + F(pocket.WidthMm) + " diepte " + F(cutDepth) + ")");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(points[0].X) + " Y" + F(points[0].Y));
             var depth = 0.0;
             while (depth > -cutDepth)
@@ -381,6 +387,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             if (points.Count < 2) return;
             sb.AppendLine();
             sb.AppendLine("(Handgreep afwerkcontour: 2mm voorpocket, tabs 8x2mm, tussenafstand max 70mm)");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(points[0].X) + " Y" + F(points[0].Y));
             sb.AppendLine("G1 Z" + F(clearedZ) + " F" + F(tool.PlungeRateMmMin));
             sb.AppendLine("G1 Z" + F(cutZ) + " F" + F(tool.PlungeRateMmMin));
@@ -610,6 +617,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             sb.AppendLine();
             sb.AppendLine("(" + hole.Name + " kopkamer diameter " + F(hole.CountersinkDiameterMm) + " diepte " + F(depthMm) + ", centrum X" + F(x) + " Y" + F(y) + ")");
             sb.AppendLine("(V-frees peck: 2 snijders, rechtsom, S" + F(tool.SpindleRpm) + ", plunge F" + F(tool.PlungeRateMmMin) + ")");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(x) + " Y" + F(y));
             DrillPeck(sb, tool, machine, depthMm);
             sb.AppendLine("G0 Z" + F(machine.SafeZmm));
@@ -624,6 +632,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var start = points[0];
             sb.AppendLine();
             sb.AppendLine("(V-frees randafwerking: afschuining " + F(chamferWidthMm) + "x" + F(depthMm) + "mm, volledige gesloten buitencontour)");
+            sb.AppendLine("G0 Z" + F(machine.SafeZmm));
             sb.AppendLine("G0 X" + F(start.X) + " Y" + F(start.Y));
             sb.AppendLine("G1 Z" + F(-depthMm) + " F" + F(tool.PlungeRateMmMin));
             AddPolylinePass(sb, points, tool);

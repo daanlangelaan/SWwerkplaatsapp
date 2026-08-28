@@ -1,8 +1,15 @@
 # Designstandaard klantbijlage
 
+Status: **actueel presentatiecontract**.
+
 Doel: de klant moet binnen enkele seconden begrijpen wat wordt aangeboden, welk voordeel de uitvoering biedt en welke gegevens vóór akkoord gecontroleerd moeten worden.
 
 De huidige Workstation-bijlage is de visuele referentiestandaard. Nieuwe producten gebruiken dezelfde rustige opbouw, typografie, marges, kleuren en paginavolgorde. Alleen de inhoud en relevante productvisualisaties veranderen.
+
+De portal behoort tot dezelfde visuele familie, maar neemt deze documentopbouw
+niet letterlijk over. De taakgerichte vertaling voor formulieren, tabellen,
+wachtrijen, rollen, technische controle en klantweergaven staat in
+`ui/Portal-designsysteem.md`.
 
 ## Vaste opbouw
 
@@ -10,6 +17,11 @@ De huidige Workstation-bijlage is de visuele referentiestandaard. Nieuwe product
 2. **Gebruik** — maximaal vier concrete voordelen, geschreven vanuit het werk van de gebruiker.
 3. **Uitvoering** — materialen, werking en leveringsomvang in gewone taal; geen merken, leveranciers of typenummers.
 4. **Maatcontrole** — alle klantmaten op één pagina met groot boven-, voor- en zijaanzicht.
+
+Bij een horizontaal verstelbaar werkblad toont de bewegingspagina voor iedere
+eind- en middenstand beide overstekmaten: van de buitenzijde van de vaste poten
+tot het linker en rechter bladuiteinde. Deze waarden worden uit het getypeerde
+bewegingscontract afgeleid en niet in de presentatie vastgelegd.
 
 ## Ontwerpregels
 

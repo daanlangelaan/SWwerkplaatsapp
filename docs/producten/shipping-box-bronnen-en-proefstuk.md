@@ -1,5 +1,7 @@
 # Shipping box — bronnen en proefstukdata
 
+Status: **actuele productafspraak**.
+
 ## Vastgelegde productkeuzes
 
 - Product-ID: `shipping_box`.

@@ -12,8 +12,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate repository structure and JSON
+        run: python scripts\check-repository.py
+
+      - name: Validate canonical masterdata
+        run: python scripts\validate-master-data.py
+
+      - name: Verify generated masterdata snapshot
+        run: python scripts\generate-masterdata-runtime.py --check
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: |
+          dotnet restore src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj --locked-mode
+          dotnet restore tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj --locked-mode
+          dotnet restore tests\ProductContracts.RegressionTests\ProductContracts.RegressionTests.csproj --locked-mode
+          dotnet restore tests\OrderStorage.IntegrationTests\OrderStorage.IntegrationTests.csproj --locked-mode
+
       - name: Build configurator
-        run: dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj --configuration Debug
+        run: dotnet build src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj --configuration Debug --no-restore
 
       - name: Verify G-code monitoring markers
-        run: dotnet run --project tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj --configuration Debug
+        run: dotnet run --project tests\GCodeMonitoringMarkers.SmokeTests\GCodeMonitoringMarkers.SmokeTests.csproj --configuration Debug --no-restore
+
+      - name: Verify product and profile contracts
+        run: dotnet run --project tests\ProductContracts.RegressionTests\ProductContracts.RegressionTests.csproj --configuration Debug --no-restore
+
+      - name: Verify SQL order storage and migration
+        run: dotnet run --project tests\OrderStorage.IntegrationTests\OrderStorage.IntegrationTests.csproj --configuration Debug --no-restore

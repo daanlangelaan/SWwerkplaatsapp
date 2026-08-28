@@ -18,6 +18,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double FixedRailFrameWidthMm { get; set; }
         public double FixedRailFrameDepthMm { get; set; }
         public double CarriageCenterDistanceMm { get; set; }
+        public List<double> HorizontalLockPositionsMm { get; private set; }
         public double CarriageAdapterLengthMm { get; set; }
         public double CarriageAdapterWidthMm { get; set; }
         public double CarriageAdapterThicknessMm { get; set; }
@@ -36,7 +37,6 @@ namespace SWWerkplaats.Configurator.Domain
         public double BallTransferBallDiameterMm { get; set; }
         public double BallTransferWorkingHeightMm { get; set; }
         public ProfileSawingMode SawingMode { get; set; }
-        public Material Profile80x40 { get; set; }
         public Material Profile80x80 { get; set; }
         public Material Profile40x40 { get; set; }
         public Material TopSheet { get; set; }
@@ -46,11 +46,14 @@ namespace SWWerkplaats.Configurator.Domain
         public LiftColumnTemplate LiftColumn { get; set; }
         public LevelingFootCornerAdapterTemplate LevelingFootCornerAdapter { get; set; }
         public LevelingFootTemplate LevelingFoot { get; set; }
+        public SwingLatchTemplate SwingLatch { get; set; }
+        public double MovingFrameSlotAxisEdgeOffsetMm { get; set; }
         public List<string> DesignNotes { get; private set; }
 
         public LexWorkbenchConfig()
         {
             DesignNotes = new List<string>();
+            HorizontalLockPositionsMm = new List<double>();
         }
     }
 }

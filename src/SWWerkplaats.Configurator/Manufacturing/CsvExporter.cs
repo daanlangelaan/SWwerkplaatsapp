@@ -53,7 +53,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
         public string ExportProfileOperations(IEnumerable<ProfileOperation> operations)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("ProfielId;Onderdeel;Aantal;Materiaal;Profielmaat_mm;Lengte_mm;Volgorde;Bewerking;Nulpunt;Zijde;Positie_mm;Diameter_mm;Doorlopend;Uitvoerder;MachineHint;Opmerking");
+            sb.AppendLine("ProfielId;Onderdeel;Aantal;Materiaal;Profielmaat_mm;Lengte_mm;Volgorde;Bewerking;Nulpunt;Zijde;CNC_vlak;Sleuf;Sleufas_Y_mm;Positie_mm;Diameter_mm;Diepte_mm;Doorlopend;Uitvoerder;MachineHint;Opmerking");
 
             string lastProfileId = null;
             foreach (var operation in operations)
@@ -65,6 +65,53 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 lastProfileId = operation.ProfileId;
             }
 
+            return sb.ToString();
+        }
+
+        public string ExportDrillList(IEnumerable<ProfileProductionSequenceItem> sequence)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("ProfielstukId;Onderdeel;Materiaal;Lengte_mm;CNC_vlak;Sleuf;Positie_vanaf_kop_A_mm;Diameter_mm;Doorlopend;Opmerking");
+            foreach (var item in sequence ?? Enumerable.Empty<ProfileProductionSequenceItem>())
+            foreach (var drill in item.Operations.Where(value => value.Kind == ProfileOperationKind.Drill).OrderBy(value => value.Sequence))
+            {
+                sb.Append(E(item.TraceId)).Append(';');
+                sb.Append(E(item.PartName)).Append(';');
+                sb.Append(E(item.Material == null ? "" : item.Material.Name)).Append(';');
+                sb.Append(F(item.ProfileLengthMm)).Append(';');
+                sb.Append(E(drill.FaceId)).Append(';');
+                sb.Append(drill.SlotIndex > 0 ? "S" + drill.SlotIndex.ToString(CultureInfo.InvariantCulture) : "").Append(';');
+                sb.Append(F(drill.PositionFromEndAMm)).Append(';');
+                sb.Append(F(drill.DiameterMm)).Append(';');
+                sb.Append(drill.ThroughHole ? "ja" : "nee").Append(';');
+                sb.AppendLine(E(drill.Note));
+            }
+            return sb.ToString();
+        }
+
+        public string ExportProfileStickers(IEnumerable<AssemblyPlacement> placements)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("ProfielstukId;MemberId;Onderdeel;Stickervlak;Assemblage_zijde;Plaatsingsregel;Ankerkop;Afstand_vanaf_ankerkop_mm;Vrij_van_obstructies;Orientatie_instructie");
+            foreach (var placement in placements.Where(item => item.Kind == AssemblyComponentKind.Profile && item.Sticker != null))
+            {
+                var traceIds = placement.Sticker.TraceIds.Count > 0
+                    ? placement.Sticker.TraceIds
+                    : new List<string> { placement.TraceId ?? string.Empty };
+                foreach (var traceId in traceIds)
+                {
+                    sb.Append(E(traceId)).Append(';');
+                    sb.Append(E(placement.MemberId)).Append(';');
+                    sb.Append(E(placement.PartName)).Append(';');
+                    sb.Append(E(placement.Sticker.FaceId)).Append(';');
+                    sb.Append(E(placement.Sticker.LocalFace)).Append(';');
+                    sb.Append(E(StickerRuleText(placement.Sticker.Rule))).Append(';');
+                    sb.Append(E("Kop " + placement.Sticker.AnchorEnd)).Append(';');
+                    sb.Append(F(placement.Sticker.OffsetFromAnchorEndMm)).Append(';');
+                    sb.Append(placement.Sticker.ObstructionFree ? "ja" : "nee").Append(';');
+                    sb.AppendLine(E(placement.Sticker.OrientationInstruction));
+                }
+            }
             return sb.ToString();
         }
 
@@ -388,6 +435,25 @@ namespace SWWerkplaats.Configurator.Manufacturing
             return sb.ToString();
         }
 
+        public string ExportProfileStationPlan(ProfileProjectConfiguration configuration)
+        {
+            if (configuration == null) throw new ArgumentNullException("configuration");
+            var operationCount = configuration.Profiles.Sum(value => value.Operations == null ? 0 : value.Operations.Count);
+            var sb = new StringBuilder();
+            sb.AppendLine("Profiel-bewerkingsstation plan");
+            sb.AppendLine();
+            sb.AppendLine("Enige projectbron: Profielconfiguratie.json");
+            sb.AppendLine("Schema: " + configuration.SchemaVersion);
+            sb.AppendLine("Productievrijgave: " + (configuration.ProductionReleased ? "JA" : "NEE"));
+            sb.AppendLine("Nulpunt: afgezaagde stickerkop tegen de vaste aanslag; nooit in lengterichting keren.");
+            sb.AppendLine("Zijdewissel: om de lengteas rollen volgens D0-D3 uit de projectconfiguratie.");
+            sb.AppendLine();
+            sb.AppendLine("Aantal fysieke profielen: " + configuration.Profiles.Count.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("Aantal profielbewerkingsregels: " + operationCount.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("Aantal productieblokkades: " + configuration.ProductionBlockers.Count.ToString(CultureInfo.InvariantCulture));
+            return sb.ToString();
+        }
+
         public string ExportBom(WorkbenchModel model)
         {
             return ExportBom(model, null);
@@ -549,8 +615,12 @@ namespace SWWerkplaats.Configurator.Manufacturing
                 ProfileOperationText(operation.Kind),
                 operation.WorkOrigin,
                 operation.Side,
+                operation.FaceId,
+                operation.SlotIndex > 0 ? "S" + operation.SlotIndex.ToString(CultureInfo.InvariantCulture) : "",
+                operation.SlotAxisOffsetMm > 0 ? F(operation.SlotAxisOffsetMm) : "",
                 PositionText(operation),
                 operation.DiameterMm > 0 ? F(operation.DiameterMm) : "",
+                operation.DepthMm > 0 ? F(operation.DepthMm) : "",
                 operation.DiameterMm > 0 ? (operation.ThroughHole ? "ja" : "nee") : "",
                 operation.ExecutionParty,
                 operation.MachineHint,
@@ -630,6 +700,13 @@ namespace SWWerkplaats.Configurator.Manufacturing
             if (kind == ProfileOperationKind.SawCut) return "Afkorten";
             if (kind == ProfileOperationKind.Drill) return "Boren";
             return "Tappen";
+        }
+
+        private static string StickerRuleText(ProfileStickerPlacementRule rule)
+        {
+            if (rule == ProfileStickerPlacementRule.UpperFace) return "Bovenzijde ligger";
+            if (rule == ProfileStickerPlacementRule.AssemblyViewSide) return "Montage-/zichtzijde staander";
+            return "Best zichtbaar bovenvlak schuin profiel";
         }
     }
 }

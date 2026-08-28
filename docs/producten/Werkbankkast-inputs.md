@@ -1,5 +1,7 @@
 # Werkbank met kastonderbouw
 
+Status: **actuele productafspraak**.
+
 Product-id: `werkbankkast`.
 
 Dit product gebruikt een eigen `WorkbenchCabinetEngine` en levert daarna hetzelfde `WorkbenchModel` als de andere productfamilies. Daardoor blijven nesting, prijs, CNC, SolidWorks, 3D en orderoutput gedeeld.
@@ -38,6 +40,7 @@ Dit product gebruikt een eigen `WorkbenchCabinetEngine` en levert daarna hetzelf
 - De officiële montage-instructie toont drie C-clips per verpakking van twee poten. De BOM rekent daarom per gekochte pootverpakking met drie meegeleverde clips.
 - Deuren krijgen 35mm scharnierpotten en schroefgaten. Buitenwanden en de twee afzonderlijke panelen van een dubbel middenschot krijgen montageplaatgaten aan de juiste binnenzijde.
 - Bodem en werkblad krijgen positioneergroeven en montagegaten voor alle dragende zijwanden en volledige tussenschotten.
+- Wanneer een achterwand is gekozen, schuift die bij aanwezige interne tussenschotten volgens `PRD-WBK-012` 3mm naar voren. De voorzijde krijgt per werkelijk volledig tussenschot een doorlopende groef van plaatdikte plus 1mm passingsruimte; het bestaande tussenschot valt daardoor 3mm in de achterwand zonder dat zijn reeds gefreesde dieptemaat verandert. Volgens `PRD-WBK-013` krijgt iedere groefhartlijn doorlopende Ø4-gaten uit `WOODSCREW_4`, 45mm uit beide uiteinden en maximaal 260mm uit elkaar. De buitenwanden, bodem en het werkblad sluiten op de kopse kanten van de achterwand aan en veroorzaken daarom geen extra vlakgaten in de achterwand.
 - Buitenwanden en volledige tussenschotten krijgen een voorste en achterste systeem-32-gatenrij. In een enkel gedeeld tussenschot zijn deze gaten door-en-door, zodat één CNC-zijde volstaat; de twee delen van het dubbele middenschot krijgen ieder alleen de gaten aan hun kastzijde. Zo heeft iedere unit vier oplegpunten.
 - Legplanken worden per unit als losse plaatdelen gemaakt en overspannen nooit twee units. De twee planken naast een T-aanslag krijgen aan hun voorste binnenhoek automatisch een passende uitsparing.
 - Optioneel krijgt iedere unit één bovenlade. De engine maakt per unit een ladefront, bodem, twee zijden en achterzijde; de deuren worden automatisch lager.
