@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "3.4",
+  "schemaVersion": "3.5",
   "workbook": "config/product-master-data.xlsx",
   "canonicalTables": {
     "ProductsTable": { "sheet": "Producten", "primaryKey": "Product-ID" },
@@ -38,6 +38,18 @@
     "maximumLength": 80,
     "fallback": "Familie + Kwaliteit/type",
     "semantics": "De backend gebruikt Klantnaam uitsluitend als korte klantgerichte keuzenaam. Technische materiaalvelden, stabiele ID's en leverancierskoppelingen blijven leidend voor engineering en inkoop."
+  },
+  "productCardImageContract": {
+    "pathField": "Kaartafbeelding-pad",
+    "altField": "Kaartafbeelding-alt",
+    "sourceField": "Kaartafbeelding-bron",
+    "revisionField": "Kaartafbeelding-revisie",
+    "statusField": "Kaartafbeelding-status",
+    "availableStatus": "Beschikbaar",
+    "missingStatus": "Ontbreekt",
+    "assetRoot": "src/SWWerkplaats.Configurator/Portal",
+    "allowedExtensions": [".png", ".jpg", ".jpeg"],
+    "semantics": "Productkaartafbeeldingen zijn beheerde productpresentatie. De backend levert pad, alt-tekst en status; de browser koppelt nooit op product-ID."
   },
   "componentRenderContract": {
     "statusField": "Renderstatus",

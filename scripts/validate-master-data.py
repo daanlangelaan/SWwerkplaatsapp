@@ -89,6 +89,16 @@ def unique(records: list[dict[str, str]], key: str, errors: list[str]) -> set[st
     return set(values)
 
 
+def detect_image_extension(path: Path) -> str:
+    with path.open("rb") as stream:
+        signature = stream.read(12)
+    if signature.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if signature.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    return ""
+
+
 def main() -> int:
     errors: list[str] = []
     sheets = read_workbook(WORKBOOK)
@@ -130,6 +140,54 @@ def main() -> int:
     unique(input_contracts, "Invoercontract-ID", errors)
     unique(preferences, "Voorkeur-ID", errors)
     unique(offers, "Aanbieding-ID", errors)
+
+    card_contract = schema.get("productCardImageContract", {})
+    card_path_field = card_contract.get("pathField", "Kaartafbeelding-pad")
+    card_alt_field = card_contract.get("altField", "Kaartafbeelding-alt")
+    card_source_field = card_contract.get("sourceField", "Kaartafbeelding-bron")
+    card_revision_field = card_contract.get("revisionField", "Kaartafbeelding-revisie")
+    card_status_field = card_contract.get("statusField", "Kaartafbeelding-status")
+    card_available = card_contract.get("availableStatus", "Beschikbaar")
+    card_missing = card_contract.get("missingStatus", "Ontbreekt")
+    card_asset_root = ROOT / card_contract.get("assetRoot", "src/SWWerkplaats.Configurator/Portal")
+    card_allowed_extensions = {str(value).lower() for value in card_contract.get("allowedExtensions", [])}
+    if not card_allowed_extensions:
+        errors.append("Schema mist productCardImageContract.allowedExtensions")
+    for product in products:
+        product_id = product["Product-ID"]
+        status = product.get(card_status_field, "").strip()
+        if status not in {card_available, card_missing}:
+            errors.append(f"Product {product_id} heeft ongeldige {card_status_field}: {status!r}")
+            continue
+        values = {
+            card_path_field: product.get(card_path_field, "").strip(),
+            card_alt_field: product.get(card_alt_field, "").strip(),
+            card_source_field: product.get(card_source_field, "").strip(),
+            card_revision_field: product.get(card_revision_field, "").strip(),
+        }
+        if status == card_available:
+            for field, value in values.items():
+                if not value:
+                    errors.append(f"Product {product_id} mist {field} bij {card_available}")
+            asset_path = values[card_path_field]
+            if asset_path:
+                asset_file = card_asset_root / asset_path.lstrip("/")
+                extension = asset_file.suffix.lower()
+                if not asset_path.startswith("/images/") or not asset_file.is_file():
+                    errors.append(f"Product {product_id} verwijst naar ontbrekende kaartafbeelding: {asset_path}")
+                elif extension not in card_allowed_extensions:
+                    errors.append(f"Product {product_id} gebruikt niet-toegestane kaartafbeeldingsextensie: {extension!r}")
+                else:
+                    detected_extension = detect_image_extension(asset_file)
+                    normalized_extension = ".jpg" if extension == ".jpeg" else extension
+                    if not detected_extension:
+                        errors.append(f"Product {product_id} heeft een onbekend of beschadigd kaartafbeeldingsformaat: {asset_path}")
+                    elif detected_extension != normalized_extension:
+                        errors.append(
+                            f"Product {product_id} heeft extensie {extension} maar bestandssignatuur {detected_extension}: {asset_path}"
+                        )
+        elif any(values.values()):
+            errors.append(f"Product {product_id} heeft afbeeldingsvelden terwijl status {card_missing} is")
 
     material_appearance_contract = schema.get("materialAppearanceContract", {})
     material_appearance_field = material_appearance_contract.get("field", "Renderweergave")

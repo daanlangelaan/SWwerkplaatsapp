@@ -1,8 +1,8 @@
 {
-  "schemaVersion": "3.4",
+  "schemaVersion": "3.5",
   "source": {
     "workbook": "config/product-master-data.xlsx",
-    "sha256": "234E7C5DE6C92C624BB6A84CC4AA05FCAB137ECE03F3AEA33A9324115491F939",
+    "sha256": "DDA02B9B65AF26D70EB264EC51A5505BFF880A2F1C0FE0011CBDF0FA8FF3DBC2",
     "imageCatalog": "config/catalog-images/image-catalog.json"
   },
   "tables": {
@@ -26,7 +26,12 @@
         "Status": "Goedgekeurd",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-cabinet.png",
+        "Kaartafbeelding-alt": "3/4-render van de cabinet / kast",
+        "Kaartafbeelding-bron": "Beheerde bestaande portalrender",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "vakjeskast",
@@ -47,7 +52,12 @@
         "Status": "Goedgekeurd",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-cubby.png",
+        "Kaartafbeelding-alt": "3/4-render van de vakjeskast",
+        "Kaartafbeelding-bron": "Beheerde bestaande portalrender",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "werkbankkast",
@@ -68,7 +78,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-workbench-cabinet.jpg",
+        "Kaartafbeelding-alt": "3/4-render van de werkbank met kastonderbouw",
+        "Kaartafbeelding-bron": "PortalData-projectexport Werkbankkast 2400x600x900, 2026-08-18",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "werktafel",
@@ -89,7 +104,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-workbench.png",
+        "Kaartafbeelding-alt": "3/4-render van de werktafel",
+        "Kaartafbeelding-bron": "Beheerde bestaande portalrender",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "werktafel_lex",
@@ -110,7 +130,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-lex-workbench.jpg",
+        "Kaartafbeelding-alt": "3/4-render van het LEX-workstation",
+        "Kaartafbeelding-bron": "PortalData-projectexport WORKSTATION 1650x1000x848, 2026-08-26",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "werktafel_lex_revolution",
@@ -131,7 +156,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "robotcel",
@@ -152,7 +182,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "shipping_box",
@@ -173,7 +208,12 @@
         "Status": "Proefstuk",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "machinebasis",
@@ -194,7 +234,12 @@
         "Status": "Goedgekeurd",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "/images/product-machinebase.png",
+        "Kaartafbeelding-alt": "3/4-render van de parametrische machinebasis",
+        "Kaartafbeelding-bron": "PortalData-projectexport MACHINEBASIS 2000x800x2000, 2026-08-21",
+        "Kaartafbeelding-revisie": "2026-08-28",
+        "Kaartafbeelding-status": "Beschikbaar"
       },
       {
         "Product-ID": "materiaalwagen",
@@ -215,7 +260,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "sim_rig_4080",
@@ -236,7 +286,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "OK",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "lineaire_robotcel",
@@ -257,7 +312,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       },
       {
         "Product-ID": "hoogteverstelbare_werktafel",
@@ -278,7 +338,12 @@
         "Status": "Voorlopig",
         "Categoriecontrole": "OK",
         "Overervingscontrole": "n.v.t.",
-        "Aantal stuks default": "1"
+        "Aantal stuks default": "1",
+        "Kaartafbeelding-pad": "",
+        "Kaartafbeelding-alt": "",
+        "Kaartafbeelding-bron": "",
+        "Kaartafbeelding-revisie": "",
+        "Kaartafbeelding-status": "Ontbreekt"
       }
     ],
     "materials": [
@@ -12159,6 +12224,16 @@
         "Besluit/wijziging": "Materiaalrecords krijgen een optionele Klantnaam. De portal gebruikt deze korte naam voor materiaalkeuzes en behoudt de uitgebreide kwaliteit-, leveranciers- en certificaatdata in de overige masterdatavelden.",
         "Betreft ID": "multiplex_okoume_grandplex_40;Klantnaam;ProductCatalogApplicationService.MaterialOptions;LibraryCatalog.MaterialName",
         "Opmerking": "Klantweergave: Okoumé 40 mm. Technische identificatie en inkoopkoppeling blijven ongewijzigd."
+      },
+      {
+        "Wijziging-ID": "CHG-063",
+        "Datum": "46262",
+        "Auteur": "Dylan / Codex",
+        "Versie": "5.5",
+        "Onderwerp": "Beheerde productkaartafbeeldingen",
+        "Besluit/wijziging": "Producten krijgen beheerde kaartafbeeldingsvelden voor pad, alt-tekst, bron, revisie en beschikbaarheidsstatus. De backend levert deze velden aan de portal; ontbrekende renders blijven expliciet zichtbaar. Validator controleert bestandstype en extensie.",
+        "Betreft ID": "productCardImageContract;Kaartafbeelding-pad;Kaartafbeelding-alt;Kaartafbeelding-bron;Kaartafbeelding-revisie;Kaartafbeelding-status;cabinet;vakjeskast;werkbankkast;werktafel;werktafel_lex;machinebasis",
+        "Opmerking": "Kaartafbeeldingen zijn presentatie en geen technische of productiebron. Bestandsformaat en extensie moeten overeenkomen."
       }
     ],
     "camParameters": [
