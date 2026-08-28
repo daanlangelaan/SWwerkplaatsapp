@@ -24,10 +24,14 @@ De bedoelde tabelnamen en relaties staan in `config/master-data-schema.json`. Va
 
 Een voorkeur is geen productregel maar een relatie tussen categorie, subcategorie, leverancier en scope. De app filtert eerst op `Categorie`, `Subcategorie` en `Scope-type`/`Scope-ID`; vervolgens wint de laagste actieve `Rang`. `Alle producten` geldt ook voor producten die later worden toegevoegd. Een kandidaataanbieder krijgt pas invloed wanneer zijn voorkeur de status `Actief` heeft.
 
+Houd `SupplierPreferencesTable` fysiek gesorteerd op categorie, subcategorie en rang. Daarmee staat het beheer per inkoopcategorie bij elkaar zonder een tweede leveranciers- of voorkeurstabblad als concurrerende bron te maken.
+
 TechXXL is standaard rang 1 voor:
 
 - `Profiel` / `Aluminium systeemprofielen`;
 - `Beslag` / `Profieltoebehoren`.
+
+Goedkoop Bouwmaterialen is standaard rang 1 voor `Materiaal` / `Houtachtige platen` en kandidaatbron voor `Materiaal` / `Trespa platen`. Kunststofplatenshop blijft rang 1 voor `Materiaal` / `Kunststof platen`.
 
 ## Afbeeldingen
 
@@ -51,6 +55,58 @@ Bij toevoegen of vervangen:
 6. Voeg noodzakelijke controles toe en registreer de wijziging.
 7. Valideer alle foreign keys, unieke ID's en afbeeldingsbestanden; controleer het gewijzigde werkblad visueel.
 8. Voer `python scripts/generate-masterdata-runtime.py` uit en daarna de minimale controles uit `AGENTS.md`.
+
+## Technische leveranciersgeometrie
+
+Een technische maat heet alleen leveranciersdata wanneer zij aan een concreet,
+stabiel intern materiaal- of component-ID én aan een leveranciersaanbieding met
+artikelcode en bron is gekoppeld. Een maat uit een gelijkend product, afbeelding,
+UI-render of andere profielserie is geen exacte bron.
+
+Leg profieldoorsneden vast bij het materiaalrecord en hardware-enveloppen bij het
+componentrecord. Een verbindingsrecept verwijst vervolgens uitsluitend naar die
+stabiele records. Minimaal vereist voor de assemblagerenderer:
+
+- profiel: sleufmondbreedte en -diepte, sleufkamerbreedte en -diepte,
+  buitenradius en kernboringdiameter;
+- standaardverbinder: totale plaat- en klemgeometrie, onderlinge klempositie en
+  positie ten opzichte van het profieluiteinde;
+- bout: norm of exact artikel, draadmaat en lengte, kopdiameter en -hoogte en
+  binnenzeskantmaat;
+- bewijs: leverancier-ID, artikelcode, bron-URL of beheerd datablad, revisie en
+  verificatiestatus.
+
+Zolang één van deze waarden of de exacte artikelkeuze ontbreekt, blijft het
+backend-rendercontract `ProvisionalRenderEnvelope`, is `OpenData` niet leeg en
+mag de envelope niet worden gebruikt voor CAM, inkoop of productievrijgave.
+
+### TechXXL CAD-download
+
+Gebruik voor TechXXL altijd de leverancierspagina en het artikelnummer als
+startpunt:
+
+1. open `https://www.techxxl.nl/part-<TIN>.html` en controleer TIN, ID, serie,
+   type en raster;
+2. volg **CAD gegevens** naar `https://www.techxxl.nl/cad-<TIN>.html`;
+3. voer het geldige weekwachtwoord in en verzend het formulier; technisch is dit
+   een `POST` met veldnaam `eingabe`;
+4. accepteer alleen een respons met een CAD-bestandsnaam in
+   `Content-Disposition`; een HTML-respons is een fout of verlopen wachtwoord;
+5. leg bestandsnaam, formaat, SHA-256, controledatum, TIN en leveranciers-ID vast
+   in het materiaal- of componentrecord;
+6. controleer de geometrie tegen de zichtbare leveranciersmaten voordat een veld
+   `ExactSupplierGeometry` wordt.
+
+Het wachtwoord is circa één week geldig. Bewaar het uitsluitend in de lokale
+Codex-leveranciersopslag buiten de repository, met verkrijgings- en vervaldatum.
+Neem het nooit op in Excel, runtime-JSON, broncode, documentatie of Git. Na de
+vervaldatum moet een nieuw wachtwoord bij TechXXL worden opgevraagd.
+
+De machinebasis gebruikt één consistente groef-8-keten: `alu_system_80x40`
+(TIN 100535), `alu_system_80x80` (TIN 100545),
+`techxxl_standard_connector_8_40` (TIN 100342) en
+`techxxl_button_head_iso7380_m8x25` (TIN 100673). De profielen hebben ronde
+kernboringen Ø6,8 mm voor M8. De renderer mag deze als ronde gaten tonen.
 
 ## Migratieregel
 

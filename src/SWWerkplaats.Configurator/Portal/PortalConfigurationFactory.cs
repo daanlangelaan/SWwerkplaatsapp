@@ -23,6 +23,9 @@ namespace SWWerkplaats.Configurator.Portal
             var width = Clamp(request.WidthMm, 300, 3020, ProductDefaults.WorkbenchWidthMm);
             var depth = Clamp(request.DepthMm, 300, 1520, ProductDefaults.WorkbenchDepthMm);
             var height = Clamp(request.HeightMm, 300, 2400, ProductDefaults.WorkbenchHeightMm);
+            var profileMaterialId = string.IsNullOrWhiteSpace(request.ProfileMaterialId)
+                ? ProductDefaultProfileId("werktafel")
+                : request.ProfileMaterialId;
             var topSheet = CloneMaterial(FindSheet(request.SheetMaterialId));
             topSheet.ThicknessMm = topSheet.ThicknessMm <= 0 ? 18 : topSheet.ThicknessMm;
 
@@ -33,7 +36,7 @@ namespace SWWerkplaats.Configurator.Portal
                 WidthMm = width,
                 DepthMm = depth,
                 HeightMm = height,
-                FrameProfile = CloneMaterial(FindProfile(request.ProfileMaterialId)),
+                FrameProfile = CloneMaterial(FindProfile(profileMaterialId)),
                 TopSheet = topSheet,
                 ShelfSheet = CloneMaterial(FindSheet(request.SheetMaterialId)),
                 IncludeLowerFrame = true,
@@ -64,14 +67,13 @@ namespace SWWerkplaats.Configurator.Portal
         public MachineBaseConfig BuildMachineBase(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();
-            var width = Clamp(request.WidthMm, 1000, 6000, ProductDefaults.MachineBaseWidthMm);
-            var depth = Clamp(request.DepthMm, 600, 2000, ProductDefaults.MachineBaseDepthMm);
-            var height = Clamp(request.HeightMm, 1000, 2300, ProductDefaults.MachineBaseHeightMm);
+            var master = MachineBaseMasterDataSettings.LoadRequired();
+            var width = Clamp(request.WidthMm, master.MinimumWidthMm, master.MaximumWidthMm, ProductDefaults.MachineBaseWidthMm);
+            var depth = Clamp(request.DepthMm, master.MinimumDepthMm, master.MaximumDepthMm, ProductDefaults.MachineBaseDepthMm);
+            var height = Clamp(request.HeightMm, master.MinimumHeightMm, master.MaximumHeightMm, ProductDefaults.MachineBaseHeightMm);
             var worktopHeight = Clamp(request.MachineBaseWorktopHeightMm, 600, 1000, ProductDefaults.MachineBaseWorktopHeightMm);
-            if (height < worktopHeight + 80) height = Math.Min(2300, worktopHeight + 80);
-            var worktopMaterialId = string.Equals(request.MachineBaseWorktopMaterialId, "hpl_12_machinebase", StringComparison.OrdinalIgnoreCase)
-                ? "hpl_12_machinebase"
-                : "hpl_10_lex";
+            if (height < worktopHeight + 80) height = Math.Min(master.MaximumHeightMm, worktopHeight + 80);
+            var worktopMaterialId = master.ResolveWorktopMaterial(request.MachineBaseWorktopMaterialId);
             var worktopMaterial = CloneMaterial(FindSheet(worktopMaterialId));
             return new MachineBaseConfig
             {
@@ -82,13 +84,13 @@ namespace SWWerkplaats.Configurator.Portal
                 WorktopHeightMm = worktopHeight,
                 ReservedWorktopThicknessMm = worktopMaterial.ThicknessMm,
                 WorktopMaterial = worktopMaterial,
-                UprightProfile = CloneMaterial(FindProfile("alu_system_80x40")),
-                LowerBeamProfile = CloneMaterial(FindProfile(NormalizeMachineBaseBeamProfile(request.MachineBaseLowerBeamProfileId, false))),
-                WorktopBeamProfile = CloneMaterial(FindProfile("alu_system_80x40")),
+                UprightProfile = CloneMaterial(FindProfile(master.PrimaryProfileId)),
+                LowerBeamProfile = CloneMaterial(FindProfile(master.ResolveLowerBeamProfile(request.MachineBaseLowerBeamProfileId))),
+                WorktopBeamProfile = CloneMaterial(FindProfile(master.PrimaryProfileId)),
                 WorktopIntermediateBeamMaxSpacingMm = Clamp(request.MachineBaseWorktopIntermediateBeamMaxSpacingMm, 300, 1000, ProductDefaults.MachineBaseWorktopIntermediateBeamMaxSpacingMm),
-                TopBeamProfile = CloneMaterial(FindProfile("alu_system_40x40")),
-                LowerPanelMaterial = CloneMaterial(FindSheet("hpl_6_lex_stabilizer")),
-                UpperPanelMaterial = CloneMaterial(FindSheet("acrylic_clear_6")),
+                TopBeamProfile = CloneMaterial(FindProfile(master.TopFrameProfileId)),
+                LowerPanelMaterial = CloneMaterial(FindSheet(master.LowerPanelMaterialId)),
+                UpperPanelMaterial = CloneMaterial(FindSheet(master.UpperPanelMaterialId)),
                 FrontProtectionMode = string.Equals(request.MachineBaseFrontProtectionMode, "lightcurtain", StringComparison.OrdinalIgnoreCase) ? "lightcurtain" : "doors",
                 ControlCabinetWidthMm = Clamp(request.MachineBaseControlCabinetWidthMm, 300, width - 160, ProductDefaults.MachineBaseControlCabinetWidthMm),
                 ControlCabinetDepthMm = Clamp(request.MachineBaseControlCabinetDepthMm, 200, depth - 120, ProductDefaults.MachineBaseControlCabinetDepthMm),
@@ -119,6 +121,66 @@ namespace SWWerkplaats.Configurator.Portal
                 FrameBeamProfile = CloneMaterial(FindProfile("alu_system_80x40")),
                 RearRailProfile = CloneMaterial(FindProfile("alu_system_160x40")),
                 WorktopMaterial = CloneMaterial(FindSheet("hpl_10_lex")),
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+        }
+
+        public LinearRobotCellConfig BuildLinearRobotCell(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var master = LinearRobotCellMasterDataSettings.LoadRequired();
+            var length = Clamp(request.WidthMm, master.MinimumLengthMm, master.MaximumLengthMm, master.DefaultLengthMm);
+            var worktopDepth = Clamp(request.DepthMm, master.MinimumWorktopDepthMm, master.MaximumWorktopDepthMm, master.DefaultWorktopDepthMm);
+            var worktopHeight = Clamp(request.HeightMm, master.MinimumWorktopHeightMm, master.MaximumWorktopHeightMm, master.DefaultWorktopHeightMm);
+            var sideCount = request.LinearRobotCellWorktopSideCount == 2 ? 2 : master.DefaultWorktopSideCount;
+            var guardHeight = Clamp(request.LinearRobotCellGuardHeightAboveWorktopMm, master.MinimumGuardHeightMm, master.MaximumGuardHeightMm, master.DefaultGuardHeightMm);
+            var lightCurtain = master.SelectLightCurtain(guardHeight);
+            return new LinearRobotCellConfig
+            {
+                ProjectName = "LINEAIRE_ROBOTCEL_" + length.ToString("0") + "x" + worktopDepth.ToString("0") + "x" + worktopHeight.ToString("0") + "_" + sideCount + "Z",
+                LengthMm = length,
+                WorktopDepthMm = worktopDepth,
+                WorktopHeightMm = worktopHeight,
+                WorktopSideCount = sideCount,
+                GuardHeightAboveWorktopMm = guardHeight,
+                IntermediateSupportMaxSpacingMm = Clamp(request.LinearRobotCellIntermediateSupportMaxSpacingMm, master.MinimumSupportSpacingMm, master.MaximumSupportSpacingMm, master.DefaultSupportSpacingMm),
+                RailZoneWidthMm = master.RailZoneWidthMm,
+                RailCenterSpacingMm = master.RailCenterSpacingMm,
+                RailWidthMm = master.RailEnvelope[0],
+                RailHeightMm = master.RailEnvelope[1],
+                CarriageLengthMm = master.CarriageEnvelope[0],
+                CarriageWidthMm = master.CarriageEnvelope[1],
+                CarriageHeightMm = master.CarriageEnvelope[2],
+                RobotAdapterLengthMm = master.RobotAdapterEnvelope[0],
+                RobotAdapterWidthMm = master.RobotAdapterEnvelope[1],
+                RobotAdapterThicknessMm = master.RobotAdapterEnvelope[2],
+                MotorAdapterLengthMm = master.MotorAdapterEnvelope[0],
+                MotorAdapterHeightMm = master.MotorAdapterEnvelope[1],
+                MotorAdapterThicknessMm = master.MotorAdapterEnvelope[2],
+                RackWidthMm = master.RackEnvelope[0],
+                RackHeightMm = master.RackEnvelope[1],
+                FootVisibleHeightMm = master.SupportEnvelope[0],
+                FootDiameterMm = master.SupportEnvelope[1],
+                FootPlateThicknessMm = master.SupportEnvelope[2],
+                LowerFrameEndCrossmembersUseOuterLane = master.LowerFrameEndCrossmembersUseOuterLane,
+                TwoSidedEndWallIntermediatePostCount = master.TwoSidedEndWallIntermediatePostCount,
+                ThroughCornerUprightCount = master.ThroughCornerUprightCount,
+                TwoSidedCenterSupportRowCount = master.TwoSidedCenterSupportRowCount,
+                LightCurtainSetComponentId = lightCurtain.SetComponentId,
+                LightCurtainEmitterComponentId = lightCurtain.EmitterComponentId,
+                LightCurtainReceiverComponentId = lightCurtain.ReceiverComponentId,
+                LightCurtainDisplayName = lightCurtain.DisplayName,
+                LightCurtainArticleNumber = lightCurtain.ArticleNumber,
+                LightCurtainProtectedHeightMm = lightCurtain.ProtectedHeightMm,
+                LightCurtainWidthMm = lightCurtain.WidthMm,
+                LightCurtainOverallHeightMm = lightCurtain.OverallHeightMm,
+                LightCurtainDepthMm = lightCurtain.DepthMm,
+                UprightProfile = CloneMaterial(FindProfile(master.UprightProfileId)),
+                FrameBeamProfile = CloneMaterial(FindProfile(master.FrameBeamProfileId)),
+                RailCarrierProfile = CloneMaterial(FindProfile(master.RailCarrierProfileId)),
+                GuardProfile = CloneMaterial(FindProfile(master.GuardProfileId)),
+                WorktopMaterial = CloneMaterial(FindSheet(master.WorktopMaterialId)),
+                GuardPanelMaterial = CloneMaterial(FindSheet(master.GuardPanelMaterialId)),
                 SawingMode = ParseSawingMode(request.ProfileSawingMode)
             };
         }
@@ -196,20 +258,13 @@ namespace SWWerkplaats.Configurator.Portal
             };
         }
 
-        private static string NormalizeMachineBaseBeamProfile(string value, bool defaultTo80x40)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return defaultTo80x40 ? "alu_system_80x40" : "alu_system_40x40";
-            return string.Equals(value, "alu_system_80x40", StringComparison.OrdinalIgnoreCase)
-                ? "alu_system_80x40"
-                : "alu_system_40x40";
-        }
-
         public LexWorkbenchConfig BuildLexWorkbench(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();
             var width = Clamp(request.WidthMm, 1200, 2200, ProductDefaults.LexWorkbenchWidthMm);
             var depth = Clamp(request.DepthMm, 700, 1400, ProductDefaults.LexWorkbenchDepthMm);
             var height = Clamp(request.HeightMm, ProductDefaults.LexWorkbenchHeightMm, ProductDefaults.LexWorkbenchHeightMm + 400, ProductDefaults.LexWorkbenchHeightMm);
+            var motionSettings = LexMotionMasterDataSettings.LoadRequired();
             var config = new LexWorkbenchConfig
             {
                 ProductVariant = "lex_standard",
@@ -225,7 +280,7 @@ namespace SWWerkplaats.Configurator.Portal
                 WorktopCenterSupportOffsetMm = 70,
                 FixedRailFrameWidthMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm + 80,
                 FixedRailFrameDepthMm = 780,
-                CarriageCenterDistanceMm = 600,
+                CarriageCenterDistanceMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm,
                 CarriageAdapterLengthMm = 80,
                 CarriageAdapterWidthMm = 80,
                 CarriageAdapterThicknessMm = 10,
@@ -236,34 +291,37 @@ namespace SWWerkplaats.Configurator.Portal
                 CarriageAdapterProfileGrooveOffsetMm = 20,
                 BallTransferHoleDiameterMm = 30.1,
                 BallTransferBodyDiameterMm = 30.01,
-                BallTransferFlangeDiameterMm = 31.95,
-                BallTransferFlangeThicknessMm = 1.2,
+                BallTransferFlangeDiameterMm = 32,
+                BallTransferFlangeThicknessMm = 2,
                 BallTransferFlangeRecessDiameterMm = 32.1,
-                BallTransferFlangeRecessDepthMm = 1.2,
+                BallTransferFlangeRecessDepthMm = 2,
                 BallTransferInsertionLengthMm = 17,
                 BallTransferBallDiameterMm = 19.05,
-                BallTransferWorkingHeightMm = 2,
+                BallTransferWorkingHeightMm = 6.3,
                 SawingMode = ParseSawingMode(request.ProfileSawingMode),
-                Profile80x40 = CloneMaterial(FindProfile("alu_system_80x40")),
                 Profile80x80 = CloneMaterial(FindProfile("alu_system_80x80")),
                 Profile40x40 = CloneMaterial(FindProfile("alu_system_40x40")),
                 TopSheet = CloneMaterial(FindSheet("hpl_10_lex")),
                 StabilizationSheet = CloneMaterial(FindSheet("hpl_6_lex_stabilizer")),
-                CarriageAdapterSheet = CloneMaterial(FindSheet("alu_6082_10_adapter")),
+                CarriageAdapterSheet = CloneMaterial(FindSheet("pa_cf_print_10_adapter")),
                 LinearGuide = ProductDefaults.LexHsr15LinearGuide(),
                 LiftColumn = ProductDefaults.LexHte2LiftColumn(),
                 LevelingFootCornerAdapter = ProductDefaults.LexLevelingFootCornerAdapter(),
-                LevelingFoot = ProductDefaults.LexLevelingFoot()
+                LevelingFoot = ProductDefaults.LexLevelingFoot(),
+                SwingLatch = new SwingLatchCatalog().LoadRequired()
             };
+            config.HorizontalLockPositionsMm.AddRange(motionSettings.HorizontalLockPositionsMm);
+            config.MovingFrameSlotAxisEdgeOffsetMm = new ProfileSlotGeometryCatalog().FindRequired(config.Profile40x40.Id).EdgeOffsetMm;
             config.DesignNotes.Add("Basisontwerp v0.1: rollenbaan vervallen; een afzonderlijk eigen maakdeel in HPL 6 mm vervangt het eerdere 240 mm verbindingsprofiel. Deze tussenplaat is niet inbegrepen bij de HTE2-hefset.");
-            config.DesignNotes.Add("HSR15 is als systeemcode vastgelegd: rail 15x15, steek 60, 25 gaten op 1500 mm met 30 mm eindafstand en HSR15R-wagen 34x56,6x28.");
-            config.DesignNotes.Add("Kogelpot voorlopig op QB310-envelope: huis Ø30,01, flens Ø31,95x1,2, insteeklengte 17 en hoofdkogel Ø19,05. Verzonken montage in Ø30,1 doorvoer met vlakke flenszitting Ø32,1x1,2 mm; kraag draagt mechanisch op de HPL-schouder. Gewenste kogeltop 2 mm boven het afgewerkte HPL. Definitief inkooptype, passing en eventuele transportborging met een proefexemplaar vrijgeven.");
+            config.DesignNotes.Add("HSR15 is als systeemcode vastgelegd: de vier HSR15R-wagens 34x56,6x28 staan per rail op 890 mm h.o.h., exact boven de HTE2-poot- en vaste zijframeharten. Twee voorraadrails 1500x15x15 worden voor de vrijgegeven slag ±220 mm symmetrisch op 1440 mm afgezaagd; 24 patroonboringen blijven behouden en de mechanische eindstopharten liggen op X=±699,3 mm.");
+            config.DesignNotes.Add("Kogelpot geselecteerd als VCN310-30: D1 30 mm, flens D 32 mm, huislengte L 17 mm, flenshoogte H 2 mm, kogeltophoogte L1 6,3 mm en hoofdkogel d 19,05 mm; leveranciersbelasting 412 N bij rechtop gebruik. Montagepassing en borging in HPL met een proefexemplaar vrijgeven.");
             config.DesignNotes.Add("De verticale stabilisatieplaat ligt tegen de achterste kopse zijde van de 160 mm diepe, 90 graden gedraaide HTE2-kolommen en loopt over 955 mm door tot de beide buitenzijden van de 65 mm brede kolommen.");
-            config.DesignNotes.Add("HSR15-rails zijn ondersteboven tegen de onderzijde van twee raildragers in het bewegende werkbladframe gemonteerd; railgaten liggen op de profielgroef en gebruiken M4-inschuifmoeren.");
-            config.DesignNotes.Add("Vier aluminium adapterplaten 80x80x10 koppelen de omgekeerde HSR15R-wagens aan het vaste 80x80-frame: wagenpatroon 26x26 en twee sleufgaten in de profielgroeven op 20 en 60 mm, dus 40 mm hartafstand.");
-            config.DesignNotes.Add("De bewegende werkbladhouder behoudt een gesloten rechthoekige buitencontour van 80x40-profielen. Binnen die contour liggen drie 1570 mm lange 80x40-liggers tussen de linker- en rechterzijprofielen op Z=-350, +70 en +350 mm; de buitenste twee zijn tevens raildrager. De middenligger ligt daarmee tussen de kogelpotrijen op Z=0 en Z=+140 mm, zodat de circa 8,2 mm uitstekende kogelpotbehuizingen vrij blijven. Alleen de drie eerdere losse dwarsliggers langs Z vervallen.");
-            config.DesignNotes.Add("Alle werkelijk blootliggende profielkoppen krijgen zwarte PA-GF serie-8 afdekkappen: 4x 80x80 op het vaste railframe en 4x 80x40 op het bewegende buitenframe. De vier voetprofielkoppen worden volledig afgedekt door de ZI-1744 hoekadapters en krijgen daarom geen losse kap.");
+            config.DesignNotes.Add("HSR15-rails zijn ondersteboven tegen de onderzijde van twee raildragers in het bewegende werkbladframe gemonteerd; railgaten liggen op de profielgroef en gebruiken verschuifbare M4-schuifmoeren. Boutlengte volgt uit raildoorvoer plus beschikbare draadzone en stopt vóór de sleufbodem.");
+            config.DesignNotes.Add("Vier 3D-geprinte PA-CF adapterplaten 80x80x10, 100% infill, koppelen de omgekeerde HSR15R-wagens aan het vaste 80x80-frame: wagenpatroon 26x26 en twee sleufgaten in de profielgroeven op 20 en 60 mm, dus 40 mm hartafstand. Naar het profiel worden M8-inklikmoeren met verende kogel gebruikt.");
+            config.DesignNotes.Add("De bewegende werkbladhouder heeft een gesloten rechthoekige buitencontour van groef-8 40x40-profielen. Binnen die contour liggen drie 1570 mm lange 40x40-liggers tussen de linker- en rechterzijprofielen op Z=-350, +70 en +350 mm; de buitenste twee zijn tevens raildrager. De middenligger ligt daarmee tussen de kogelpotrijen op Z=0 en Z=+140 mm, zodat de circa 8,2 mm uitstekende kogelpotbehuizingen vrij blijven.");
+            config.DesignNotes.Add("Alle werkelijk blootliggende profielkoppen krijgen zwarte PA-GF serie-8 afdekkappen: 4x 80x80 op het vaste railframe en 4x TechXXL TIN 100184 40x40 op het bewegende buitenframe. De vier voetprofielkoppen worden volledig afgedekt door de ZI-1744 hoekadapters en krijgen daarom geen losse kap.");
             config.DesignNotes.Add("Vier Maunsystem ZI-1744 hoekadapters met M16-opname dragen ZI-1415-S stelvoeten D80/M16x130. De voetprofielen worden tussen de adapters ingekort; adapter, voet en blad blijven samen exact binnen de diepte-envelope van " + depth.ToString("0.##") + " mm.");
+            config.DesignNotes.Add("Zes Item Schwenkriegel 8 Pi 54 PA (0.0.700.81) vormen draaibare werkstukaanslagen: twee per lange zijde en één per korte zijde. De 90-graden raststanden maken iedere werkbladhoek bruikbaar tegen twee aanslagen; externe maten komen uit Item-masterdata.");
             return config;
         }
 
@@ -273,6 +331,39 @@ namespace SWWerkplaats.Configurator.Portal
             config.ProductVariant = "lex_revolution";
             config.ProjectName = config.ProjectName.Replace("WORKSTATION_", "WORKSTATION_ONTWIKKELVARIANT_");
             config.DesignNotes.Insert(0, "LEX Revolution ontwikkelvariant: zelfstandige productroute op basis van de offerbare LEX-revisie. De startgeometrie, stuklijst en calculatie zijn bij aanmaak bewust gelijk; nieuwe slimme oplossingen worden alleen in deze variant doorontwikkeld.");
+            return config;
+        }
+
+        public HeightAdjustableWorkbenchConfig BuildHeightAdjustableWorkbench(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var master = HeightAdjustableWorkbenchMasterDataSettings.LoadRequired();
+            var width = Clamp(request.WidthMm, master.MinimumWidthMm, master.MaximumWidthMm, master.DefaultWidthMm);
+            var depth = Clamp(request.DepthMm, master.MinimumDepthMm, master.MaximumDepthMm, master.DefaultDepthMm);
+            var height = Clamp(request.HeightMm, master.MinimumHeightMm, master.MaximumHeightMm, master.DefaultHeightMm);
+            var worktopMaterialId = master.ResolveWorktopMaterial(request.SheetMaterialId);
+
+            var config = new HeightAdjustableWorkbenchConfig
+            {
+                ProjectName = "HOOGTEVERSTELBARE_WERKTAFEL_" + width.ToString("0") + "x" + depth.ToString("0") + "x" + height.ToString("0"),
+                WidthMm = width,
+                DepthMm = depth,
+                HeightMm = height,
+                ColumnCenterDistanceMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm,
+                StabilizationPlateWidthMm = ProductDefaults.LexWorkbenchColumnCenterDistanceMm + ProductDefaults.LexHte2LiftColumn().BodyDepthMm,
+                StabilizationPlateHeightMm = 240,
+                FootProfile = CloneMaterial(FindProfile(master.FootProfileId)),
+                TopFrameProfile = CloneMaterial(FindProfile(master.ResolveTopFrameProfile(request.ProfileMaterialId))),
+                TopSheet = CloneMaterial(FindSheet(worktopMaterialId)),
+                StabilizationSheet = CloneMaterial(FindSheet(master.StabilizationMaterialId)),
+                LiftColumn = ProductDefaults.LexHte2LiftColumn(),
+                LevelingFootCornerAdapter = ProductDefaults.LexLevelingFootCornerAdapter(),
+                LevelingFoot = ProductDefaults.LexLevelingFoot(),
+                SawingMode = ParseSawingMode(request.ProfileSawingMode)
+            };
+            config.DesignNotes.Add("Onderstel hergebruikt de Workstation-keten: twee 80x80-voetprofielen, twee HTE2 O1-hefkolommen, vier ZI-1744-hoekadapters met ZI-1415-S-stelvoeten en de vaste HPL-stabilisatieplaat.");
+            config.DesignNotes.Add("Vaste bovenlaag: vier randprofielen en exact twee aansluitprofielen op de HTE2-kolomharten. Keuze 40x40 of 40x80 staand; het gekozen werkblad is vast en beweegt uitsluitend verticaal.");
+            config.DesignNotes.Add("Niet aanwezig: kogelpotten, HSR15-rails en -wagens, wagenadapterplaten, horizontale borgposities, eindstops en draaibare werkstukaanslagen.");
             return config;
         }
 
@@ -381,6 +472,7 @@ namespace SWWerkplaats.Configurator.Portal
             var shelfFrontInset = Math.Max(0, Math.Min(maxShelfFrontInset, request.ShelfFrontInsetMm));
             var adjustableFoot = ProductDefaults.WorkbenchCabinetAdjustableFoot();
             var sheetFastener = ProductFastener(request.Product, "werkbankkast", true);
+            var backPanelSettings = WorkbenchCabinetBackPanelSettings.LoadRequired();
             sheetFastener.LengthMm = FastenerSelectionService.SelectWoodToWoodEdgeLength(sheetFastener, carcass.ThicknessMm, Math.Max(depth, height));
             var minimumFootInset = Math.Max(
                 adjustableFoot.FootDiameterMm / 2.0 + 1.0,
@@ -428,6 +520,10 @@ namespace SWWerkplaats.Configurator.Portal
                 DrawerSideClearanceMm = Math.Max(13, rail.ThicknessMm),
                 DrawerBackClearanceMm = ProductDefaults.WorkbenchCabinetDrawerBackClearanceMm,
                 IncludeBackPanel = request.IncludeBackPanel,
+                BackPanelGrooveDepthMm = backPanelSettings.GrooveDepthMm,
+                BackPanelGrooveClearanceMm = backPanelSettings.GrooveClearanceMm,
+                BackPanelFastenerEndInsetMm = backPanelSettings.FastenerEndInsetMm,
+                BackPanelFastenerMaxSpacingMm = backPanelSettings.FastenerMaxSpacingMm,
                 CarcassMaterial = carcass,
                 WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
                 FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
@@ -553,6 +649,15 @@ namespace SWWerkplaats.Configurator.Portal
             return FindMaterial(profiles, id, profiles[ProductDefaults.DefaultProfileIndex]);
         }
 
+        private static string ProductDefaultProfileId(string productId)
+        {
+            var product = Array.Find(new ProductCatalogApplicationService().ListProducts(), item =>
+                string.Equals(item.Product, productId, StringComparison.OrdinalIgnoreCase));
+            if (product == null || string.IsNullOrWhiteSpace(product.DefaultProfileMaterialId))
+                throw new InvalidOperationException("Standaard profielmateriaal ontbreekt in productmasterdata voor " + productId + ".");
+            return product.DefaultProfileMaterialId;
+        }
+
         private static Material FindMaterial(Material[] materials, string id, Material fallback)
         {
             foreach (var material in materials)
@@ -589,7 +694,9 @@ namespace SWWerkplaats.Configurator.Portal
                 ThicknessMm = material.ThicknessMm,
                 StockLengthMm = material.StockLengthMm,
                 SheetLengthMm = material.SheetLengthMm,
-                SheetWidthMm = material.SheetWidthMm
+                SheetWidthMm = material.SheetWidthMm,
+                RenderAppearance = material.RenderAppearance,
+                IsAdditiveManufactured = material.IsAdditiveManufactured
             };
         }
 

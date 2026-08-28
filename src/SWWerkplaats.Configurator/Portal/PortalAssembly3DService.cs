@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Drawing;
@@ -10,12 +11,18 @@ namespace SWWerkplaats.Configurator.Portal
     {
         public List<PortalAssemblyPart> Build(WorkbenchModel model, PortalQuoteRequest request)
         {
-            var parts = BuildFromPlacements(model);
-            if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase))
+            LexWorkbenchConfig lexConfig = null;
+            if (request != null &&
+                (string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)))
             {
-                AddWorkbenchFrame(parts, request);
+                var factory = new PortalConfigurationFactory();
+                lexConfig = string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)
+                    ? factory.BuildLexRevolutionWorkbench(request)
+                    : factory.BuildLexWorkbench(request);
             }
-            else if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase))
+            var parts = BuildFromPlacements(model, lexConfig);
+            if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase))
             {
                 var config = new PortalConfigurationFactory().BuildWorkbenchCabinet(request);
                 AddWorkbenchCabinetFeet(parts, config);
@@ -25,14 +32,65 @@ namespace SWWerkplaats.Configurator.Portal
                 (string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)))
             {
-                var factory = new PortalConfigurationFactory();
-                var config = string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)
-                    ? factory.BuildLexRevolutionWorkbench(request)
-                    : factory.BuildLexWorkbench(request);
-                AddLexBallTransferUnits(parts, config);
+                AddLexBallTransferUnits(parts, lexConfig);
             }
 
+            AddProfileConnectionAccessHoles(parts, model);
+            ApplyPresentationMetadata(parts);
+            if (lexConfig != null || (request != null && string.Equals(request.Product, "hoogteverstelbare_werktafel", StringComparison.OrdinalIgnoreCase)))
+                PortalMotionContractService.ApplyPartMotionMetadata(parts);
             return parts;
+        }
+
+        private static void ApplyPresentationMetadata(IEnumerable<PortalAssemblyPart> parts)
+        {
+            foreach (var part in parts)
+            {
+                if (part == null) continue;
+                var name = (part.Name ?? string.Empty).ToLowerInvariant();
+                part.SuppressSideHoleMarkers = name.StartsWith("zijwand");
+                if (name.StartsWith("draaideur ") || name.StartsWith("schuifdeur u")) part.VisibilityGroup = "door";
+                else if (name.Contains("kogelpotblad")) part.VisibilityGroup = "optional-top";
+
+                if (!string.IsNullOrWhiteSpace(part.AppearanceRole)) { }
+                else if (name.StartsWith("custom ")) part.AppearanceRole = "custom-black";
+                else if (string.Equals(part.Shape, "pa40-hinge", StringComparison.OrdinalIgnoreCase)
+                    || (part.Shape ?? string.Empty).StartsWith("black-hole-", StringComparison.OrdinalIgnoreCase)
+                    || name.Contains("zwarte eindkap") || name.Contains("zwarte spleet") || name.Contains("liangyue ly103-12 clip")) part.AppearanceRole = "black-hardware";
+                else if ((part.Kind ?? string.Empty).StartsWith("hardware-cabinet", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "cabinet-hardware";
+                else if (string.Equals(part.Shape, "acrylic-panel", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "transparent-panel";
+                else if (name.Contains("kogelpotblad")) part.AppearanceRole = "primary-surface";
+                else if (name.Contains("schwenkriegel") && name.Contains("rode kap")) part.AppearanceRole = "swing-latch-cap";
+                else if (name.Contains("schwenkriegel")) part.AppearanceRole = "swing-latch-body";
+                else if (name.Contains("afdekkap")) part.AppearanceRole = "end-cap";
+                else if (name.Contains("stabilisatieplaat")) part.AppearanceRole = "stabilizer";
+                else if (name.Contains("hoekadapter") || name.Contains("adapterplaat") || name.Contains("stellfußsockel")) part.AppearanceRole = "adapter";
+                else if (name.Contains("hte2")) part.AppearanceRole = "lifting-column";
+                else if (name.Contains("hsr15r wagen")) part.AppearanceRole = "guide-carriage";
+                else if (name.Contains("hsr15")) part.AppearanceRole = "linear-guide";
+                else if (name.Contains("eindstop") || name.Contains("stelvoet") || name.Contains("stelpoot") || name.Contains("plunjer")) part.AppearanceRole = "dark-hardware";
+                else if (name.Contains("vast railframe")) part.AppearanceRole = "fixed-frame";
+                else if (name.Contains("schuifframe") || name.Contains("meebewegend") || name.Contains("tafelbladframe")) part.AppearanceRole = "moving-frame";
+                else if (name.Contains("voetprofiel")) part.AppearanceRole = "foot-profile";
+                else if (name.Contains("kogelpot")) part.AppearanceRole = "ball-transfer";
+                else if (string.Equals(part.Kind, "sheet", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "sheet";
+                else if (string.Equals(part.Kind, "profile", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "profile";
+                else if ((part.Kind ?? string.Empty).StartsWith("hardware", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "hardware";
+                else part.AppearanceRole = "generic";
+
+                foreach (var hole in part.Holes)
+                {
+                    if (!string.IsNullOrWhiteSpace(hole.VisualRole)) continue;
+                    var holeName = (hole.Name ?? string.Empty).ToLowerInvariant();
+                    hole.VisualRole = holeName.StartsWith("kogelpot ") ? "ball-seat"
+                        : (holeName.StartsWith("toegangsgat standaardverbinder") ? "connector-access" : "standard");
+                }
+                foreach (var pocket in part.Pockets)
+                {
+                    var pocketName = (pocket.Name ?? string.Empty).ToLowerInvariant();
+                    pocket.VisualRole = pocketName.Contains("handgreep") ? "handle-cutout" : "standard";
+                }
+            }
         }
 
         private static void AddLexBallTransferUnits(List<PortalAssemblyPart> parts, LexWorkbenchConfig config)
@@ -69,13 +127,23 @@ namespace SWWerkplaats.Configurator.Portal
             }
         }
 
-        private static List<PortalAssemblyPart> BuildFromPlacements(WorkbenchModel model)
+        private static List<PortalAssemblyPart> BuildFromPlacements(WorkbenchModel model, LexWorkbenchConfig lexConfig)
         {
             var parts = new List<PortalAssemblyPart>();
+            var coreHolePositions = new ProfileCoreHolePositionService();
+            var profileRenderContracts = new ProfileRenderContractService();
+            var componentRenderContracts = new ComponentPrimitiveRenderContractService();
             foreach (var placement in model.AssemblyPlacements)
             {
+                // Legacy decoratieve markers zijn vervangen door gaten uit het
+                // bevestigde AssemblyConnection-contract.
+                if ((placement.Shape ?? string.Empty).StartsWith("black-hole-", StringComparison.OrdinalIgnoreCase)) continue;
                 var sheet = FindSheet(model, placement.PartName);
-                var thickness = sheet == null || sheet.Material == null ? 18 : Math.Max(2, sheet.Material.ThicknessMm);
+                if (placement.Kind == AssemblyComponentKind.Sheet && sheet == null)
+                    throw new InvalidOperationException("Rendercontract mist plaatrecord voor " + placement.PartName + ".");
+                if (sheet != null && (sheet.Material == null || sheet.Material.ThicknessMm <= 0))
+                    throw new InvalidOperationException("Rendercontract mist plaatdikte voor " + placement.PartName + ".");
+                var thickness = sheet == null ? 0 : sheet.Material.ThicknessMm;
                 var sx = placement.LengthMm;
                 var sy = thickness;
                 var sz = placement.WidthMm;
@@ -103,6 +171,12 @@ namespace SWWerkplaats.Configurator.Portal
                     continue;
                 }
 
+                if (placement.Kind == AssemblyComponentKind.Purchased && !string.IsNullOrWhiteSpace(placement.ComponentId))
+                {
+                    AddComponentPrimitives(parts, placement, componentRenderContracts.BuildRequired(placement.ComponentId));
+                    continue;
+                }
+
                 if (sheet != null && placement.Orientation == AssemblyOrientation.SheetVerticalZ && HasSlidingDoorFrontEdgeCutout(sheet))
                 {
                     AddSlidingDoorPassThroughVerticalZPanel(parts, placement, sheet, thickness);
@@ -122,6 +196,9 @@ namespace SWWerkplaats.Configurator.Portal
                 var part = new PortalAssemblyPart
                 {
                     Name = placement.PartName,
+                    MemberId = placement.MemberId,
+                    TraceId = placement.TraceId,
+                    Sticker = placement.Sticker,
                     Kind = placement.Kind == AssemblyComponentKind.Profile
                         ? "profile"
                         : (placement.Kind == AssemblyComponentKind.Purchased ? (string.IsNullOrWhiteSpace(placement.VisualKind) ? "hardware" : placement.VisualKind) : "sheet"),
@@ -129,13 +206,35 @@ namespace SWWerkplaats.Configurator.Portal
                     Xmm = placement.Xmm,
                     Ymm = placement.Ymm,
                     Zmm = placement.Zmm,
-                    SizeXmm = Math.Max(2, sx),
-                    SizeYmm = Math.Max(2, sy),
-                    SizeZmm = Math.Max(2, sz),
+                    SizeXmm = sx,
+                    SizeYmm = sy,
+                    SizeZmm = sz,
                     RotationXDeg = placement.RotationXDeg,
                     RotationYDeg = placement.RotationYDeg,
-                    RotationZDeg = placement.RotationZDeg
+                    RotationZDeg = placement.RotationZDeg,
+                    MaterialAppearance = sheet == null || sheet.Material == null ? null : sheet.Material.RenderAppearance,
+                    MaterialThicknessAxis = sheet == null ? null : SheetThicknessAxis(placement.Orientation)
                 };
+                if (placement.Kind == AssemblyComponentKind.Profile)
+                {
+                    try
+                    {
+                        foreach (var coreHole in coreHolePositions.Build(model, placement)) part.CoreHoles.Add(coreHole);
+                        part.ProfileRender = profileRenderContracts.Build(model, placement);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Niet-vrijgegeven profielgeometrie blijft leeg; de instructieplanner blokkeert
+                        // de bijbehorende verbinding afzonderlijk voor productievrijgave.
+                    }
+                }
+                if (string.Equals(placement.Shape, "swing-latch", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (lexConfig == null || lexConfig.SwingLatch == null)
+                        throw new InvalidOperationException("Rendercontract mist draaibare aanslagdata voor " + placement.PartName + ".");
+                    AddLexSwingLatch(parts, placement, lexConfig.SwingLatch);
+                    continue;
+                }
                 if (sheet != null) part.CornerRadiusMm = sheet.CornerRadiusMm;
                 AddOutline(part, sheet);
                 AddHoles(part, placement, sheet, thickness);
@@ -160,14 +259,16 @@ namespace SWWerkplaats.Configurator.Portal
                         Zmm = 0,
                         Orientation = AssemblyOrientation.SheetHorizontal
                     };
-                    var thickness = sheet.Material == null ? 18 : Math.Max(2, sheet.Material.ThicknessMm);
+                    if (sheet.Material == null || sheet.Material.ThicknessMm <= 0)
+                        throw new InvalidOperationException("Rendercontract mist plaatdikte voor " + sheet.Name + ".");
+                    var thickness = sheet.Material.ThicknessMm;
                     if (sheet.HasCornerNotches)
                     {
                         AddCornerNotchedHorizontalSheet(parts, placement, sheet, thickness);
                     }
                     else
                     {
-                        var part = Part(sheet.Name, "sheet", 0, sheet.CenterHeightMm, 0, sheet.LengthMm, thickness, sheet.WidthMm);
+                        var part = ApplySheetAppearance(Part(sheet.Name, "sheet", 0, sheet.CenterHeightMm, 0, sheet.LengthMm, thickness, sheet.WidthMm), sheet, "y");
                         part.CornerRadiusMm = sheet.CornerRadiusMm;
                         AddOutline(part, sheet);
                         AddHoles(part, placement, sheet, thickness);
@@ -178,6 +279,164 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             return parts;
+        }
+
+        private static void AddProfileConnectionAccessHoles(List<PortalAssemblyPart> parts, WorkbenchModel model)
+        {
+            if (parts == null || model == null) return;
+            var placements = model.AssemblyPlacements
+                .Where(p => p.Kind == AssemblyComponentKind.Profile && !string.IsNullOrWhiteSpace(p.MemberId))
+                .GroupBy(p => p.MemberId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            foreach (var connection in model.AssemblyConnections.Where(c => c.JointType == AssemblyJointType.StandardConnector
+                && c.Status == AssemblyDataStatus.Confirmed && c.AccessHoleDiameterMm > 0))
+            {
+                AssemblyPlacement placement;
+                if (!placements.TryGetValue(connection.SlotMemberId ?? string.Empty, out placement)) continue;
+                var part = parts.FirstOrDefault(p => string.Equals(p.MemberId, connection.SlotMemberId, StringComparison.OrdinalIgnoreCase));
+                if (part == null) continue;
+                var localNormal = new[] { 0.0, 0.0, 0.0 };
+                if (connection.AccessLocalNormalAxis >= 0 && connection.AccessLocalNormalAxis <= 2)
+                    localNormal[connection.AccessLocalNormalAxis] = connection.AccessLocalNormalSign;
+                var normal = RotateLocal(localNormal[0], localNormal[1], localNormal[2],
+                    placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg);
+                var absolute = new[] { Math.Abs(normal[0]), Math.Abs(normal[1]), Math.Abs(normal[2]) };
+                var axis = Array.IndexOf(absolute, absolute.Max());
+                part.Holes.Add(new PortalAssemblyHole
+                {
+                    Name = "Toegangsgat standaardverbinder " + connection.ConnectionId,
+                    Xmm = connection.AccessXmm,
+                    Ymm = connection.AccessYmm,
+                    Zmm = connection.AccessZmm,
+                    DiameterMm = connection.AccessHoleDiameterMm,
+                    Plane = axis == 0 ? "x" : (axis == 1 ? "y" : "z"),
+                    IsThroughCutout = true,
+                    VisualRole = "connector-access"
+                });
+            }
+        }
+
+        private static void AddComponentPrimitives(List<PortalAssemblyPart> parts, AssemblyPlacement placement, ComponentPrimitiveRenderContract contract)
+        {
+            foreach (var primitive in contract.Primitives)
+            {
+                var center = RotateLocal(primitive.Xmm, primitive.Ymm, primitive.Zmm,
+                    placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg);
+                var part = new PortalAssemblyPart
+                {
+                    Name = placement.PartName + " / " + primitive.Id,
+                    MemberId = placement.MemberId + ":" + primitive.Id,
+                    TraceId = placement.TraceId,
+                    Kind = string.IsNullOrWhiteSpace(placement.VisualKind) ? "hardware" : placement.VisualKind,
+                    Shape = primitive.Shape,
+                    AppearanceRole = primitive.AppearanceRole,
+                    ComponentId = contract.ComponentId,
+                    ComponentRenderStatus = contract.Status,
+                    ComponentRenderSource = contract.Source,
+                    Xmm = placement.Xmm + center[0],
+                    Ymm = placement.Ymm + center[1],
+                    Zmm = placement.Zmm + center[2],
+                    SizeXmm = primitive.InheritPlacementDimensions ? placement.LengthMm : primitive.SizeXmm,
+                    SizeYmm = primitive.InheritPlacementDimensions ? placement.HeightMm : primitive.SizeYmm,
+                    SizeZmm = primitive.InheritPlacementDimensions ? placement.WidthMm : primitive.SizeZmm,
+                    RotationXDeg = placement.RotationXDeg + primitive.RotationXDeg,
+                    RotationYDeg = placement.RotationYDeg + primitive.RotationYDeg,
+                    RotationZDeg = placement.RotationZDeg + primitive.RotationZDeg,
+                    RadiusTopMm = primitive.InheritPlacementDimensions && primitive.Shape == "cylinder" && primitive.RadiusTopMm <= 0
+                        ? placement.LengthMm / 2.0 : primitive.RadiusTopMm,
+                    RadiusBottomMm = primitive.InheritPlacementDimensions && primitive.Shape == "cylinder" && primitive.RadiusBottomMm <= 0
+                        ? placement.WidthMm / 2.0 : primitive.RadiusBottomMm,
+                    RadialSegments = primitive.RadialSegments
+                };
+                part.ComponentRenderOpenData.AddRange(contract.OpenData);
+                foreach (var source in primitive.Holes)
+                {
+                    var hole = RotateLocal(source.Xmm, source.Ymm, source.Zmm,
+                        placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg);
+                    part.Holes.Add(new PortalAssemblyHole
+                    {
+                        Name = source.Id,
+                        Xmm = placement.Xmm + hole[0],
+                        Ymm = placement.Ymm + hole[1],
+                        Zmm = placement.Zmm + hole[2],
+                        DiameterMm = source.DiameterMm,
+                        DepthMm = source.DepthMm,
+                        Plane = RotatePlane(source.Plane, placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg),
+                        Countersunk = source.CountersinkDiameterMm > source.DiameterMm && source.CountersinkDepthMm > 0,
+                        CountersinkDiameterMm = source.CountersinkDiameterMm,
+                        CountersinkDepthMm = source.CountersinkDepthMm,
+                        VisualRole = "component-mounting-hole"
+                    });
+                }
+                parts.Add(part);
+            }
+        }
+
+        private static double[] RotateLocal(double x, double y, double z, double rotationXDeg, double rotationYDeg, double rotationZDeg)
+        {
+            var rx = rotationXDeg * Math.PI / 180.0;
+            var ry = rotationYDeg * Math.PI / 180.0;
+            var rz = rotationZDeg * Math.PI / 180.0;
+            var cosX = Math.Cos(rx); var sinX = Math.Sin(rx);
+            var y1 = y * cosX - z * sinX; var z1 = y * sinX + z * cosX;
+            var cosY = Math.Cos(ry); var sinY = Math.Sin(ry);
+            var x2 = x * cosY + z1 * sinY; var z2 = -x * sinY + z1 * cosY;
+            var cosZ = Math.Cos(rz); var sinZ = Math.Sin(rz);
+            return new[] { x2 * cosZ - y1 * sinZ, x2 * sinZ + y1 * cosZ, z2 };
+        }
+
+        private static string RotatePlane(string plane, double rotationXDeg, double rotationYDeg, double rotationZDeg)
+        {
+            var normal = string.Equals(plane, "x", StringComparison.OrdinalIgnoreCase)
+                ? RotateLocal(1, 0, 0, rotationXDeg, rotationYDeg, rotationZDeg)
+                : (string.Equals(plane, "y", StringComparison.OrdinalIgnoreCase)
+                    ? RotateLocal(0, 1, 0, rotationXDeg, rotationYDeg, rotationZDeg)
+                    : RotateLocal(0, 0, 1, rotationXDeg, rotationYDeg, rotationZDeg));
+            var absolute = new[] { Math.Abs(normal[0]), Math.Abs(normal[1]), Math.Abs(normal[2]) };
+            var index = absolute[0] >= absolute[1] && absolute[0] >= absolute[2] ? 0 : (absolute[1] >= absolute[2] ? 1 : 2);
+            return index == 0 ? "x" : (index == 1 ? "y" : "z");
+        }
+
+        private static void AddLexSwingLatch(List<PortalAssemblyPart> parts, AssemblyPlacement placement, SwingLatchTemplate latch)
+        {
+            var radians = placement.RotationYDeg * Math.PI / 180.0;
+            var nx = Math.Sin(radians);
+            var nz = Math.Cos(radians);
+            var alongX = Math.Abs(nz) > 0.5;
+            var upperProjection = latch.OverallProjectionMm - latch.BaseProjectionMm;
+            var noseCenter = latch.NoseCenterDistanceMm;
+            AddLatchCylinder(parts, placement.PartName + " montagevoet", placement, latch.MountingBaseDiameterMm,
+                latch.BaseProjectionMm, placement.Ymm, latch.BaseProjectionMm / 2.0, nx, nz);
+            AddLatchCylinder(parts, placement.PartName + " draaipunt", placement, latch.WidthMm,
+                upperProjection, placement.Ymm, latch.BaseProjectionMm + upperProjection / 2.0, nx, nz);
+
+            var bridge = Part(placement.PartName + " arm", "hardware-swing-latch",
+                placement.Xmm + nx * (latch.BaseProjectionMm + upperProjection / 2.0),
+                placement.Ymm + noseCenter / 2.0,
+                placement.Zmm + nz * (latch.BaseProjectionMm + upperProjection / 2.0),
+                alongX ? latch.WidthMm : upperProjection,
+                noseCenter,
+                alongX ? upperProjection : latch.WidthMm);
+            bridge.Shape = "box";
+            parts.Add(bridge);
+            AddLatchCylinder(parts, placement.PartName + " aanslagnok", placement, latch.WidthMm,
+                upperProjection, placement.Ymm + noseCenter, latch.BaseProjectionMm + upperProjection / 2.0, nx, nz);
+
+            // De kap is een expliciete presentatiedetail binnen de als voorlopig gemarkeerde renderenvelop.
+            var capThickness = upperProjection / 8.0;
+            AddLatchCylinder(parts, placement.PartName + " rode kap", placement, latch.WidthMm * 0.62,
+                capThickness, placement.Ymm, latch.OverallProjectionMm + capThickness / 2.0, nx, nz);
+        }
+
+        private static void AddLatchCylinder(List<PortalAssemblyPart> parts, string name, AssemblyPlacement placement,
+            double diameter, double length, double centerY, double outwardCenter, double nx, double nz)
+        {
+            var alongZ = Math.Abs(nz) > 0.5;
+            var part = Part(name, "hardware-swing-latch",
+                placement.Xmm + nx * outwardCenter, centerY, placement.Zmm + nz * outwardCenter,
+                alongZ ? diameter : length, diameter, alongZ ? length : diameter);
+            part.Shape = alongZ ? "cylinder-z" : "cylinder-x";
+            parts.Add(part);
         }
 
         private static void AddOutline(PortalAssemblyPart part, SheetPart sheet)
@@ -280,8 +539,9 @@ namespace SWWerkplaats.Configurator.Portal
             if (string.IsNullOrWhiteSpace(placement.PartName) || !placement.PartName.StartsWith("HSR15 rail", StringComparison.OrdinalIgnoreCase)) return;
 
             var guide = ProductDefaults.LexHsr15LinearGuide();
-            var firstX = part.Xmm - guide.RailLengthMm / 2.0 + guide.RailEndDistanceMm;
-            for (var index = 0; index < guide.RailHoleCount; index++)
+            var holeCount = (int)Math.Floor((part.SizeXmm - 2.0 * guide.RailEndDistanceMm) / guide.RailMountingPitchMm) + 1;
+            var firstX = part.Xmm - part.SizeXmm / 2.0 + guide.RailEndDistanceMm;
+            for (var index = 0; index < holeCount; index++)
             {
                 part.Holes.Add(new PortalAssemblyHole
                 {
@@ -334,7 +594,7 @@ namespace SWWerkplaats.Configurator.Portal
             var notchWidth = Math.Max(0, Math.Min(sheet.CornerNotchWidthMm > 0 ? sheet.CornerNotchWidthMm : sheet.CornerNotchSizeMm, sheet.WidthMm / 2.0 - 1));
             if (notchLength <= 0 || notchWidth <= 0)
             {
-                var fallback = Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, sheet.LengthMm, thickness, sheet.WidthMm);
+                var fallback = ApplySheetAppearance(Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, sheet.LengthMm, thickness, sheet.WidthMm), sheet, "y");
                 AddHoles(fallback, placement, sheet, thickness);
                 AddPockets(fallback, placement, sheet, thickness);
                 parts.Add(fallback);
@@ -342,9 +602,9 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             var centerLength = Math.Max(2, sheet.LengthMm - 2 * notchLength);
-            var center = Part(placement.PartName + " midden", "sheet", placement.Xmm, placement.Ymm, placement.Zmm, centerLength, thickness, sheet.WidthMm);
-            var left = Part(placement.PartName + " links", "sheet", placement.Xmm - sheet.LengthMm / 2.0 + notchLength / 2.0, placement.Ymm, placement.Zmm, notchLength, thickness, Math.Max(2, sheet.WidthMm - 2 * notchWidth));
-            var right = Part(placement.PartName + " rechts", "sheet", placement.Xmm + sheet.LengthMm / 2.0 - notchLength / 2.0, placement.Ymm, placement.Zmm, notchLength, thickness, Math.Max(2, sheet.WidthMm - 2 * notchWidth));
+            var center = ApplySheetAppearance(Part(placement.PartName + " midden", "sheet", placement.Xmm, placement.Ymm, placement.Zmm, centerLength, thickness, sheet.WidthMm), sheet, "y");
+            var left = ApplySheetAppearance(Part(placement.PartName + " links", "sheet", placement.Xmm - sheet.LengthMm / 2.0 + notchLength / 2.0, placement.Ymm, placement.Zmm, notchLength, thickness, Math.Max(2, sheet.WidthMm - 2 * notchWidth)), sheet, "y");
+            var right = ApplySheetAppearance(Part(placement.PartName + " rechts", "sheet", placement.Xmm + sheet.LengthMm / 2.0 - notchLength / 2.0, placement.Ymm, placement.Zmm, notchLength, thickness, Math.Max(2, sheet.WidthMm - 2 * notchWidth)), sheet, "y");
             AddHoles(center, placement, sheet, thickness);
             AddHoles(left, placement, sheet, thickness);
             AddHoles(right, placement, sheet, thickness);
@@ -364,14 +624,14 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (notchHeight <= 0 || notchDepth <= 0)
             {
-                parts.Add(Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, thickness, panelHeight, panelDepth));
+                parts.Add(ApplySheetAppearance(Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, thickness, panelHeight, panelDepth), sheet, "x"));
                 return;
             }
 
-            var upper = Part(placement.PartName + " boven uitsparing", "sheet", placement.Xmm, notchHeight + (panelHeight - notchHeight) / 2.0, placement.Zmm, thickness, panelHeight - notchHeight, panelDepth);
+            var upper = ApplySheetAppearance(Part(placement.PartName + " boven uitsparing", "sheet", placement.Xmm, notchHeight + (panelHeight - notchHeight) / 2.0, placement.Zmm, thickness, panelHeight - notchHeight, panelDepth), sheet, "x");
             var lowerDepth = panelDepth - notchDepth;
             var lowerZ = frontZ + notchDepth + lowerDepth / 2.0;
-            var lower = Part(placement.PartName + " plintvoet", "sheet", placement.Xmm, notchHeight / 2.0, lowerZ, thickness, notchHeight, lowerDepth);
+            var lower = ApplySheetAppearance(Part(placement.PartName + " plintvoet", "sheet", placement.Xmm, notchHeight / 2.0, lowerZ, thickness, notchHeight, lowerDepth), sheet, "x");
             AddHoles(upper, placement, sheet, thickness);
             AddHoles(lower, placement, sheet, thickness);
             AddPockets(upper, placement, sheet, thickness);
@@ -409,7 +669,7 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (cutout == null)
             {
-                var fallback = Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, thickness, placement.WidthMm, placement.LengthMm);
+                var fallback = ApplySheetAppearance(Part(placement.PartName, "sheet", placement.Xmm, placement.Ymm, placement.Zmm, thickness, placement.WidthMm, placement.LengthMm), sheet, "x");
                 AddHoles(fallback, placement, sheet, thickness);
                 AddPockets(fallback, placement, sheet, thickness);
                 parts.Add(fallback);
@@ -431,7 +691,7 @@ namespace SWWerkplaats.Configurator.Portal
                 var lowerBackHeight = Math.Max(notchHeight, Math.Min(cutBottom, panelHeight - 1));
                 var lowerBackDepth = Math.Max(2, panelDepth - notchDepth);
                 var lowerBackZ = frontZ + notchDepth + lowerBackDepth / 2.0;
-                var lowerBack = Part(placement.PartName + " plintvoet", "sheet", placement.Xmm, placement.Ymm - panelHeight / 2.0 + lowerBackHeight / 2.0, lowerBackZ, thickness, lowerBackHeight, lowerBackDepth);
+                var lowerBack = ApplySheetAppearance(Part(placement.PartName + " plintvoet", "sheet", placement.Xmm, placement.Ymm - panelHeight / 2.0 + lowerBackHeight / 2.0, lowerBackZ, thickness, lowerBackHeight, lowerBackDepth), sheet, "x");
                 AddHoles(lowerBack, placement, sheet, thickness);
                 AddPockets(lowerBack, placement, sheet, thickness, false);
                 parts.Add(lowerBack);
@@ -439,7 +699,7 @@ namespace SWWerkplaats.Configurator.Portal
                 var lowerFrontHeight = lowerBackHeight - notchHeight;
                 if (lowerFrontHeight > 2)
                 {
-                    var lowerFront = Part(
+                    var lowerFront = ApplySheetAppearance(Part(
                         placement.PartName + " bodemplaat-aansluiting",
                         "sheet",
                         placement.Xmm,
@@ -447,7 +707,7 @@ namespace SWWerkplaats.Configurator.Portal
                         frontZ + notchDepth / 2.0,
                         thickness,
                         lowerFrontHeight,
-                        notchDepth);
+                        notchDepth), sheet, "x");
                     AddHoles(lowerFront, placement, sheet, thickness);
                     AddPockets(lowerFront, placement, sheet, thickness, false);
                     parts.Add(lowerFront);
@@ -458,7 +718,7 @@ namespace SWWerkplaats.Configurator.Portal
                 {
                     var upperBackDepth = Math.Max(2, panelDepth - cutDepth);
                     var upperBackZ = frontZ + cutDepth + upperBackDepth / 2.0;
-                    var upperBack = Part(placement.PartName + " achter doorvoer", "sheet", placement.Xmm, placement.Ymm - panelHeight / 2.0 + lowerBackHeight + upperBackHeight / 2.0, upperBackZ, thickness, upperBackHeight, upperBackDepth);
+                    var upperBack = ApplySheetAppearance(Part(placement.PartName + " achter doorvoer", "sheet", placement.Xmm, placement.Ymm - panelHeight / 2.0 + lowerBackHeight + upperBackHeight / 2.0, upperBackZ, thickness, upperBackHeight, upperBackDepth), sheet, "x");
                     AddHoles(upperBack, placement, sheet, thickness);
                     AddPockets(upperBack, placement, sheet, thickness, false);
                     parts.Add(upperBack);
@@ -468,7 +728,7 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 var backDepth = Math.Max(2, panelDepth - cutDepth);
                 var backZ = frontZ + cutDepth + backDepth / 2.0;
-                var back = Part(placement.PartName + " achter doorvoer", "sheet", placement.Xmm, placement.Ymm, backZ, thickness, panelHeight, backDepth);
+                var back = ApplySheetAppearance(Part(placement.PartName + " achter doorvoer", "sheet", placement.Xmm, placement.Ymm, backZ, thickness, panelHeight, backDepth), sheet, "x");
                 AddHoles(back, placement, sheet, thickness);
                 AddPockets(back, placement, sheet, thickness, false);
                 parts.Add(back);
@@ -476,7 +736,7 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (!hasToeKick && cutBottom > 2)
             {
-                var lower = Part(
+                var lower = ApplySheetAppearance(Part(
                     placement.PartName + " onder doorvoer",
                     "sheet",
                     placement.Xmm,
@@ -484,7 +744,7 @@ namespace SWWerkplaats.Configurator.Portal
                     frontZ + cutDepth / 2.0,
                     thickness,
                     cutBottom,
-                    cutDepth);
+                    cutDepth), sheet, "x");
                 AddHoles(lower, placement, sheet, thickness);
                 AddPockets(lower, placement, sheet, thickness, false);
                 parts.Add(lower);
@@ -493,7 +753,7 @@ namespace SWWerkplaats.Configurator.Portal
             var upperHeight = panelHeight - cutTop;
             if (upperHeight > 2)
             {
-                var upper = Part(
+                var upper = ApplySheetAppearance(Part(
                     placement.PartName + " boven doorvoer",
                     "sheet",
                     placement.Xmm,
@@ -501,7 +761,7 @@ namespace SWWerkplaats.Configurator.Portal
                     frontZ + cutDepth / 2.0,
                     thickness,
                     upperHeight,
-                    cutDepth);
+                    cutDepth), sheet, "x");
                 AddHoles(upper, placement, sheet, thickness);
                 AddPockets(upper, placement, sheet, thickness, false);
                 parts.Add(upper);
@@ -1001,39 +1261,6 @@ namespace SWWerkplaats.Configurator.Portal
             return value != null && value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void AddWorkbenchFrame(List<PortalAssemblyPart> parts, PortalQuoteRequest request)
-        {
-            var width = ValueOr(request.WidthMm, 1500);
-            var depth = ValueOr(request.DepthMm, 750);
-            var height = ValueOr(request.HeightMm, 900);
-            var topT = 18.0;
-            var profile = 40.0;
-            var legH = height - topT;
-
-            AddProfile(parts, "Bovenframe voor", 0, height - topT - profile / 2.0, -depth / 2.0 + profile / 2.0, width - 2 * profile, profile, profile);
-            AddProfile(parts, "Bovenframe achter", 0, height - topT - profile / 2.0, depth / 2.0 - profile / 2.0, width - 2 * profile, profile, profile);
-            AddProfile(parts, "Bovenframe links", -width / 2.0 + profile / 2.0, height - topT - profile / 2.0, 0, profile, profile, depth - 2 * profile);
-            AddProfile(parts, "Bovenframe rechts", width / 2.0 - profile / 2.0, height - topT - profile / 2.0, 0, profile, profile, depth - 2 * profile);
-
-            var xLeft = -width / 2.0 + profile / 2.0;
-            var xRight = width / 2.0 - profile / 2.0;
-            var zFront = -depth / 2.0 + profile / 2.0;
-            var zBack = depth / 2.0 - profile / 2.0;
-            AddProfile(parts, "Poot linksvoor", xLeft, legH / 2.0, zFront, profile, legH, profile);
-            AddProfile(parts, "Poot rechtsvoor", xRight, legH / 2.0, zFront, profile, legH, profile);
-            AddProfile(parts, "Poot linksachter", xLeft, legH / 2.0, zBack, profile, legH, profile);
-            AddProfile(parts, "Poot rechtsachter", xRight, legH / 2.0, zBack, profile, legH, profile);
-            if (request.IncludeLowerShelf)
-            {
-                AddFrameLayer(parts, "Onderframe", width, depth, Math.Max(80, request.LowerShelfHeightMm), profile);
-            }
-
-            if (request.IncludeMiddleShelf)
-            {
-                AddFrameLayer(parts, "Tussenframe", width, depth, Math.Max(120, request.MiddleShelfHeightMm), profile);
-            }
-        }
-
         private static void AddWorkbenchCabinetFeet(List<PortalAssemblyPart> parts, WorkbenchCabinetConfig config)
         {
             var foot = config.AdjustableFoot ?? ProductDefaults.WorkbenchCabinetAdjustableFoot();
@@ -1384,17 +1611,19 @@ namespace SWWerkplaats.Configurator.Portal
             part.Pockets.Add(pocket);
         }
 
-        private static void AddFrameLayer(List<PortalAssemblyPart> parts, string prefix, double width, double depth, double y, double profile)
+        private static PortalAssemblyPart ApplySheetAppearance(PortalAssemblyPart part, SheetPart sheet, string thicknessAxis)
         {
-            AddProfile(parts, prefix + " voor", 0, y, -depth / 2.0 + profile / 2.0, width - 2 * profile, profile, profile);
-            AddProfile(parts, prefix + " achter", 0, y, depth / 2.0 - profile / 2.0, width - 2 * profile, profile, profile);
-            AddProfile(parts, prefix + " links", -width / 2.0 + profile / 2.0, y, 0, profile, profile, depth - 2 * profile);
-            AddProfile(parts, prefix + " rechts", width / 2.0 - profile / 2.0, y, 0, profile, profile, depth - 2 * profile);
+            if (part == null || sheet == null || sheet.Material == null) return part;
+            part.MaterialAppearance = sheet.Material.RenderAppearance;
+            part.MaterialThicknessAxis = thicknessAxis;
+            return part;
         }
 
-        private static void AddProfile(List<PortalAssemblyPart> parts, string name, double x, double y, double z, double sx, double sy, double sz)
+        private static string SheetThicknessAxis(AssemblyOrientation orientation)
         {
-            parts.Add(Part(name, "profile", x, y, z, sx, sy, sz));
+            if (orientation == AssemblyOrientation.SheetVerticalX) return "z";
+            if (orientation == AssemblyOrientation.SheetVerticalZ) return "x";
+            return "y";
         }
 
         private static PortalAssemblyPart Part(string name, string kind, double x, double y, double z, double sx, double sy, double sz)

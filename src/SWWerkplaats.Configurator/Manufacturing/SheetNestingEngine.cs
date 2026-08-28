@@ -129,6 +129,7 @@ namespace SWWerkplaats.Configurator.Manufacturing
             var groups = new List<SheetGroup>();
             foreach (var sheet in sheets)
             {
+                if (sheet.Material != null && sheet.Material.IsAdditiveManufactured) continue;
                 var group = FindGroup(groups, sheet.Material);
                 if (group == null)
                 {

@@ -11,6 +11,7 @@ $project = Join-Path $root "src\SWWerkplaats.Configurator"
 $outDir = Join-Path $project "bin\Debug\net48\win-x64"
 $exe = Join-Path $outDir "SWWerkplaats.Configurator.exe"
 $url = "http://localhost:8088/"
+. (Join-Path $PSScriptRoot "configurator-process-control.ps1")
 
 function Show-PortalError($message) {
     Add-Type -AssemblyName System.Windows.Forms
@@ -29,18 +30,7 @@ function Get-PortalProcessId {
 }
 
 function Stop-ExistingPortal {
-    $portalPid = Get-PortalProcessId
-    if (-not $portalPid) { return }
-
-    try {
-        Stop-Process -Id $portalPid -Force -ErrorAction Stop
-    } catch {
-    }
-
-    for ($i = 0; $i -lt 20; $i++) {
-        Start-Sleep -Milliseconds 150
-        if (-not (Get-PortalProcessId)) { return }
-    }
+    Stop-ConfiguratorProcesses -ExecutablePath $exe -PortalOnly
 }
 
 function Build-CurrentPortal {
@@ -51,12 +41,17 @@ function Build-CurrentPortal {
 }
 
 function Start-Portal {
-    if (Get-PortalProcessId) { return }
+    $existingPid = Get-PortalProcessId
+    if ($existingPid) {
+        if (Test-ProcessUsesConfiguratorExecutable -ProcessId $existingPid -ExecutablePath $exe) { return }
+        throw "Poort 8088 is al bezet door een ander proces (PID $existingPid)."
+    }
     if (-not (Test-Path $exe)) {
         throw "De portal is nog niet gebouwd. Gebruik eerst Web configurator rebuild.cmd."
     }
 
-    Start-Process -FilePath $exe -ArgumentList "--portal-only" -WorkingDirectory $outDir -WindowStyle Hidden | Out-Null
+    $started = Start-Process -FilePath $exe -ArgumentList "--portal-only" -WorkingDirectory $outDir -WindowStyle Hidden -PassThru
+    Write-Host "Webconfigurator gestart, PID $($started.Id)."
 
     for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Milliseconds 150
@@ -106,7 +101,8 @@ try {
     }
 
     if ($Action -eq "Rebuild") {
-        Stop-ExistingPortal
+        Stop-ConfiguratorProcesses -ExecutablePath $exe
+        Wait-ConfiguratorExecutableUnlocked -ExecutablePath $exe
         Build-CurrentPortal
     }
 

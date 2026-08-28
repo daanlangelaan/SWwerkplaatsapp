@@ -89,4 +89,28 @@ namespace SWWerkplaats.Configurator.Domain
         public double NutHeightMm { get; set; }
         public double MaxLoadKg { get; set; }
     }
+
+    public sealed class SwingLatchTemplate
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string ArticleNumber { get; set; }
+        public string SupplierUrl { get; set; }
+        public double OverallLengthMm { get; set; }
+        public double WidthMm { get; set; }
+        public double OverallProjectionMm { get; set; }
+        public double MountingBaseDiameterMm { get; set; }
+        public double BaseProjectionMm { get; set; }
+        public double ThreadDiameterMm { get; set; }
+        public double RotationStepDeg { get; set; }
+        public double HexKeyAcrossFlatsMm { get; set; }
+        public double WeightGrams { get; set; }
+        public string RenderStatus { get; set; }
+        public string OpenRenderData { get; set; }
+
+        public double NoseCenterDistanceMm
+        {
+            get { return OverallLengthMm - MountingBaseDiameterMm / 2.0 - WidthMm / 2.0; }
+        }
+    }
 }

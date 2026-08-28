@@ -1,11 +1,14 @@
 using System;
 using System.Linq;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.Engine
 {
     public sealed class LexWorkbenchEngine
     {
+        private const double MechanicalStopLengthMm = 12.0;
+
         public WorkbenchModel Build(LexWorkbenchConfig config)
         {
             Validate(config);
@@ -18,14 +21,30 @@ namespace SWWerkplaats.Configurator.Engine
 
             AddProfiles(model, config);
             AddSheets(model, config);
+            AddWorktopBrackets(model, config);
             AddLiftColumns(model, config);
             AddAdjustableFeet(model, config);
             AddLinearGuides(model, config);
             AddLocksAndStops(model, config);
+            AddSwingLatches(model, config);
             AddExposedProfileEndCaps(model, config);
             BuildProfileOperations(model, config.SawingMode);
             AddHardware(model, config);
+            AddFastenerCalculations(model, config);
+            model.StructuralCalculation = new StructuralCalculationService().Calculate(
+                "werktafel_lex", config.Profile40x40.Id, config.WidthMm, 5);
             return model;
+        }
+
+        private static void AddWorktopBrackets(WorkbenchModel model, LexWorkbenchConfig config)
+        {
+            var supports = model.AssemblyPlacements.Where(item => item.Kind == AssemblyComponentKind.Profile
+                && (item.PartName.StartsWith("Bewegend buitenframe voor", StringComparison.OrdinalIgnoreCase)
+                    || item.PartName.StartsWith("Bewegend buitenframe achter", StringComparison.OrdinalIgnoreCase)
+                    || item.PartName.StartsWith("Werkbladhouder", StringComparison.OrdinalIgnoreCase))).ToArray();
+            new WorktopBracketPlacementService().AddSymmetricPairs(
+                model, "werktafel_lex", supports, WorktopSupportAxis.X,
+                config.HeightMm - config.TopSheet.ThicknessMm, "Werkbladhouder montagebeugel");
         }
 
         private static void AddProfiles(WorkbenchModel model, LexWorkbenchConfig config)
@@ -38,12 +57,12 @@ namespace SWWerkplaats.Configurator.Engine
                 "80x80; langs X onder de omgekeerde HSR15R-wagens; bovenvlak volledig onder 80x80-adapterplaten");
             AddProfile(model, config, "Vast railframe links/rechts", config.Profile80x80, config.FixedRailFrameDepthMm - 160, 2,
                 "80x80; langs Z tussen voor- en achterprofiel; hart exact boven de HTE2-poot");
-            AddProfile(model, config, "Bewegend buitenframe voor/achter", config.Profile80x40, config.WidthMm, 2,
-                "80 mm verticaal; langs X als voor- en achterrand van de rechthoekige buitencontour");
-            AddProfile(model, config, "Bewegend buitenframe links/rechts", config.Profile80x40, config.DepthMm - 80, 2,
-                "80 mm verticaal; langs Z tussen voor- en achterprofiel; buitencontour blijft gesloten");
-            AddProfile(model, config, "Bewegende werkbladhouder horizontaal", config.Profile80x40, config.WidthMm - 80, 3,
-                "Drie 80x40-profielen langs X tussen de binnenvlakken van de 40 mm brede zijprofielen, 80 mm verticaal; buitenste twee op HSR15-railhart en middelste op Z=" + config.WorktopCenterSupportOffsetMm.ToString("0.##") + " mm tussen twee kogelpotrijen. Geen overlap met de zijprofielen en geen extra dwarsliggers langs Z.");
+            AddProfile(model, config, "Bewegend buitenframe voor/achter", config.Profile40x40, config.WidthMm, 2,
+                "40x40 mm; langs X als voor- en achterrand van de rechthoekige buitencontour");
+            AddProfile(model, config, "Bewegend buitenframe links/rechts", config.Profile40x40, config.DepthMm - 80, 2,
+                "40x40 mm; langs Z tussen voor- en achterprofiel; buitencontour blijft gesloten");
+            AddProfile(model, config, "Bewegende werkbladhouder horizontaal", config.Profile40x40, config.WidthMm - 80, 3,
+                "Drie 40x40-profielen langs X tussen de binnenvlakken van de 40 mm brede zijprofielen; buitenste twee op HSR15-railhart en middelste op Z=" + config.WorktopCenterSupportOffsetMm.ToString("0.##") + " mm tussen twee kogelpotrijen. Geen overlap met de zijprofielen en geen extra dwarsliggers langs Z.");
 
             var footX = config.ColumnCenterDistanceMm / 2.0;
             AddPlacement(model, "Voetprofiel links", AssemblyComponentKind.Profile, 80, 80, footProfileLength,
@@ -64,21 +83,21 @@ namespace SWWerkplaats.Configurator.Engine
                 fixedSideX, fixedFrameY, 0, "profile");
 
             var movingFrameBottom = MovingFrameBottomY(config);
-            var movingFrameY = movingFrameBottom + 40;
+            var movingFrameY = movingFrameBottom + config.Profile40x40.HeightMm / 2.0;
             var frameZ = (config.DepthMm - 40) / 2.0;
-            AddPlacement(model, "Bewegend buitenframe voor", AssemblyComponentKind.Profile, config.WidthMm, 80, 40,
+            AddPlacement(model, "Bewegend buitenframe voor", AssemblyComponentKind.Profile, config.WidthMm, 40, 40,
                 0, movingFrameY, -frameZ, "profile");
-            AddPlacement(model, "Bewegend buitenframe achter", AssemblyComponentKind.Profile, config.WidthMm, 80, 40,
+            AddPlacement(model, "Bewegend buitenframe achter", AssemblyComponentKind.Profile, config.WidthMm, 40, 40,
                 0, movingFrameY, frameZ, "profile");
-            AddPlacement(model, "Bewegend buitenframe links", AssemblyComponentKind.Profile, 40, 80, config.DepthMm - 80,
+            AddPlacement(model, "Bewegend buitenframe links", AssemblyComponentKind.Profile, 40, 40, config.DepthMm - 80,
                 -(config.WidthMm - 40) / 2.0, movingFrameY, 0, "profile");
-            AddPlacement(model, "Bewegend buitenframe rechts", AssemblyComponentKind.Profile, 40, 80, config.DepthMm - 80,
+            AddPlacement(model, "Bewegend buitenframe rechts", AssemblyComponentKind.Profile, 40, 40, config.DepthMm - 80,
                 (config.WidthMm - 40) / 2.0, movingFrameY, 0, "profile");
-            AddPlacement(model, "Werkbladhouder raildrager voor", AssemblyComponentKind.Profile, config.WidthMm - 80, 80, 40,
+            AddPlacement(model, "Werkbladhouder raildrager voor", AssemblyComponentKind.Profile, config.WidthMm - 80, 40, 40,
                 0, movingFrameY, -railZ, "profile");
-            AddPlacement(model, "Werkbladhouder middenligger", AssemblyComponentKind.Profile, config.WidthMm - 80, 80, 40,
+            AddPlacement(model, "Werkbladhouder middenligger", AssemblyComponentKind.Profile, config.WidthMm - 80, 40, 40,
                 0, movingFrameY, config.WorktopCenterSupportOffsetMm, "profile");
-            AddPlacement(model, "Werkbladhouder raildrager achter", AssemblyComponentKind.Profile, config.WidthMm - 80, 80, 40,
+            AddPlacement(model, "Werkbladhouder raildrager achter", AssemblyComponentKind.Profile, config.WidthMm - 80, 40, 40,
                 0, movingFrameY, railZ, "profile");
         }
 
@@ -92,7 +111,7 @@ namespace SWWerkplaats.Configurator.Engine
                 WidthMm = config.DepthMm,
                 Quantity = 1,
                 CenterHeightMm = config.HeightMm - config.TopSheet.ThicknessMm / 2.0,
-                BomStatus = "Actueel uit model; bevestiging aan bewegend profielframe staat als open BOM-regel."
+                BomStatus = "Actueel uit model; via automatisch verdeelde TIN 100391-beugels aan het bewegende profielframe."
             };
             for (var row = 0; row < 5; row++)
             {
@@ -137,7 +156,7 @@ namespace SWWerkplaats.Configurator.Engine
                 LengthMm = config.StabilizationPlateWidthMm,
                 WidthMm = config.StabilizationPlateHeightMm,
                 Quantity = 1,
-                CenterHeightMm = config.ColumnBaseHeightMm + EffectiveColumnLength(config) / 2.0,
+                CenterHeightMm = config.ColumnBaseHeightMm + config.LiftColumn.RetractedLengthMm / 2.0,
                 BomStatus = "Actueel eigen maakdeel in 6 mm HPL; niet inbegrepen bij de HTE2-set. Bevestigingswijze nog open."
             };
             model.Sheets.Add(stabilizer);
@@ -187,7 +206,7 @@ namespace SWWerkplaats.Configurator.Engine
                 WidthMm = config.CarriageAdapterWidthMm,
                 Quantity = 4,
                 UseTabs = false,
-                BomStatus = "Actueel uit model; vier stuks met wagenpatroon en twee profielgroefsleuven."
+                BomStatus = "Actueel uit model; vier 3D-geprinte PA-CF-delen, 100% infill, met wagenpatroon en twee profielgroefsleuven."
             };
 
             var halfPitchX = config.LinearGuide.CarriageMountingPitchXmm / 2.0;
@@ -246,13 +265,14 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddLiftColumns(WorkbenchModel model, LexWorkbenchConfig config)
         {
             var column = config.LiftColumn;
-            var columnLength = EffectiveColumnLength(config);
+            var installationLength = EffectiveColumnLength(config);
+            var bodyLength = installationLength - 2.0 * column.EndPlateThicknessMm;
             var xOffset = config.ColumnCenterDistanceMm / 2.0;
             foreach (var x in new[] { -xOffset, xOffset })
             {
                 AddPlacement(model, "HTE2 kolom", AssemblyComponentKind.Purchased,
-                    column.BodyDepthMm, columnLength, column.BodyWidthMm,
-                    x, config.ColumnBaseHeightMm + columnLength / 2.0, 0, "hardware");
+                    column.BodyDepthMm, bodyLength, column.BodyWidthMm,
+                    x, config.Profile80x80.HeightMm + column.EndPlateThicknessMm + bodyLength / 2.0, 0, "hardware");
                 AddPlacement(model, "HTE2 O1 onderplaat 280x65", AssemblyComponentKind.Purchased,
                     column.EndPlateWidthMm, column.EndPlateThicknessMm, column.EndPlateLengthMm,
                     x, config.Profile80x80.HeightMm + column.EndPlateThicknessMm / 2.0, 0, "hardware");
@@ -308,14 +328,15 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddLinearGuides(WorkbenchModel model, LexWorkbenchConfig config)
         {
             var guide = config.LinearGuide;
+            var cutLength = RequiredRailCutLengthMm(config);
             var adapterTop = FixedFrameTopY(config) + config.CarriageAdapterThicknessMm;
             var railMountingY = MovingFrameBottomY(config);
             var railCenterY = railMountingY - guide.RailHeightMm / 2.0;
             var railZ = config.RailCenterDistanceMm / 2.0;
             foreach (var z in new[] { -railZ, railZ })
             {
-                AddPlacement(model, "HSR15 rail 1500", AssemblyComponentKind.Purchased,
-                    guide.RailLengthMm, guide.RailHeightMm, guide.RailWidthMm,
+                AddPlacement(model, "HSR15 rail " + cutLength.ToString("0.##"), AssemblyComponentKind.Purchased,
+                    cutLength, guide.RailHeightMm, guide.RailWidthMm,
                     0, railCenterY, z, "hardware");
                 foreach (var x in new[] { -config.CarriageCenterDistanceMm / 2.0, config.CarriageCenterDistanceMm / 2.0 })
                 {
@@ -329,21 +350,57 @@ namespace SWWerkplaats.Configurator.Engine
         private static void AddLocksAndStops(WorkbenchModel model, LexWorkbenchConfig config)
         {
             var railZ = config.RailCenterDistanceMm / 2.0;
-            const double stopLength = 12.0;
+            var travel = MaximumHorizontalTravelMm(config);
+            var stopCenter = config.CarriageCenterDistanceMm / 2.0 + travel
+                + config.LinearGuide.CarriageLengthMm / 2.0 + MechanicalStopLengthMm / 2.0;
             var railCenterY = MovingFrameBottomY(config) - config.LinearGuide.RailHeightMm / 2.0;
             foreach (var z in new[] { -railZ, railZ })
             {
-                foreach (var x in new[] { -config.LinearGuide.RailLengthMm / 2.0 + stopLength / 2.0, config.LinearGuide.RailLengthMm / 2.0 - stopLength / 2.0 })
+                foreach (var x in new[] { -stopCenter, stopCenter })
                 {
                     AddPlacement(model, "HSR15 mechanische eindstop", AssemblyComponentKind.Purchased,
-                        stopLength, 24, 30, x, railCenterY, z, "hardware");
+                        MechanicalStopLengthMm, 24, 30, x, railCenterY, z, "hardware");
                 }
             }
-            foreach (var x in new[] { -220.0, 0.0, 220.0 })
+            foreach (var x in config.HorizontalLockPositionsMm)
             {
                 AddPlacement(model, "Plunjer borgpositie", AssemblyComponentKind.Purchased,
                     18, 35, 18, x, config.HeightMm - 95, -railZ - 55, "hardware");
             }
+        }
+
+        private static void AddSwingLatches(WorkbenchModel model, LexWorkbenchConfig config)
+        {
+            var latch = config.SwingLatch;
+            var pivotY = config.HeightMm - config.TopSheet.ThicknessMm - config.MovingFrameSlotAxisEdgeOffsetMm;
+            var longSideX = config.WidthMm / 4.0;
+            foreach (var x in new[] { -longSideX, longSideX })
+            {
+                AddSwingLatchPlacement(model, "voor " + (x < 0 ? "links" : "rechts"), latch, x, pivotY, -config.DepthMm / 2.0, 180);
+                AddSwingLatchPlacement(model, "achter " + (x < 0 ? "links" : "rechts"), latch, x, pivotY, config.DepthMm / 2.0, 0);
+            }
+            AddSwingLatchPlacement(model, "zijde links", latch, -config.WidthMm / 2.0, pivotY, 0, -90);
+            AddSwingLatchPlacement(model, "zijde rechts", latch, config.WidthMm / 2.0, pivotY, 0, 90);
+        }
+
+        private static void AddSwingLatchPlacement(WorkbenchModel model, string label, SwingLatchTemplate latch,
+            double x, double y, double z, double rotationYDeg)
+        {
+            model.AssemblyPlacements.Add(new AssemblyPlacement
+            {
+                Kind = AssemblyComponentKind.Purchased,
+                PartName = latch.Name + " " + label,
+                LengthMm = latch.WidthMm,
+                HeightMm = latch.OverallLengthMm,
+                WidthMm = latch.OverallProjectionMm,
+                Xmm = x,
+                Ymm = y,
+                Zmm = z,
+                Orientation = AssemblyOrientation.Default,
+                VisualKind = "hardware-swing-latch",
+                Shape = "swing-latch",
+                RotationYDeg = rotationYDeg
+            });
         }
 
         private static void AddExposedProfileEndCaps(WorkbenchModel model, LexWorkbenchConfig config)
@@ -367,14 +424,14 @@ namespace SWWerkplaats.Configurator.Engine
 
             // Alleen de vier vrije X-koppen van het bewegende buitenframe. De zijliggers
             // en drie binnenliggers sluiten tegen een ander profiel aan en krijgen geen kap.
-            var movingFrameY = MovingFrameBottomY(config) + 40.0;
+            var movingFrameY = MovingFrameBottomY(config) + config.Profile40x40.HeightMm / 2.0;
             var movingFrameZ = (config.DepthMm - 40) / 2.0;
             foreach (var z in new[] { -movingFrameZ, movingFrameZ })
             {
                 foreach (var xDirection in new[] { -1.0, 1.0 })
                 {
-                    AddPlacement(model, "Afdekkap 8 80x40 zwart - bewegend buitenframe", AssemblyComponentKind.Purchased,
-                        visibleCapThickness, 80, 40,
+                    AddPlacement(model, "Afdekkap 8 40x40 zwart - bewegend buitenframe", AssemblyComponentKind.Purchased,
+                        visibleCapThickness, 40, 40,
                         xDirection * (config.WidthMm / 2.0 + halfCapThickness), movingFrameY, z, "hardware");
                 }
             }
@@ -386,7 +443,12 @@ namespace SWWerkplaats.Configurator.Engine
             var top = model.Sheets.First(s => string.Equals(s.Name, "Kogelpotblad HPL", StringComparison.OrdinalIgnoreCase));
             var adjustableFootCount = CountPlacements(model, "Stelvoet D80 schotel ZI-1415-S");
             var footAdapterCount = CountPlacements(model, "Stelpoot hoekadapter ZI-1744");
-            var standardConnectorCount = ModelDerivedStandardConnectorCount(model);
+            var swingLatchCount = CountPlacements(model, config.SwingLatch.Name);
+            // Het definitieve aantal wordt na traceertoekenning uit fysieke profielcontacten afgeleid.
+            // De tijdelijke nul wordt door ProfileConnectionHardwareSynchronizationService vervangen.
+            const int standardConnectorCount = 0;
+            var railCutLength = RequiredRailCutLengthMm(config);
+            var railHoleCount = RailHoleCount(config, railCutLength);
 
             model.Hardware.Add(new HardwareItem
             {
@@ -407,6 +469,16 @@ namespace SWWerkplaats.Configurator.Engine
                 Note = "Vier ZI-1415-S stelvoeten met werkelijke schotel Ø" + config.LevelingFoot.ActualFootDiameterMm.ToString("0.##") + " mm, M16-draad en totale hoogte 130 mm. Voetharten liggen binnen de adaptercontour en steken niet buiten het 1000-mm blad.",
                 ModelStatus = "In 3D-model als schotel, zwenkkraag, M16-draadeind en stelmoer",
                 BomStatus = "Actueel volgens aangeleverde Maunsystem-keuze"
+            });
+            model.Hardware.Add(new HardwareItem
+            {
+                Name = config.SwingLatch.Name,
+                ArticleNumber = config.SwingLatch.ArticleNumber,
+                Quantity = swingLatchCount,
+                Unit = "st",
+                Note = "Zes draaibare serie-8 aanslagen: twee op de voorzijde, twee op de achterzijde en één gecentreerd op iedere korte zijde. In 90 graden raststanden bruikbaar als uitgeklapte werkstukaanslag of ingeklapte vrije rand; voorgemonteerde M6 Nut-8 bevestiging.",
+                ModelStatus = "In 3D-model als montagevoet, draaibare grijze aanslag en rode indicatiekap",
+                BomStatus = "Actueel volgens Item 0.0.700.81; interne renderdetails niet voor CAM"
             });
             model.Hardware.Add(new HardwareItem
             {
@@ -434,23 +506,24 @@ namespace SWWerkplaats.Configurator.Engine
                 ArticleNumber = config.LinearGuide.Id,
                 Quantity = 1,
                 Unit = "set",
-                Note = "2 rails en 4 wagens; rail 1500x15x15, " + config.LinearGuide.RailHoleCount + " montagegaten op steek " +
+                Note = "2 voorraadrails van " + config.LinearGuide.RailLengthMm.ToString("0.##") + " mm en 4 wagens; beide rails symmetrisch afzagen tot " +
+                    railCutLength.ToString("0.##") + "x15x15 mm voor de vrijgegeven slag. Na zagen blijven " + railHoleCount + " montagegaten op steek " +
                     config.LinearGuide.RailMountingPitchMm.ToString("0.##") + " mm, eindafstand " + config.LinearGuide.RailEndDistanceMm.ToString("0.##") +
                     " mm; gat Ø" + config.LinearGuide.RailHoleThroughDiameterMm.ToString("0.##") + "/Ø" +
                     config.LinearGuide.RailHoleCounterboreDiameterMm.ToString("0.##") + "x" + config.LinearGuide.RailHoleCounterboreDepthMm.ToString("0.##") +
                     " mm; wagen " + config.LinearGuide.CarriageWidthMm.ToString("0.##") + "x" + config.LinearGuide.CarriageLengthMm.ToString("0.##") +
                     "x" + config.LinearGuide.AssemblyHeightMm.ToString("0.##") + " mm, montage " + config.LinearGuide.CarriageMountingThread +
-                    ". Rail ondersteboven onder het bewegende werkbladframe; wagens vast op adapterplaten.",
+                    ". Rail ondersteboven onder het bewegende werkbladframe; wagens vast op adapterplaten. Eindstops staan op de afgeleide wagen-contactposities.",
                 ModelStatus = "In 3D-model",
                 BomStatus = "Actueel"
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "HSR15R M4 verzonken wagenschroef",
-                ArticleNumber = "LEX_HSR15_ADAPTER_M4_CSUNK",
+                Name = "HSR15R M4x12 verzonken wagenschroef",
+                ArticleNumber = "LEX_HSR15_ADAPTER_M4X12_CSUNK_FABORY",
                 Quantity = adapter.Quantity * 4,
                 Unit = "st",
-                Note = "Vier M4-verzonken schroeven per 80x80x10-adapterplaat, afgeleid van het wagenpatroon in het plaatmodel.",
+                Note = "Vier M4x12-verzonken schroeven per 80x80x10-adapterplaat. Effectieve doorvoer na 2,1 mm verzinking is 7,9 mm; de HSR15R-wagen heeft M4x5 blinde draad, zodat 12 mm binnen de geometrische draadzone blijft. Inkoop uit passend Fabory-doosje nog prijzen.",
                 ModelStatus = "Verbinding uit model; schroeven niet als losse bodies",
                 BomStatus = "Actueel uit model"
             });
@@ -460,7 +533,7 @@ namespace SWWerkplaats.Configurator.Engine
                 ArticleNumber = "LEX_HSR15_ADAPTER_M8_TNUT",
                 Quantity = adapter.Quantity * 2,
                 Unit = "st",
-                Note = "Twee M8-verbindingen per adapterplaat naar de twee profielgroeven op 20 en 60 mm.",
+                Note = "Twee M8-verbindingen per PA-CF-adapterplaat naar de profielgroeven op 20 en 60 mm. Gebruik serie-8 inklikmoeren met verende kogel; boutlengte pas selecteren uit 10 mm doorvoerstack en de leveranciers-draadzone van de gekozen inklikmoer.",
                 ModelStatus = "Verbinding uit model; bouten niet als losse bodies",
                 BomStatus = "Actueel uit model"
             });
@@ -468,21 +541,31 @@ namespace SWWerkplaats.Configurator.Engine
             {
                 Name = "Railmontage met inschuifmoeren",
                 ArticleNumber = "LEX_HSR15_RAIL_TNUT_M4",
-                Quantity = config.LinearGuide.RailQuantity * config.LinearGuide.RailHoleCount,
+                Quantity = config.LinearGuide.RailQuantity * railHoleCount,
                 Unit = "st",
-                Note = "M4-inschuifmoer met passende cilinderkopschroef; één per railgat, railgatpatroon gecentreerd op de onderste profielgroef van de bewegende raildrager.",
+                Note = "M4-schuifmoer met passende schroef; één per railgat. De schroef passeert 9,7 mm railmateriaal onder de verzonken kop (15-5,3 mm). Definitieve lengte volgt uit deze doorvoer plus de draadzone van de gekozen schuifmoer en moet vóór de sleufbodem stoppen.",
                 ModelStatus = "Verbinding uit railgatmodel; schroeven niet als losse bodies",
                 BomStatus = "Actueel uit model"
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "Standaard profielverbinder serie 8 inclusief bout",
-                ArticleNumber = "TECHXXL_SERIE8_STANDARD_CONNECTOR_TBC",
+                Name = "TechXXL standaardverbinder 8 40",
+                ArticleNumber = "TIN 100342 / S208ZP",
                 Quantity = standardConnectorCount,
                 Unit = "st",
-                Note = "Aantal automatisch afgeleid van 80 mm profielverbindingen in het model: twee verbinders per aangesloten 80 mm profielzijde. Omvat vast railframe, bewegende buitencontour en de drie horizontale werkbladhouders.",
-                ModelStatus = "Verbindingen afgeleid uit model; clips/bouten niet als losse bodies",
-                BomStatus = "Actueel aantal; definitief artikel bevestigen"
+                Note = "Aantal automatisch afgeleid uit de profielkoppen: twee verbinders per 80 mm kopvlak in het vaste frame en één per 40 mm kopvlak in het bewegende frame. Leveranciersgeometrie 35x17x10,2 mm.",
+                ModelStatus = "Verbindingen afgeleid uit model; verbinders niet als losse bodies",
+                BomStatus = "Actueel leveranciersartikel en modelaantal"
+            });
+            model.Hardware.Add(new HardwareItem
+            {
+                Name = "TechXXL bolkop-inbusbout ISO 7380 M8x25",
+                ArticleNumber = "TIN 100673 / S208HS825",
+                Quantity = standardConnectorCount,
+                Unit = "st",
+                Note = "Eén bout per TIN 100342 standaardverbinder; schacht M8x25, kop Ø14x4 mm en inbus SW5 volgens leveranciersdata.",
+                ModelStatus = "Bevestigers afgeleid uit verbinder-aantal; niet als losse bodies",
+                BomStatus = "Actueel leveranciersartikel en modelaantal"
             });
             model.Hardware.Add(new HardwareItem
             {
@@ -490,32 +573,32 @@ namespace SWWerkplaats.Configurator.Engine
                 ArticleNumber = "LEX_HTE2_ENDPLATE_M8_TNUT",
                 Quantity = config.LiftColumn.Quantity * 2 * 2,
                 Unit = "st",
-                Note = "Twee sleufverbindingen per onder- en bovenplaat, twee kolommen; aantal afgeleid van de HTE2-template.",
+                Note = "Twee sleufverbindingen per onder- en bovenplaat, twee kolommen. Gebruik M8-inklikmoeren met verende kogel; de GeMing O1-eindplaat is 5 mm. De bout gaat door de plaat, overbrugt de gemonteerde draadinlaat, grijpt in de doorlopende moerdraad en blijft vóór de profiel-sleufbodem.",
                 ModelStatus = "Verbinding uit HTE2-model; bouten niet als losse bodies",
                 BomStatus = "Actueel uit model"
             });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Kogelpot / ball transfer unit",
-                ArticleNumber = "LEX_KOGELPOT_H5_PROVISIONAL",
+                ArticleNumber = "1005008611039159 / VCN310-30",
                 Quantity = top.Holes.Count,
                 Unit = "st",
-                Note = "Voorlopige maatvoering: huis Ø" + config.BallTransferBodyDiameterMm.ToString("0.##") +
+                Note = "Geselecteerde VCN310-30: huis D1 Ø" + config.BallTransferBodyDiameterMm.ToString("0.##") +
                     ", flens Ø" + config.BallTransferFlangeDiameterMm.ToString("0.##") +
                     "x" + config.BallTransferFlangeThicknessMm.ToString("0.##") +
                     ", insteeklengte " + config.BallTransferInsertionLengthMm.ToString("0.##") +
                     ", hoofdkogel Ø" + config.BallTransferBallDiameterMm.ToString("0.##") +
                     " en gewenste werkhoogte " + config.BallTransferWorkingHeightMm.ToString("0.##") +
-                    " mm boven het HPL. Verzonken in vlakke zitting Ø" + config.BallTransferFlangeRecessDiameterMm.ToString("0.##") +
+                    " mm boven het HPL; toelaatbare leveranciersbelasting 412 N bij rechtop gebruik. Verzonken in vlakke zitting Ø" + config.BallTransferFlangeRecessDiameterMm.ToString("0.##") +
                     "x" + config.BallTransferFlangeRecessDepthMm.ToString("0.##") +
-                    " mm; kraag draagt op de HPL-schouder. Patroon 11-10-11-10-11, raster 140 mm, verspringing 70 mm; kies een inkooptype dat deze uitsteking haalt en geef passing/borging met proefexemplaar vrij.",
+                    " mm; kraag draagt op de HPL-schouder. Patroon 11-10-11-10-11, raster 140 mm, verspringing 70 mm. Passing/borging met proefexemplaar vrijgeven.",
                 ModelStatus = "In 3D-model; aantal uit bladgaten",
-                BomStatus = "Actueel gemonteerd aantal; inkooptype nog bepalen"
+                BomStatus = "Actueel gemonteerd aantal en geselecteerd leveranciersartikel; passing nog proefondervindelijk vrijgeven"
             });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Kogelpot / ball transfer unit - reserve",
-                ArticleNumber = "LEX_KOGELPOT_H5_PROVISIONAL",
+                ArticleNumber = "1005008611039159 / VCN310-30",
                 Quantity = 4,
                 Unit = "st",
                 Note = "Apart bestellen als reserve bovenop het gemodelleerde aantal.",
@@ -524,58 +607,53 @@ namespace SWWerkplaats.Configurator.Engine
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "Plunjerborging lineaire verschuiving",
-                ArticleNumber = "LEX_PLUNJER_TBD",
+                Name = "VCN226 indexeerplunjer M10 voor lineaire verschuiving",
+                ArticleNumber = "836926179 / VCN226",
                 Quantity = 3,
-                Unit = "positie",
-                Note = "Drie borgposities; VCN226 is kandidaat, definitieve slagposities en exact plunjertype nog bepalen.",
+                Unit = "st",
+                Note = "Drie plunjers voor de borgposities links, midden en rechts. Leveranciersselectie en prijs zijn bronvast; exacte penlengte, slag en opnameplaat blijven te valideren.",
                 ModelStatus = "In 3D-model (vereenvoudigde vorm)",
-                BomStatus = "OPEN - artikel en slag nog bepalen"
+                BomStatus = "Artikel geselecteerd; geometrie blijft voorlopig"
             });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Mechanische eindstop HSR15",
-                ArticleNumber = "LEX_HSR15_ENDSTOP_TBD",
+                ArticleNumber = "LEX_HSR15_ENDSTOP_PA_CF_RUBBER",
                 Quantity = CountPlacements(model, "HSR15 mechanische eindstop"),
                 Unit = "st",
-                Note = "Eén eindstop per railuiteinde; definitieve leverancierkeuze wordt door documentbeheer ingevuld.",
+                Note = "Eén eigen PA-CF 3D-printdeel per railuiteinde met kleine vervangbare rubber buffer. Exacte bevestiging, buffermaat en proefbelasting blijven uit te werken.",
                 ModelStatus = "In 3D-model (vereenvoudigde vorm)",
                 BomStatus = "Actueel aantal; artikel te beheren"
             });
-            model.Hardware.Add(new HardwareItem
-            {
-                Name = "Bevestigingsset HPL-kogelpotblad aan bewegend frame",
-                ArticleNumber = "LEX_HPL_TOP_FASTENERS_OPEN",
-                Quantity = 1,
-                Unit = "set",
-                Note = "Bevestigingswijze, gatpatroon en aantallen nog constructief bepalen; bewust zichtbaar als open BOM-punt.",
-                ModelStatus = "Niet in 3D-model",
-                BomStatus = "OPEN - bevestigingsconcept bepalen"
-            });
+            var bracketCount = CountPlacements(model, "Werkbladhouder montagebeugel");
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL montagebeugel 40×40×20 ZN", ArticleNumber = WorktopBracketPlacementService.ArticleNumber, Quantity = bracketCount, Unit = "st", Note = "Twee symmetrische beugels op ieder van vijf X-draagprofielen.", ModelStatus = "In 3D-model", BomStatus = "Actueel leveranciersartikel" });
+            model.Hardware.Add(new HardwareItem { Name = "M6×12 verzonken inbusbout voor profielzijde werkbladbeugel", ArticleNumber = "TIN 100691 / S208SKS612V", Quantity = bracketCount, Unit = "st", Note = "Eén per TIN 100391-beugel naar groef-8-profiel.", ModelStatus = "Niet als losse body", BomStatus = "Aantal uit beugelplaatsingen" });
+            model.Hardware.Add(new HardwareItem { Name = "T-moer 8 met brug M6 voor werkbladbeugel", ArticleNumber = "TIN 100242 / S208NSMS6", Quantity = bracketCount, Unit = "st", Note = "Eén per TIN 100391-beugel.", ModelStatus = "Niet als losse body", BomStatus = "Aantal uit beugelplaatsingen" });
+            model.Hardware.Add(new HardwareItem { Name = "M6 werkblad-doorsteekset voor TIN 100391", ArticleNumber = "WORKTOP_M6_THROUGH_SET", Quantity = bracketCount, Unit = "st", Note = "M6 verzonken bout, ring en borgmoer; handelslengte volgt uit 10 mm HPL plus 8 mm beugel en moerstack.", ModelStatus = "Niet als losse body", BomStatus = "Aantal uit beugelplaatsingen; leveranciersartikel nog koppelen" });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Bevestigingsset HPL-stabilisatieplaat 6 mm",
                 ArticleNumber = "LEX_HPL_STABILIZER_FASTENERS_OPEN",
                 Quantity = 1,
                 Unit = "set",
-                Note = "Tussenplaat is een eigen 6 mm HPL-maakdeel en zit niet bij HTE2; bevestigingswijze en gaten nog bepalen.",
+                Note = "Tussenplaat is een eigen 6 mm HPL-maakdeel en zit niet bij HTE2. Voorlopig concept: 8 bouten M6 of M8 volgens de nog te verifiëren HTE2-kolomsleuf, met passende inklikmoeren; bij afwijkende Chinese sleufgeometrie vierkante moeren valideren.",
                 ModelStatus = "Niet in 3D-model",
                 BomStatus = "OPEN - bevestigingsconcept bepalen"
             });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Kabelmanagement en trekontlasting",
-                ArticleNumber = "LEX_CABLE_MANAGEMENT_TBD",
+                ArticleNumber = "RS 879-3725 / 4X1M",
                 Quantity = 1,
                 Unit = "set",
-                Note = "Voedings- en motorkabels, kabelklemmen en trekontlasting; voorlopig niet geometrisch gemodelleerd.",
+                Note = "RS PRO VDR kabelgoot PVC grijs 40x40 mm, open sleuf, verpakking 4x1 m. Kabels worden in/aan de goot getyrapt, waarmee de route lokaal wordt gefixeerd; aansluitzijde van bewegende kabels afzonderlijk op buig- en trekbelasting controleren.",
                 ModelStatus = "Niet in 3D-model",
-                BomStatus = "In BOM houden; later detailleren"
+                BomStatus = "Actueel leveranciersartikel en verpakkingshoeveelheid"
             });
             model.Hardware.Add(new HardwareItem
             {
                 Name = "Typeplaat en veiligheidslabels",
-                ArticleNumber = "LEX_LABEL_SET",
+                ArticleNumber = "LEX-LABEL-SET",
                 Quantity = 1,
                 Unit = "set",
                 Note = "Typeplaat met machinegegevens en benodigde waarschuwingen.",
@@ -594,13 +672,13 @@ namespace SWWerkplaats.Configurator.Engine
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "Afdekkap 8 80x40 zwart",
-                ArticleNumber = "TECHXXL_SERIE8_CAP_80X40_BLACK_TBC",
-                Quantity = CountPlacements(model, "Afdekkap 8 80x40 zwart"),
+                Name = "Afdekkap 8 40x40 zwart",
+                ArticleNumber = "TIN 100184 / S208AK4040",
+                Quantity = CountPlacements(model, "Afdekkap 8 40x40 zwart"),
                 Unit = "st",
-                Note = "Zwart PA-GF; vrije koppen automatisch geteld uit de modelplaatsingen. Aangesloten profielkoppen blijven zonder kap.",
+                Note = "TechXXL serie groef 8 type I, 40x40x12 mm, zwart PA-GF; vrije koppen automatisch geteld uit de modelplaatsingen. Aangesloten profielkoppen blijven zonder kap.",
                 ModelStatus = "In 3D-model",
-                BomStatus = "Actueel aantal; artikel te beheren"
+                BomStatus = "Actueel leveranciersartikel en modelaantal"
             });
         }
 
@@ -623,21 +701,6 @@ namespace SWWerkplaats.Configurator.Engine
         private static int CountPlacements(WorkbenchModel model, string partNamePrefix)
         {
             return model.AssemblyPlacements.Count(p => p.PartName != null && p.PartName.StartsWith(partNamePrefix, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static int ModelDerivedStandardConnectorCount(WorkbenchModel model)
-        {
-            var fixedFrameEndJoints = ProfileQuantity(model, "Vast railframe links/rechts") * 2;
-            var movingOuterEndJoints = ProfileQuantity(model, "Bewegend buitenframe links/rechts") * 2;
-            var movingHolderEndJoints = ProfileQuantity(model, "Bewegende werkbladhouder horizontaal") * 2;
-            const int connectorsPer80MmFace = 2;
-            return (fixedFrameEndJoints + movingOuterEndJoints + movingHolderEndJoints) * connectorsPer80MmFace;
-        }
-
-        private static int ProfileQuantity(WorkbenchModel model, string name)
-        {
-            var profile = model.Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            return profile == null ? 0 : profile.Quantity;
         }
 
         private static void BuildProfileOperations(WorkbenchModel model, ProfileSawingMode sawingMode)
@@ -689,8 +752,10 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double EffectiveColumnLength(LexWorkbenchConfig config)
         {
-            var retractedOverallHeight = config.ColumnBaseHeightMm + config.LiftColumn.RetractedLengthMm +
-                40 + config.LinearGuide.AssemblyHeightMm + 80 + config.TopSheet.ThicknessMm;
+            var retractedOverallHeight = config.Profile80x80.HeightMm + config.LiftColumn.RetractedLengthMm
+                + config.Profile80x80.HeightMm + config.CarriageAdapterThicknessMm
+                + config.LinearGuide.AssemblyHeightMm + config.Profile40x40.HeightMm
+                + config.TopSheet.ThicknessMm;
             var extension = Math.Max(0, Math.Min(config.LiftColumn.StrokeMm,
                 config.HeightMm - retractedOverallHeight));
             return config.LiftColumn.RetractedLengthMm + extension;
@@ -703,22 +768,117 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static double FixedFrameCenterY(LexWorkbenchConfig config)
         {
-            return config.ColumnBaseHeightMm + EffectiveColumnLength(config) - config.CarriageAdapterThicknessMm;
+            return FixedFrameBottomY(config) + config.Profile80x80.HeightMm / 2.0;
         }
 
         private static double FixedFrameTopY(LexWorkbenchConfig config)
         {
-            return FixedFrameCenterY(config) + 40.0;
+            return FixedFrameCenterY(config) + config.Profile80x80.HeightMm / 2.0;
         }
 
         private static double FixedFrameBottomY(LexWorkbenchConfig config)
         {
-            return FixedFrameCenterY(config) - 40.0;
+            return config.Profile80x80.HeightMm + EffectiveColumnLength(config);
         }
 
         private static double MovingFrameBottomY(LexWorkbenchConfig config)
         {
             return FixedFrameTopY(config) + config.CarriageAdapterThicknessMm + config.LinearGuide.AssemblyHeightMm;
+        }
+
+        private static void AddFastenerCalculations(WorkbenchModel model, LexWorkbenchConfig config)
+        {
+            var threadZones = ProfileNutThreadZoneCatalog.LoadRequired();
+            var m8ClickNut = threadZones.Required("techxxl_t_nut_8_m8", 8);
+            var m4SlidingNut = threadZones.Required("techxxl_t_nut_8_sliding_m4", 4);
+            var slotGeometry = new ProfileSlotGeometryCatalog();
+            var profile40SlotDepth = slotGeometry.FindRequired(config.Profile40x40.Id).SlotCavityDepthMm;
+            var profile80SlotDepth = slotGeometry.FindRequired(config.Profile80x80.Id).SlotCavityDepthMm;
+            if (!profile40SlotDepth.HasValue || !profile80SlotDepth.HasValue)
+                throw new InvalidOperationException("Exacte sleufbodemdiepte voor LEX-profielbevestigingen ontbreekt in masterdata.");
+            var m4 = new FastenerDefinition
+            {
+                Id = "M4_PROFILE_ATTACHMENT",
+                NominalDiameterMm = 4,
+                UsageKind = FastenerUsageKind.StructuralBolt,
+                LengthMm = 12,
+                AvailableLengthsMm = new[] { 8.0, 10.0, 12.0, 16.0, 20.0 }
+            };
+            var m8 = new FastenerDefinition
+            {
+                Id = "M8_PROFILE_ATTACHMENT",
+                NominalDiameterMm = 8,
+                UsageKind = FastenerUsageKind.StructuralBolt,
+                LengthMm = 25,
+                AvailableLengthsMm = new[] { 10.0, 12.0, 16.0, 20.0, 25.0, 30.0, 35.0, 40.0 }
+            };
+            model.ProfileFastenerCalculations.Add(new ProfileFastenerCalculation
+            {
+                CalculationId = "lex-hsr15-carriage-m4",
+                HardwareArticleNumber = "LEX_HSR15_ADAPTER_M4X12_CSUNK_FABORY",
+                AttachmentKind = "component-to-printed-adapter",
+                BoltFamily = m4,
+                PassingStackMm = config.CarriageAdapterThicknessMm - 2.1,
+                MinimumThreadEngagementMm = 4,
+                AvailableThreadZoneMm = 5,
+                ThreadInletOffsetMm = 0,
+                MaximumInsertionDepthMm = 5,
+                ReceivingThreadThroughHole = false,
+                BottomClearanceMm = 0.1
+            });
+            model.ProfileFastenerCalculations.Add(ComponentCalculation("lex-adapter-m8", "LEX_HSR15_ADAPTER_M8_TNUT", "plate-to-profile-click-nut", m8,
+                config.CarriageAdapterThicknessMm, 5, m8ClickNut, profile40SlotDepth.Value, 0.1));
+            model.ProfileFastenerCalculations.Add(ComponentCalculation("lex-rail-m4", "LEX_HSR15_RAIL_TNUT_M4", "linear-rail-to-profile-sliding-nut", m4,
+                config.LinearGuide.RailHeightMm - config.LinearGuide.RailHoleCounterboreDepthMm, 4, m4SlidingNut, profile40SlotDepth.Value, 0.5));
+            model.ProfileFastenerCalculations.Add(ComponentCalculation("lex-hte2-m8", "LEX_HTE2_ENDPLATE_M8_TNUT", "component-plate-to-profile-click-nut", m8,
+                config.LiftColumn.EndPlateThicknessMm, 5, m8ClickNut, profile80SlotDepth.Value, 0.1));
+        }
+
+        private static ProfileFastenerCalculation ComponentCalculation(string id, string article, string kind,
+            FastenerDefinition bolt, double passingStackMm, double minimumEngagementMm,
+            ProfileNutThreadZone receivingThread, double maximumInsertionDepthMm, double bottomClearanceMm)
+        {
+            return new ProfileFastenerCalculation
+            {
+                CalculationId = id,
+                HardwareArticleNumber = article,
+                AttachmentKind = kind,
+                BoltFamily = bolt,
+                PassingStackMm = passingStackMm,
+                MinimumThreadEngagementMm = minimumEngagementMm,
+                ReceivingThreadComponentId = receivingThread.ComponentId,
+                ReceivingThreadSource = receivingThread.Source,
+                AvailableThreadZoneMm = receivingThread.UsableThreadZoneMm,
+                ThreadInletOffsetMm = receivingThread.ThreadInletOffsetMm,
+                MaximumInsertionDepthMm = maximumInsertionDepthMm,
+                ReceivingThreadThroughHole = receivingThread.ThroughThread,
+                BottomClearanceMm = bottomClearanceMm
+            };
+        }
+
+        private static double MaximumHorizontalTravelMm(LexWorkbenchConfig config)
+        {
+            return config.HorizontalLockPositionsMm.Max(value => Math.Abs(value));
+        }
+
+        private static double RequiredRailCutLengthMm(LexWorkbenchConfig config)
+        {
+            var guide = config.LinearGuide;
+            var minimum = 2.0 * (config.CarriageCenterDistanceMm / 2.0
+                + MaximumHorizontalTravelMm(config)
+                + guide.CarriageLengthMm / 2.0
+                + MechanicalStopLengthMm);
+            var pitchCount = Math.Ceiling((minimum - 2.0 * guide.RailEndDistanceMm) / guide.RailMountingPitchMm);
+            var cutLength = 2.0 * guide.RailEndDistanceMm + pitchCount * guide.RailMountingPitchMm;
+            if (cutLength > guide.RailLengthMm)
+                throw new ArgumentException("LEX-slag vereist een langere HSR15-rail dan de leverancierslengte.");
+            return cutLength;
+        }
+
+        private static int RailHoleCount(LexWorkbenchConfig config, double railLengthMm)
+        {
+            return (int)Math.Floor((railLengthMm - 2.0 * config.LinearGuide.RailEndDistanceMm)
+                / config.LinearGuide.RailMountingPitchMm) + 1;
         }
 
         private static void Validate(LexWorkbenchConfig config)
@@ -728,7 +888,17 @@ namespace SWWerkplaats.Configurator.Engine
             if (config.LiftColumn == null) throw new ArgumentException("HTE2-hefkolomdata ontbreekt.");
             if (config.LevelingFootCornerAdapter == null) throw new ArgumentException("LEX-stelpoot hoekadapterdata ontbreekt.");
             if (config.LevelingFoot == null) throw new ArgumentException("LEX-stelpootdata ontbreekt.");
-            if (config.Profile80x40 == null || config.Profile80x80 == null || config.Profile40x40 == null) throw new ArgumentException("LEX-profielmaterialen ontbreken.");
+            if (config.SwingLatch == null) throw new ArgumentException("LEX-draaibare aanslagdata ontbreekt.");
+            if (config.HorizontalLockPositionsMm == null || config.HorizontalLockPositionsMm.Count != 3
+                || config.HorizontalLockPositionsMm[0] >= 0 || Math.Abs(config.HorizontalLockPositionsMm[1]) > 0.001
+                || config.HorizontalLockPositionsMm[2] <= 0)
+                throw new ArgumentException("LEX-borgposities links, midden en rechts ontbreken.");
+            if (config.MovingFrameSlotAxisEdgeOffsetMm <= 0) throw new ArgumentException("LEX-sleufashoogte voor draaibare aanslagen ontbreekt.");
+            if (Math.Abs(config.CarriageCenterDistanceMm - config.ColumnCenterDistanceMm) > 0.001)
+                throw new ArgumentException("LEX-wagenharten moeten samenvallen met de HTE2-poot- en vaste zijframeharten.");
+            if (config.CarriageCenterDistanceMm / 2.0 + config.LinearGuide.CarriageLengthMm / 2.0 > config.FixedRailFrameWidthMm / 2.0 + 0.001)
+                throw new ArgumentException("LEX-wagens vallen buiten het vaste railframe.");
+            if (config.Profile80x80 == null || config.Profile40x40 == null) throw new ArgumentException("LEX-profielmaterialen ontbreken.");
             if (config.TopSheet == null || config.StabilizationSheet == null || config.CarriageAdapterSheet == null) throw new ArgumentException("LEX-plaatmateriaal ontbreekt.");
             if (config.CarriageAdapterLengthMm <= 0 || config.CarriageAdapterWidthMm <= 0 || config.CarriageAdapterThicknessMm <= 0) throw new ArgumentException("LEX-adapterplaatafmetingen ontbreken.");
             if (config.CarriageAdapterProfileGrooveOffsetMm <= 0 || config.CarriageAdapterProfileGrooveOffsetMm >= config.CarriageAdapterWidthMm) throw new ArgumentException("LEX-profielgroefhart valt buiten de adapterplaat.");

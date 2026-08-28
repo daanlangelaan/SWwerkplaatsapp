@@ -37,6 +37,11 @@ namespace SWWerkplaats.Configurator.Portal
                 return BuildRobotCellSvg(model, request);
             }
 
+            if (request != null && string.Equals(request.Product, "lineaire_robotcel", StringComparison.OrdinalIgnoreCase))
+            {
+                return BuildLinearRobotCellSvg(model, request);
+            }
+
             return BuildCabinetSvg(model, request);
         }
 
@@ -63,6 +68,31 @@ namespace SWWerkplaats.Configurator.Portal
             sb.AppendLine("<line class=\"divider\" x1=\"" + F(x + 19) + "\" y1=\"" + F(y + h + 28) + "\" x2=\"" + F(x + 19) + "\" y2=\"421\"/><line class=\"divider\" x1=\"" + F(x + w - 19) + "\" y1=\"" + F(y + h + 28) + "\" x2=\"" + F(x + w - 19) + "\" y2=\"421\"/>");
             sb.AppendLine("<circle class=\"knob\" cx=\"" + F(x + 19) + "\" cy=\"429\" r=\"12\"/><circle class=\"knob\" cx=\"" + F(x + w - 19) + "\" cy=\"429\" r=\"12\"/>");
             sb.AppendLine("<text class=\"dim\" x=\"" + F(x + w / 2 - 105) + "\" y=\"488\">" + F(widthMm) + " mm breed · blad " + F(heightMm) + " mm</text>");
+            sb.AppendLine("</svg>");
+            return sb.ToString();
+        }
+
+        private static string BuildLinearRobotCellSvg(WorkbenchModel model, PortalQuoteRequest request)
+        {
+            var config = new PortalConfigurationFactory().BuildLinearRobotCell(request);
+            const double x = 82;
+            const double y = 92;
+            const double w = 640;
+            const double h = 330;
+            var totalHeight = config.WorktopHeightMm + config.GuardHeightAboveWorktopMm;
+            var worktopY = y + h - h * config.WorktopHeightMm / totalHeight;
+            var sb = BeginSvg(model, "Lineaire robotcel");
+            sb.AppendLine("<text class=\"title\" x=\"54\" y=\"46\">" + Xml(model.ProjectName) + "</text>");
+            sb.AppendLine("<text class=\"sub\" x=\"54\" y=\"70\">Centrale robotas · " + config.WorktopSideCount + " werkbladzijde(n) · voorzijde lichtscherm · conceptvrijgave</text>");
+            sb.AppendLine("<rect class=\"floor\" x=\"54\" y=\"448\" width=\"700\" height=\"12\" rx=\"6\"/>");
+            sb.AppendLine("<rect class=\"case\" x=\"" + F(x) + "\" y=\"" + F(y) + "\" width=\"16\" height=\"" + F(h) + "\" rx=\"3\"/>");
+            sb.AppendLine("<rect class=\"case\" x=\"" + F(x + w - 16) + "\" y=\"" + F(y) + "\" width=\"16\" height=\"" + F(h) + "\" rx=\"3\"/>");
+            sb.AppendLine("<rect class=\"top\" x=\"" + F(x) + "\" y=\"" + F(y) + "\" width=\"" + F(w) + "\" height=\"12\" rx=\"3\"/>");
+            sb.AppendLine("<rect class=\"drawer\" x=\"" + F(x) + "\" y=\"" + F(worktopY - 12) + "\" width=\"" + F(w) + "\" height=\"18\" rx=\"3\"/>");
+            sb.AppendLine("<rect class=\"profile\" x=\"" + F(x + 36) + "\" y=\"" + F(worktopY - 31) + "\" width=\"" + F(w - 72) + "\" height=\"12\" rx=\"2\"/>");
+            sb.AppendLine("<rect class=\"cap\" x=\"" + F(x + w / 2.0 - 58) + "\" y=\"" + F(worktopY - 52) + "\" width=\"116\" height=\"18\" rx=\"3\"/>");
+            sb.AppendLine("<rect class=\"glass\" x=\"" + F(x + 18) + "\" y=\"" + F(y + 14) + "\" width=\"" + F(w - 36) + "\" height=\"" + F(worktopY - y - 28) + "\" rx=\"3\"/>");
+            sb.AppendLine("<text class=\"dim\" x=\"" + F(x + w / 2.0 - 155) + "\" y=\"488\">Lengte " + F(config.LengthMm) + " mm · werkbladhoogte " + F(config.WorktopHeightMm) + " mm</text>");
             sb.AppendLine("</svg>");
             return sb.ToString();
         }

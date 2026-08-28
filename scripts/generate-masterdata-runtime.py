@@ -40,6 +40,7 @@ def build_snapshot() -> dict:
         "tools": ("Gereedschappen", "Gereedschap-ID"),
         "connectionRecipes": ("Verbindingsrecepten", "Recept-ID"),
         "productRules": ("Product-regels", "Regel-ID"),
+        "productInputContracts": ("Product-invoer", "Invoercontract-ID"),
         "suppliers": ("Leveranciers", "Leverancier-ID"),
         "supplierPreferences": ("Leveranciers", "Voorkeur-ID"),
         "offers": ("Prijs & inkoop", "Aanbieding-ID"),

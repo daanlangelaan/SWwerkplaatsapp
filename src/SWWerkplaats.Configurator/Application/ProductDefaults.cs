@@ -78,7 +78,7 @@ namespace SWWerkplaats.Configurator.Application
 
         public const double LexWorkbenchWidthMm = 1650;
         public const double LexWorkbenchDepthMm = 1000;
-        public const double LexWorkbenchHeightMm = 833;
+        public const double LexWorkbenchHeightMm = 848;
         public const double LexWorkbenchColumnCenterDistanceMm = 890;
 
         public static LinearGuideTemplate LexHsr15LinearGuide()

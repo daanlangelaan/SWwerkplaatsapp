@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Web.Script.Serialization;
+using System.Globalization;
+using SWWerkplaats.Configurator.Application;
 
 namespace SWWerkplaats.Configurator.Domain
 {
@@ -77,55 +77,25 @@ namespace SWWerkplaats.Configurator.Domain
 
         private static IEnumerable<Material> ConfiguredMaterials(MaterialKind kind)
         {
-            var path = MaterialsConfigPath();
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) yield break;
-
-            MaterialConfig config;
-            try
+            foreach (var row in MasterDataRuntimeCatalog.LoadRequired().Records("materials"))
             {
-                config = new JavaScriptSerializer().Deserialize<MaterialConfig>(File.ReadAllText(path));
-            }
-            catch
-            {
-                yield break;
-            }
-
-            if (config == null || config.materials == null) yield break;
-            foreach (var item in config.materials)
-            {
-                var material = ToMaterial(item);
+                var material = ToMaterial(row);
                 if (material != null && material.Kind == kind) yield return material;
             }
         }
 
-        private static string MaterialsConfigPath()
+        private static Material ToMaterial(Dictionary<string, string> row)
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var candidates = new[]
-            {
-                Path.Combine(baseDir, "config", "materials.json"),
-                Path.Combine(baseDir, "..", "config", "materials.json"),
-                Path.Combine(baseDir, "..", "..", "config", "materials.json")
-            };
-
-            foreach (var candidate in candidates)
-            {
-                var fullPath = Path.GetFullPath(candidate);
-                if (File.Exists(fullPath)) return fullPath;
-            }
-
-            return null;
-        }
-
-        private static Material ToMaterial(MaterialConfigItem item)
-        {
-            if (item == null || string.IsNullOrWhiteSpace(item.id)) return null;
+            var id = MasterDataRuntimeCatalog.Value(row, "Materiaal-ID");
+            var form = MasterDataRuntimeCatalog.Value(row, "Vorm");
+            if (string.IsNullOrWhiteSpace(id)) return null;
             MaterialKind kind;
-            if (string.Equals(item.kind, "profile", StringComparison.OrdinalIgnoreCase))
+            if (form.IndexOf("profiel", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 kind = MaterialKind.Profile;
             }
-            else if (string.Equals(item.kind, "sheet", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(form, "Plaat", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(form, "3D-printdeel", StringComparison.OrdinalIgnoreCase))
             {
                 kind = MaterialKind.Sheet;
             }
@@ -136,16 +106,36 @@ namespace SWWerkplaats.Configurator.Domain
 
             return new Material
             {
-                Id = item.id,
-                Name = string.IsNullOrWhiteSpace(item.name) ? item.id : item.name,
+                Id = id,
+                Name = MaterialName(row, id),
                 Kind = kind,
-                ThicknessMm = item.thicknessMm,
-                WidthMm = item.widthMm,
-                HeightMm = item.heightMm,
-                StockLengthMm = item.stockLengthMm,
-                SheetLengthMm = item.sheetLengthMm,
-                SheetWidthMm = item.sheetWidthMm
+                ThicknessMm = Number(row, "Dikte mm"),
+                WidthMm = Number(row, "Breedte mm"),
+                HeightMm = Number(row, "Hoogte mm"),
+                StockLengthMm = Number(row, "Handelslengte mm"),
+                SheetLengthMm = Number(row, "Handelslengte mm"),
+                SheetWidthMm = Number(row, "Handelsbreedte mm"),
+                RenderAppearance = MasterDataRuntimeCatalog.Value(row, "Renderweergave"),
+                IsAdditiveManufactured = string.Equals(form, "3D-printdeel", StringComparison.OrdinalIgnoreCase)
             };
+        }
+
+        private static string MaterialName(Dictionary<string, string> row, string id)
+        {
+            var customerName = MasterDataRuntimeCatalog.Value(row, "Klantnaam").Trim();
+            if (!string.IsNullOrWhiteSpace(customerName)) return customerName;
+            var family = MasterDataRuntimeCatalog.Value(row, "Familie");
+            var quality = MasterDataRuntimeCatalog.Value(row, "Kwaliteit/type");
+            var name = (family + " " + quality).Trim();
+            return string.IsNullOrWhiteSpace(name) ? id : name;
+        }
+
+        private static double Number(Dictionary<string, string> row, string field)
+        {
+            double result;
+            return double.TryParse(MasterDataRuntimeCatalog.Value(row, field), NumberStyles.Float, CultureInfo.InvariantCulture, out result)
+                ? result
+                : 0;
         }
 
         private static Material Clone(Material material)
@@ -160,7 +150,9 @@ namespace SWWerkplaats.Configurator.Domain
                 HeightMm = material.HeightMm,
                 StockLengthMm = material.StockLengthMm,
                 SheetLengthMm = material.SheetLengthMm,
-                SheetWidthMm = material.SheetWidthMm
+                SheetWidthMm = material.SheetWidthMm,
+                RenderAppearance = material.RenderAppearance,
+                IsAdditiveManufactured = material.IsAdditiveManufactured
             };
         }
 
@@ -412,22 +404,5 @@ namespace SWWerkplaats.Configurator.Domain
             };
         }
 
-        private sealed class MaterialConfig
-        {
-            public MaterialConfigItem[] materials { get; set; }
-        }
-
-        private sealed class MaterialConfigItem
-        {
-            public string id { get; set; }
-            public string name { get; set; }
-            public string kind { get; set; }
-            public double thicknessMm { get; set; }
-            public double widthMm { get; set; }
-            public double heightMm { get; set; }
-            public double stockLengthMm { get; set; }
-            public double sheetLengthMm { get; set; }
-            public double sheetWidthMm { get; set; }
-        }
     }
 }

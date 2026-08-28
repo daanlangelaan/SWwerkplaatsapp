@@ -45,6 +45,11 @@ Manufacturing / SolidWorks
 5. Orderflow is expliciet: klantconfiguratie, controle, vrijgave, freeswachtrij, productie, gereed.
 6. Lokale server blijft voorlopig simpel, maar alle API's moeten later achter een echte server of reverse proxy kunnen draaien.
 
+De operationele beslisregels voor deze grens staan in
+`Data-eigenaarschap-en-UI-grens.md`. Die regels zijn normatief: bij twijfel over
+een getal, ID, default of fallback wordt eerst de eigenaar vastgesteld en niet in
+de dichtstbijzijnde UI-functie verder gebouwd.
+
 ## Gewenste lagen
 
 ### Domain

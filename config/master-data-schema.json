@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.9",
+  "schemaVersion": "3.4",
   "workbook": "config/product-master-data.xlsx",
   "canonicalTables": {
     "ProductsTable": { "sheet": "Producten", "primaryKey": "Product-ID" },
@@ -8,6 +8,7 @@
     "ToolsTable": { "sheet": "Gereedschappen", "primaryKey": "Gereedschap-ID" },
     "ConnectionRecipesTable": { "sheet": "Verbindingsrecepten", "primaryKey": "Recept-ID" },
     "ProductRulesTable": { "sheet": "Product-regels", "primaryKey": "Regel-ID" },
+    "ProductInputContractsTable": { "sheet": "Product-invoer", "primaryKey": "Invoercontract-ID" },
     "SuppliersTable": { "sheet": "Leveranciers", "primaryKey": "Leverancier-ID" },
     "SupplierPreferencesTable": { "sheet": "Leveranciers", "primaryKey": "Voorkeur-ID" },
     "PricingProcurementTable": { "sheet": "Prijs & inkoop", "primaryKey": "Aanbieding-ID" },
@@ -26,4 +27,87 @@
   "selectionRule": "Selecteer per Interne-ID alleen aanbiedingen waarvan categorie, subcategorie en productscope passen; kies daarna de laagste actieve leveranciersrang.",
   "forbiddenWorksheets": ["Leveranciersvoorkeur", "Leverancierscatalogus"],
   "forbiddenJoins": ["leveranciersnaam", "omschrijving", "werkbladpositie"]
+  ,
+  "materialAppearanceContract": {
+    "field": "Renderweergave",
+    "allowedValues": ["standaard", "multiplex-gelaagd"],
+    "renderSemantics": "De backend geeft de beheerde materiaalweergave en de plaatdikte-as door. De UI tekent alleen de bijbehorende generieke presentatie en koppelt nooit op materiaal-ID of productnaam."
+  },
+  "materialCustomerNameContract": {
+    "field": "Klantnaam",
+    "maximumLength": 80,
+    "fallback": "Familie + Kwaliteit/type",
+    "semantics": "De backend gebruikt Klantnaam uitsluitend als korte klantgerichte keuzenaam. Technische materiaalvelden, stabiele ID's en leverancierskoppelingen blijven leidend voor engineering en inkoop."
+  },
+  "componentRenderContract": {
+    "statusField": "Renderstatus",
+    "openDataField": "Open renderdata",
+    "provisionalStatus": "ProvisionalRenderEnvelope",
+    "requiredPositiveNumericFields": [
+      "Renderlengte mm", "Renderbreedte mm", "Renderprojectie mm", "Montagevoet Ø mm",
+      "Basisprojectie mm", "Draad Ø mm", "Draaistap °", "Inbus SW mm", "Gewicht g"
+    ],
+    "productionExclusion": "ProvisionalRenderEnvelope is uitsluitend backend-renderdata en is uitgesloten van CAM, inkoopmaatvoering en productievrijgave."
+  },
+  "profileRenderContract": {
+    "statusField": "Profielgeometrie-status",
+    "openDataField": "Open profielgeometrie",
+    "sourceField": "Profielgeometrie-bron",
+    "provisionalStatus": "ProvisionalRenderEnvelope",
+    "exactStatus": "ExactSupplierGeometry",
+    "positiveNumericFields": [
+      "Sleufmondbreedte mm", "Sleufmond-diepte mm", "Sleufkamerbreedte mm",
+      "Sleufkamerdiepte mm", "Buitenradius mm", "Kernboringdiameter mm"
+    ],
+    "coreContourField": "Kernboringcontour",
+    "productionExclusion": "Een profiel met ontbrekende exacte geometrie of niet-lege Open profielgeometrie blijft ProvisionalRenderEnvelope en is uitgesloten van CAM, inkoopmaatvoering en productievrijgave."
+  },
+  "assemblyHardwareRenderContract": {
+    "familyField": "Hardwarefamilie",
+    "sourceField": "Hardwaregeometrie-bron",
+    "openDataField": "Open hardwaregeometrie",
+    "provisionalStatus": "ProvisionalRenderEnvelope",
+    "exactStatus": "ExactSupplierGeometry",
+    "connectorFields": [
+      "Connectorplaatdikte mm", "Connectorplaatbreedte mm", "Connectorplaathoogte mm",
+      "Klauwlengte mm", "Klauwbreedte mm", "Klauwhoogte mm", "Klauwhartafstand mm",
+      "Connectorhart vanaf profieleinde mm", "Schachthart vanaf profieleinde mm",
+      "Kophart vanaf profieleinde mm", "Insteekweg mm", "Toegangsgatdiameter mm"
+    ],
+    "boltFields": [
+      "Draad Ø mm", "Boutschachtlengte mm", "Boutkopdiameter mm", "Boutkophoogte mm", "Inbus SW mm"
+    ],
+    "referenceSemantics": {
+      "profileEndPlane": "Het profielkopvlak is 0 mm.",
+      "Connectorhart vanaf profieleinde mm": "Positieve afstand naar buiten vanaf het profielkopvlak tot het midden van de connectorplaat.",
+      "Schachthart vanaf profieleinde mm": "Positieve afstand naar binnen vanaf het profielkopvlak tot het midden van de boutschacht.",
+      "Kophart vanaf profieleinde mm": "Positieve afstand naar buiten vanaf het profielkopvlak tot het midden van de boutkop.",
+      "Insteekweg mm": "Axiale klauwprojectie naar binnen vanaf het profielkopvlak."
+    },
+    "productionExclusion": "Ontbrekende connector- of boutgeometrie blijft backend-only ProvisionalRenderEnvelope met niet-lege OpenData en is uitgesloten van CAM, inkoopmaatvoering en productievrijgave."
+  },
+  "componentPrimitiveRenderContract": {
+    "geometryField": "Renderprimitieven JSON",
+    "statusField": "Primitieve renderstatus",
+    "sourceField": "Primitieve renderbron",
+    "openDataField": "Open primitieve renderdata",
+    "contractVersion": 1,
+    "allowedShapes": ["box", "cylinder"],
+    "placementDimensionsField": "inheritPlacementDimensions",
+    "provisionalStatus": "ProvisionalRenderEnvelope",
+    "exactStatus": "ExactSupplierGeometry",
+    "productionExclusion": "Componentprimitives zijn uitsluitend globale backend-renderdata. ProvisionalRenderEnvelope bevat altijd OpenData en is uitgesloten van CAM, inkoopmaatvoering en productievrijgave."
+  },
+  "profileFastenerReceivingThreadContract": {
+    "threadDiameterField": "Draad Ø mm",
+    "usableThreadZoneField": "Bruikbare draadzone mm",
+    "threadInletOffsetField": "Draadinlaat vanaf profielvlak mm",
+    "throughThreadField": "Draadgat doorlopend",
+    "sourceField": "Draadzone-bron",
+    "requiredComponents": [
+      { "componentId": "techxxl_t_nut_8_m8", "threadDiameterMm": 8 },
+      { "componentId": "techxxl_t_nut_8_sliding_m4", "threadDiameterMm": 4 }
+    ],
+    "selectionRule": "De centrale boutcalculator telt plaat-/componentdoorvoer en de gemonteerde draadinlaat-offset op voor de minimale lengte. De bruikbare draadzone borgt de minimale aangrijping; bij een doorlopend draadgat begrenst de profiel-sleufbodem de maximale lengte. Ontbrekende data blokkeert de boutlengtekeuze."
+  }
 }

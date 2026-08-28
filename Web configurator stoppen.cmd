@@ -1,3 +1,4 @@
 @echo off
 set "ROOT=%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\start-web-configurator.ps1" -Action Stop
+if errorlevel 1 pause & exit /b %errorlevel%

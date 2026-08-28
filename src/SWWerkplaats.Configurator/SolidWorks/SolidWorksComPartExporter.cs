@@ -167,6 +167,15 @@ namespace SWWerkplaats.Configurator.SolidWorks
             var model = (ModelDoc2)solidWorks.NewPart();
             if (model == null) throw new InvalidOperationException("SolidWorks kon geen nieuw controlepart maken. Controleer de default part template.");
 
+            // Geef het document zijn definitieve identiteit voordat er render-materialen
+            // worden aangemaakt. Anders blijven die aan het tijdelijke PartXX-document
+            // gekoppeld en kan de GLB-export ze verliezen.
+            var errors = 0;
+            var warnings = 0;
+            model.Extension.SaveAs(controlPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
+            if (errors != 0) throw new InvalidOperationException("SolidWorks kon het multibody-controlepart niet initialiseren (code " + errors + ").");
+            model = ActivateSavedControlPart(solidWorks, model, controlPath);
+
             var part = (PartDoc)model;
             var modeler = (Modeler)solidWorks.GetModeler();
             var customerPresentation = new SolidWorksCustomerPresentation(model, controlPath);
@@ -186,16 +195,57 @@ namespace SWWerkplaats.Configurator.SolidWorks
             }
 
             if (bodyCount == 0) throw new InvalidOperationException("Het controlemodel bevat geen plaatsingen.");
+
             customerPresentation.CommitAppearances();
+            model.Extension.UpdateRenderMaterialsInSceneGraph(true);
             model.EditRebuild3();
+            model.GraphicsRedraw2();
             model.ViewZoomtofit2();
-            var errors = 0;
-            var warnings = 0;
-            model.Extension.SaveAs(controlPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
-            if (errors != 0) throw new InvalidOperationException("SolidWorks kon het multibody-controlepart niet opslaan (code " + errors + ").");
-            customerPresentation.ExportGlb(model, controlPath);
+            errors = 0;
+            warnings = 0;
+            if (!model.Save3(SaveAsOptionsSilent, ref errors, ref warnings) || errors != 0)
+                throw new InvalidOperationException("SolidWorks kon de klantappearances niet in het controlepart vastleggen (code " + errors + ").");
+
+            var expectsProfileTexture = visualParts.Any(partItem =>
+                partItem != null && string.Equals(partItem.Kind, "profile", StringComparison.OrdinalIgnoreCase));
+            customerPresentation.ExportGlb(model, controlPath, expectsProfileTexture);
             if (request != null)
                 SolidWorksCustomerDrawingExporter.Export(solidWorks, model, controlPath, request, workbenchModel);
+        }
+
+        private static ModelDoc2 ActivateSavedControlPart(SldWorks solidWorks, ModelDoc2 savedModel, string controlPath)
+        {
+            if (savedModel == null) throw new ArgumentNullException("savedModel");
+            var savedPath = savedModel.GetPathName();
+            if (string.IsNullOrWhiteSpace(savedPath) ||
+                !string.Equals(Path.GetFullPath(savedPath), Path.GetFullPath(controlPath), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("SolidWorks heeft het nieuwe controlepart niet onder het bedoelde pad vastgelegd: " + controlPath);
+
+            var currentActiveModel = solidWorks.IActiveDoc2;
+            if (currentActiveModel != null)
+            {
+                var currentPath = currentActiveModel.GetPathName();
+                if (!string.IsNullOrWhiteSpace(currentPath) &&
+                    string.Equals(Path.GetFullPath(currentPath), Path.GetFullPath(controlPath), StringComparison.OrdinalIgnoreCase))
+                    return currentActiveModel;
+            }
+
+            var activationErrors = 0;
+            var title = savedModel.GetTitle();
+            var activeModel = solidWorks.ActivateDoc3(title, false, 0, ref activationErrors) as ModelDoc2;
+            if (activeModel == null)
+                throw new InvalidOperationException("SolidWorks kon het opgeslagen controlepart niet activeren (code " + activationErrors + "): " + controlPath);
+
+            var activePath = activeModel.GetPathName();
+            if (string.IsNullOrWhiteSpace(activePath) ||
+                !string.Equals(Path.GetFullPath(activePath), Path.GetFullPath(controlPath), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "SolidWorks activeerde niet het bedoelde controlepart. Verwacht: " + controlPath + "; actief: " +
+                    (string.IsNullOrWhiteSpace(activePath) ? activeModel.GetTitle() : activePath));
+            }
+
+            return activeModel;
         }
 
         private static void CreateLexLevelingFootParts(SldWorks solidWorks, List<PortalAssemblyPart> visualParts, WorkbenchModel model, string cadFolder)
@@ -265,7 +315,27 @@ namespace SWWerkplaats.Configurator.SolidWorks
         private static Body2 CreateVisualBody(Modeler modeler, PortalAssemblyPart visual)
         {
             Body2 body;
-            if (string.Equals(visual.Shape, "cylinder", StringComparison.OrdinalIgnoreCase) ||
+            if (string.Equals(visual.Shape, "cylinder-x", StringComparison.OrdinalIgnoreCase))
+            {
+                var cylinder = new double[]
+                {
+                    MmToM(visual.Xmm - visual.SizeXmm / 2.0), MmToM(visual.Ymm), MmToM(visual.Zmm),
+                    1, 0, 0,
+                    MmToM(Math.Min(visual.SizeYmm, visual.SizeZmm) / 2.0), MmToM(visual.SizeXmm)
+                };
+                body = modeler.CreateBodyFromCyl(cylinder) as Body2;
+            }
+            else if (string.Equals(visual.Shape, "cylinder-z", StringComparison.OrdinalIgnoreCase))
+            {
+                var cylinder = new double[]
+                {
+                    MmToM(visual.Xmm), MmToM(visual.Ymm), MmToM(visual.Zmm - visual.SizeZmm / 2.0),
+                    0, 0, 1,
+                    MmToM(Math.Min(visual.SizeXmm, visual.SizeYmm) / 2.0), MmToM(visual.SizeZmm)
+                };
+                body = modeler.CreateBodyFromCyl(cylinder) as Body2;
+            }
+            else if (string.Equals(visual.Shape, "cylinder", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(visual.Shape, "ball-transfer", StringComparison.OrdinalIgnoreCase))
             {
                 var cylinder = new double[]

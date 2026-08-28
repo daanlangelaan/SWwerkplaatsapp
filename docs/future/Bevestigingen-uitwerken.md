@@ -81,5 +81,5 @@ Blijvende werklijst voor bevestigers, gaten, lengteselectie en CAM-bewerkingen. 
 - [ ] Keuze-uitleg in de portal tonen: waarom deze diameter/lengte is gekozen en hoeveel grip/restmateriaal resteert.
 - [ ] Alternatieve veilige handelslengtes tonen bij voorraadtekort.
 - [ ] Waarschuwing voor overmatig lange of zware schroeven, ook wanneer ze geometrisch nog passen.
-- [ ] Automatische montagevolgorde en benodigd bit-/sleutelgereedschap genereren.
+- [ ] Automatische montagevolgorde en benodigd bit-/sleutelgereedschap genereren. Het ontwerpcontract en de huidige codedelta staan in `Assemblagehandleiding-systeemprofielen.md`.
 - [ ] Herbruikbare verbindingstemplates maken die bij het afleiden van een nieuw product worden meegekopieerd.

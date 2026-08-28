@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 using SWWerkplaats.Configurator.Drawing;
 
@@ -9,7 +11,7 @@ namespace SWWerkplaats.Configurator.Engine
     {
         private const double UprightWidthMm = 40.0;
         private const double UprightDepthMm = 80.0;
-        private const double FootPlateThicknessMm = 15.0;
+        private const double FootPlateThicknessMm = 16.0;
         private const double CasterOverallHeightMm = 82.0;
         private const double CasterLeveledExtensionMm = 10.0;
         private const double CasterLeveledHeightMm = CasterOverallHeightMm + CasterLeveledExtensionMm;
@@ -26,7 +28,9 @@ namespace SWWerkplaats.Configurator.Engine
                 SawingMode = config.SawingMode
             };
 
-            var topSheetThickness = config.UpperPanelMaterial == null ? 6.0 : config.UpperPanelMaterial.ThicknessMm;
+            if (config.UpperPanelMaterial == null || config.UpperPanelMaterial.ThicknessMm <= 0)
+                throw new ArgumentException("Bovenpaneelmateriaal ontbreekt in machinebasis-masterdata.");
+            var topSheetThickness = config.UpperPanelMaterial.ThicknessMm;
             var frameTop = config.HeightMm - topSheetThickness;
             var uprightLength = frameTop - FloorToUprightMm;
             AddProfile(model, "Staander 40x80", config.UprightProfile, uprightLength, 4,
@@ -37,10 +41,10 @@ namespace SWWerkplaats.Configurator.Engine
             connectorCount += AddLayer(model, config, "Onderligger", config.LowerBeamProfile, FloorToUprightMm, false, 20.0, 20.0);
             connectorCount += AddIntermediateBeams(model, config, "Onderframe tussenligger", config.TopBeamProfile, FloorToUprightMm, false, 20.0, 20.0);
             var carrierTop = config.WorktopHeightMm - config.ReservedWorktopThicknessMm;
-            connectorCount += AddLayer(model, config, "Bladligger", config.WorktopBeamProfile, carrierTop, true, 20.0, 0);
-            connectorCount += AddIntermediateBeams(model, config, "Bladframe tussenligger", config.WorktopBeamProfile, carrierTop, true, 20.0, 0);
-            connectorCount += AddLayer(model, config, "Bovenligger", config.TopBeamProfile, frameTop, true, 20.0, 0);
-            connectorCount += AddIntermediateBeams(model, config, "Topframe tussenligger", config.TopBeamProfile, frameTop, true, 20.0, 0);
+            connectorCount += AddLayer(model, config, "Bladligger", config.WorktopBeamProfile, carrierTop, true, 20.0, 20.0);
+            connectorCount += AddIntermediateBeams(model, config, "Bladframe tussenligger", config.WorktopBeamProfile, carrierTop, true, 20.0, 20.0);
+            connectorCount += AddLayer(model, config, "Bovenligger", config.TopBeamProfile, frameTop, true, 20.0, 20.0);
+            connectorCount += AddIntermediateBeams(model, config, "Topframe tussenligger", config.TopBeamProfile, frameTop, true, 20.0, 20.0);
 
             AddWorktop(model, config);
             AddFeet(model, config);
@@ -49,8 +53,9 @@ namespace SWWerkplaats.Configurator.Engine
             connectorCount += AddControlCabinet(model, config, carrierTop);
             connectorCount += AddFrontProtection(model, config, config.WorktopHeightMm, frameTop);
             AddBlackEndCaps(model, config, frameTop);
+            connectorCount = model.AssemblyConnections.Count(connection => connection.JointType == AssemblyJointType.StandardConnector);
             AddStandardConnectorHardware(model, connectorCount);
-            model.DesignNotes.Add("Bladhoogte is de bovenzijde van het HPL-werkblad. Het blad is configureerbaar als 10 of 12 mm en heeft vier rechthoekige hoekuitsparingen van 41x81 mm voor 1 mm montagespeling rondom de doorlopende 40x80-staanders.");
+            model.DesignNotes.Add("Bladhoogte is de bovenzijde van het gekozen HPL-werkblad. Het blad heeft vier rechthoekige hoekuitsparingen van 41x81 mm voor 1 mm montagespeling rondom de doorlopende 40x80-staanders.");
             model.DesignNotes.Add("Alle hoogtematen worden vanaf de vloer gerekend in de bedrijfsstand op de rubberen stelpoten: 82 mm rijhoogte + 10 mm uitstelling + 15 mm voetplaat.");
             model.DesignNotes.Add("GD-60S: wiel 50x25 mm, M12x1,75 en 36 mm wieloffset. De wielen zijn uitsluitend voor transport; in bedrijfsstand zijn ze vrij van de vloer.");
             model.DesignNotes.Add("De werkbladlaag gebruikt standaard 40x80 voor buitencontour en tussenliggers. Tussenliggers lopen in de diepte en worden gelijkmatig verdeeld op basis van de maximale hart-op-hartafstand.");
@@ -86,7 +91,7 @@ namespace SWWerkplaats.Configurator.Engine
 
             AddPanel(model, sheet, 0, config.WorktopHeightMm - material.ThicknessMm / 2.0, 0, AssemblyOrientation.SheetHorizontal, false);
             model.Hardware.Add(new HardwareItem { Name = "Fabory laagbolkopschroef M6x16 voor HPL werkblad", ArticleNumber = "07151.060.016", Quantity = sheet.Holes.Count, Unit = "st", Note = "ISO 7380-1, verzinkt; Ø6,5 mm werkbladgaten", ModelStatus = "Definitief artikel", BomStatus = "Inkoop" });
-            model.Hardware.Add(new HardwareItem { Name = "M6 T-moer groef 10 voor HPL werkblad", ArticleNumber = "T-NUT-G10-M6", Quantity = sheet.Holes.Count, Unit = "st", Note = "Serie 10 / groef 10", ModelStatus = "Functioneel gemodelleerd", BomStatus = "Definitief leverancierartikel nog koppelen" });
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL T-moer groef 8 met brug M6", ArticleNumber = "S208NSMS6", Quantity = sheet.Holes.Count, Unit = "st", Note = "TechXXL TIN 100242; groef 8, I-type; 23x13,2x7,3 mm; verzinkt met veerkogel", ModelStatus = "Definitief leveranciersartikel", BomStatus = "Inkoop" });
         }
 
         private static void AddEnclosurePanels(WorkbenchModel model, MachineBaseConfig config, double carrierTopMm)
@@ -120,23 +125,23 @@ namespace SWWerkplaats.Configurator.Engine
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "M6 T-moer groef 10 met brug en verende kogel",
-                ArticleNumber = "T-NUT-G10-M6-BALL",
+                Name = "TechXXL T-moer groef 8 met brug M6",
+                ArticleNumber = "S208NSMS6",
                 Quantity = acrylicHoleCount,
                 Unit = "st",
-                Note = "Voor alle acrylaatbevestigingen; in de groef inschuif-/indraaibaar en door kogeldruk op positie geborgd. De aangeleverde S208NSMS6 (TIN 100242) is groef 8 en dient alleen als vormreferentie; inkoop moet de serie-10/groef-10 uitvoering koppelen.",
-                ModelStatus = "Functioneel gemodelleerd",
-                BomStatus = "Definitief leverancierartikel nog koppelen"
+                Note = "TechXXL TIN 100242; groef 8, I-type; 23x13,2x7,3 mm; verzinkt en door veerkogel op positie gehouden.",
+                ModelStatus = "Definitief leveranciersartikel",
+                BomStatus = "Inkoop"
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "M6 T-moer groef 10 voor HPL",
-                ArticleNumber = "T-NUT-G10-M6",
+                Name = "TechXXL T-moer groef 8 met brug M6",
+                ArticleNumber = "S208NSMS6",
                 Quantity = hplHoleCount,
                 Unit = "st",
-                Note = "Voor HPL-plaatbevestigingen; serie 10 / groef 10",
-                ModelStatus = "Functioneel gemodelleerd",
-                BomStatus = "Definitief leverancierartikel nog koppelen"
+                Note = "TechXXL TIN 100242; groef 8, I-type; 23x13,2x7,3 mm; verzinkt met veerkogel.",
+                ModelStatus = "Definitief leveranciersartikel",
+                BomStatus = "Inkoop"
             });
             model.Hardware.Add(new HardwareItem
             {
@@ -265,6 +270,9 @@ namespace SWWerkplaats.Configurator.Engine
                 var accessY = centerY - verticalSize / 2.0 - 0.5;
                 AddBlackConnectorHole(model, name + " voor " + i, x, accessY, beamCenterZ - beamLength / 2.0 + 20.0, "y");
                 AddBlackConnectorHole(model, name + " achter " + i, x, accessY, beamCenterZ + beamLength / 2.0 - 20.0, "y");
+                var slotBase = IntermediateSlotBase(name);
+                AddStandardConnection(model, name, name + " " + i, ProfileEnd.A, slotBase + " voor");
+                AddStandardConnection(model, name, name + " " + i, ProfileEnd.B, slotBase + " achter");
             }
 
             model.DesignNotes.Add(beamCount + " " + name.ToLowerInvariant() + "s, werkelijk gelijk verdeeld op " + actualSpacing.ToString("0.##") + " mm h.o.h.");
@@ -314,12 +322,20 @@ namespace SWWerkplaats.Configurator.Engine
                 AddBlackConnectorHole(model, name + " links", leftBeamX, centerY - verticalSize / 2.0 - 0.5, pz, "y");
                 AddBlackConnectorHole(model, name + " rechts", rightBeamX, centerY - verticalSize / 2.0 - 0.5, pz, "y");
             }
+            AddStandardConnection(model, name, name + " voor", ProfileEnd.A, "Staander linksvoor");
+            AddStandardConnection(model, name, name + " voor", ProfileEnd.B, "Staander rechtsvoor");
+            AddStandardConnection(model, name, name + " achter", ProfileEnd.A, "Staander linksachter");
+            AddStandardConnection(model, name, name + " achter", ProfileEnd.B, "Staander rechtsachter");
+            AddStandardConnection(model, name, name + " links", ProfileEnd.A, "Staander linksvoor");
+            AddStandardConnection(model, name, name + " links", ProfileEnd.B, "Staander linksachter");
+            AddStandardConnection(model, name, name + " rechts", ProfileEnd.A, "Staander rechtsvoor");
+            AddStandardConnection(model, name, name + " rechts", ProfileEnd.B, "Staander rechtsachter");
             return connectionCount;
         }
 
         private static void AddFeet(WorkbenchModel model, MachineBaseConfig config)
         {
-            model.Hardware.Add(new HardwareItem { Name = "Voetplaat 10 80x40 M12", ArticleNumber = "S210FP804012", Quantity = 4, Unit = "st", Note = "80x40x15 mm; TechXXL TIN 101442", ModelStatus = "Referentieafmetingen vastgelegd", BomStatus = "Inkoopartikel verifiëren" });
+            model.Hardware.Add(new HardwareItem { Name = "Voetplaat 8 80x40 M12 aluminiumkleur", ArticleNumber = "S208FP804012WA", Quantity = 4, Unit = "st", Note = "80x40x16 mm; TechXXL TIN 101030; groef 8, I-type", ModelStatus = "Leveranciers-CAD gecontroleerd", BomStatus = "Inkoop" });
             model.Hardware.Add(new HardwareItem { Name = "Nivellerend zwenkwiel GD-60S M12", ArticleNumber = "GD-60S", Quantity = 4, Unit = "st", Note = "Wiel 50x25; hoogte 82+10; offset 36; M12x1,75; officiële draaglast 280 kg per wiel", ModelStatus = "Maat-envelop opgenomen", BomStatus = "Aangeleverd inkoopartikel" });
             var x = (config.WidthMm - UprightWidthMm) / 2.0;
             var z = (config.DepthMm - UprightDepthMm) / 2.0;
@@ -331,8 +347,8 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static void AddFootAt(WorkbenchModel model, double x, double z, string suffix)
         {
-            AddPlacement(model, "Voetplaat " + suffix, AssemblyComponentKind.Purchased, 40, 80, FootPlateThicknessMm, x, CasterLeveledHeightMm + FootPlateThicknessMm / 2.0, z, "hardware-adapter", "footplate-m12");
-            AddPlacement(model, "Zwenkwiel GD-60S " + suffix, AssemblyComponentKind.Purchased, 97, 74, CasterLeveledHeightMm, x, CasterLeveledHeightMm / 2.0, z, "hardware-wheel", "leveling-caster-leveled");
+            AddPlacement(model, "Voetplaat " + suffix, AssemblyComponentKind.Purchased, 40, 80, FootPlateThicknessMm, x, CasterLeveledHeightMm + FootPlateThicknessMm / 2.0, z, "hardware-adapter", "footplate-m12", "techxxl_footplate_8_80x40_m12");
+            AddPlacement(model, "Zwenkwiel GD-60S " + suffix, AssemblyComponentKind.Purchased, 97, 74, CasterLeveledHeightMm, x, CasterLeveledHeightMm / 2.0, z, "hardware-wheel", "leveling-caster-leveled", "gd60s_leveling_caster_m12");
         }
 
         private static void AddTopAcrylic(WorkbenchModel model, MachineBaseConfig config, double frameTopMm)
@@ -358,7 +374,7 @@ namespace SWWerkplaats.Configurator.Engine
             AddPanel(model, sheet, 0, frameTopMm + sheet.Material.ThicknessMm / 2.0, 0, AssemblyOrientation.SheetHorizontal, true);
             model.Hardware.Add(new HardwareItem { Name = "Transparante kunststof ring M6 voor acryl top", ArticleNumber = "WASHER-M6-CLEAR", Quantity = sheet.Holes.Count, Unit = "st", Note = "Onder laagbolkop op topplaat", ModelStatus = "Functioneel gemodelleerd", BomStatus = "Definitief leverancierartikel nog koppelen" });
             model.Hardware.Add(new HardwareItem { Name = "Fabory laagbolkopschroef M6x16 voor acryl top", ArticleNumber = "07151.060.016", Quantity = sheet.Holes.Count, Unit = "st", Note = "ISO 7380-1, verzinkt", ModelStatus = "Definitief artikel", BomStatus = "Inkoop" });
-            model.Hardware.Add(new HardwareItem { Name = "M6 T-moer groef 10 met brug en verende kogel voor top", ArticleNumber = "T-NUT-G10-M6-BALL", Quantity = sheet.Holes.Count, Unit = "st", Note = "Serie 10 / groef 10", ModelStatus = "Functioneel gemodelleerd", BomStatus = "Definitief leverancierartikel nog koppelen" });
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL M6 T-moer groef 8 met brug en verende kogel voor top", ArticleNumber = "TIN 100242 / S208NSMS6", Quantity = sheet.Holes.Count, Unit = "st", Note = "Serie 8 / groef 8; 23×13,2×7,3 mm", ModelStatus = "Exact leveranciersartikel", BomStatus = "Inkoop vrijgegeven" });
         }
 
         private static int AddControlCabinet(WorkbenchModel model, MachineBaseConfig config, double carrierTopMm)
@@ -404,7 +420,7 @@ namespace SWWerkplaats.Configurator.Engine
             var sideHeight = sideTop - bottom;
             var leftSupportX = cabinetCenterX - config.ControlCabinetWidthMm / 2.0 - 20.0;
             var rightSupportX = cabinetCenterX + config.ControlCabinetWidthMm / 2.0 + 20.0;
-            var connections = AddProfile(model, "Besturingskast zijprofiel 40x40", config.TopBeamProfile, sideHeight, 2, "Verticaal doorlopend tot en kop tegen onderzijde werkbladdrager", config.SawingMode, true, "Binnenzijde kastvak");
+            var connections = AddProfile(model, "Besturingskast zijprofiel 40x40", config.TopBeamProfile, sideHeight, 2, "Verticaal doorlopend tot en kop tegen onderzijde werkbladdrager", config.SawingMode, true);
             AddPlacement(model, "Besturingskast zijprofiel links", AssemblyComponentKind.Profile, 40, 40, sideHeight, leftSupportX, bottom + sideHeight / 2.0, frontProfileCenterZ, "profile", "box");
             AddPlacement(model, "Besturingskast zijprofiel rechts", AssemblyComponentKind.Profile, 40, 40, sideHeight, rightSupportX, bottom + sideHeight / 2.0, frontProfileCenterZ, "profile", "box");
             connections += AddProfile(model, "Besturingskast topprofiel 40x40", config.TopBeamProfile, config.ControlCabinetWidthMm, 1, "Horizontale insluiting bovenzijde kast", config.SawingMode, true);
@@ -511,13 +527,13 @@ namespace SWWerkplaats.Configurator.Engine
             });
             model.Hardware.Add(new HardwareItem
             {
-                Name = "M6 T-moer groef 10 voor HPL voorfront",
-                ArticleNumber = "T-NUT-G10-M6",
+                Name = "TechXXL M6 T-moer groef 8 met brug en verende kogel voor HPL voorfront",
+                ArticleNumber = "TIN 100242 / S208NSMS6",
                 Quantity = totalHoleCount,
                 Unit = "st",
-                Note = "Eén per Ø6,5 mm HPL-gat; serie 10 / groef 10",
-                ModelStatus = "Functioneel gemodelleerd",
-                BomStatus = "Definitief leverancierartikel nog koppelen"
+                Note = "Eén per Ø6,5 mm HPL-gat; serie 8 / groef 8; 23×13,2×7,3 mm",
+                ModelStatus = "Exact leveranciersartikel",
+                BomStatus = "Inkoop vrijgegeven"
             });
             model.DesignNotes.Add("Onderste voorfront is met HPL 6 mm gesloten. Rond de besturingskast loopt het plaatwerk door als bovenstrook, buitenstijl en onderstrook; het tegenoverliggende vak is volledig beplaat. Gaten Ø6,5 mm, groef-offset 20 mm, eerste/laatste bevestiging circa 50 mm en tussenafstand maximaal 250 mm.");
         }
@@ -554,6 +570,10 @@ namespace SWWerkplaats.Configurator.Engine
                 AddPlacement(model, prefix + " onder", AssemblyComponentKind.Profile, doorWidth, 40, 40, centerX, openingBottom + perimeterGap + 20, frontZ, "profile", "box");
                 AddPlacement(model, prefix + " links", AssemblyComponentKind.Profile, 40, 40, doorHeight - 80, centerX - doorWidth / 2 + 20, openingBottom + openingHeight / 2, frontZ, "profile", "box");
                 AddPlacement(model, prefix + " rechts", AssemblyComponentKind.Profile, 40, 40, doorHeight - 80, centerX + doorWidth / 2 - 20, openingBottom + openingHeight / 2, frontZ, "profile", "box");
+                AddStandardConnection(model, prefix + " frame", prefix + " boven", ProfileEnd.A, prefix + " links");
+                AddStandardConnection(model, prefix + " frame", prefix + " boven", ProfileEnd.B, prefix + " rechts");
+                AddStandardConnection(model, prefix + " frame", prefix + " onder", ProfileEnd.A, prefix + " links");
+                AddStandardConnection(model, prefix + " frame", prefix + " onder", ProfileEnd.B, prefix + " rechts");
                 foreach (var hx in new[] { centerX - doorWidth / 2 + 20, centerX + doorWidth / 2 - 20 })
                 {
                     AddBlackConnectorHole(model, prefix + " onder", hx, openingBottom + perimeterGap - 0.5, frontZ, "y");
@@ -561,22 +581,52 @@ namespace SWWerkplaats.Configurator.Engine
                 }
                 var infill = SheetDrawing.CreateSheet(prefix + " acryl 6mm", config.UpperPanelMaterial, doorWidth - 80, doorHeight - 80);
                 AddPanel(model, infill, centerX, openingBottom + openingHeight / 2, frontZ - 3, AssemblyOrientation.SheetVerticalX, true);
-                var hingeX = doorCount == 2 ? (d == 0 ? centerX - doorWidth / 2 : centerX + doorWidth / 2) : (config.FrontSingleDoorHingeSide == "right" ? doorWidth / 2 : -doorWidth / 2);
-                AddDoorHinge(model, hingeX, openingBottom + openingHeight * .28, frontZ, prefix + " onder");
-                AddDoorHinge(model, hingeX, openingBottom + openingHeight * .72, frontZ, prefix + " boven");
+                var hingeAtRight = doorCount == 2 ? d == 1 : string.Equals(config.FrontSingleDoorHingeSide, "right", StringComparison.OrdinalIgnoreCase);
+                var hingeX = hingeAtRight ? centerX + doorWidth / 2 : centerX - doorWidth / 2;
+                var doorHingeProfile = prefix + (hingeAtRight ? " rechts" : " links");
+                var frameHingeProfile = hingeAtRight ? "Staander rechtsvoor" : "Staander linksvoor";
+                AddDoorHinge(model, hingeX, openingBottom + openingHeight * .28, frontZ, prefix + " onder", doorHingeProfile, frameHingeProfile, prefix + " scharnieren");
+                AddDoorHinge(model, hingeX, openingBottom + openingHeight * .72, frontZ, prefix + " boven", doorHingeProfile, frameHingeProfile, prefix + " scharnieren");
             }
-            model.Hardware.Add(new HardwareItem { Name = "Scharnier 10 PA 40 uitrusting", ArticleNumber = "S210SCHPA40S", Quantity = doorCount * 2, Unit = "set", Note = "TechXXL TIN 102059; 62x50x8,5; PA-GF zwart; groef 10", ModelStatus = "Maatmodel opgenomen", BomStatus = "Inkoop" });
+            var hingeCount = doorCount * 2;
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL scharnier 8 40x40 licht", ArticleNumber = "S208SCHALL4040", Quantity = hingeCount, Unit = "st", Note = "TechXXL TIN 102930; groef 8, I-type; 103x44x10 mm; intern tussen basisframe en deur", ModelStatus = "Definitief leveranciersartikel", BomStatus = "Inkoop" });
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL verzonken inbusbout M6x12 verzinkt", ArticleNumber = "S208SKS612V", Quantity = hingeCount * 4, Unit = "st", Note = "TechXXL TIN 100691; vereist vier per scharnier", ModelStatus = "Definitief leveranciersartikel", BomStatus = "Inkoop" });
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL T-moer groef 8 met brug M6", ArticleNumber = "S208NSMS6", Quantity = hingeCount * 4, Unit = "st", Note = "TechXXL TIN 100242; vereist vier per scharnier", ModelStatus = "Definitief leveranciersartikel", BomStatus = "Inkoop" });
             return connections;
         }
 
-        private static void AddDoorHinge(WorkbenchModel model, double x, double y, double z, string suffix)
+        private static void AddDoorHinge(WorkbenchModel model, double x, double y, double z, string suffix,
+            string doorProfile, string frameProfile, string instructionGroup)
         {
             const double doorProfileDepthMm = 40.0;
-            const double hingeDepthMm = 8.5;
+            const double hingeDepthMm = 10.0;
             var doorProfileFrontSurfaceZ = z - doorProfileDepthMm / 2.0;
             var hingeCenterZ = doorProfileFrontSurfaceZ - hingeDepthMm / 2.0;
-            AddPlacement(model, "Scharnier 10 PA 40 " + suffix, AssemblyComponentKind.Purchased,
-                62, hingeDepthMm, 50, x, y, hingeCenterZ, "hardware-hinge", "pa40-hinge");
+            AddPlacement(model, "Scharnier 8 40x40 licht " + suffix, AssemblyComponentKind.Purchased,
+                44, hingeDepthMm, 103, x, y, hingeCenterZ, "hardware-hinge", "pa40-hinge", "techxxl_hinge_8_40x40_light");
+            var connection = new AssemblyConnection
+            {
+                ConnectionId = "machinebasis-hinge-" + StableId(suffix),
+                WorkflowId = "hinge-sliding-nut-v1",
+                JointType = AssemblyJointType.HingeSlidingNut,
+                InstructionGroup = instructionGroup,
+                TappedMemberId = StableId(doorProfile),
+                TappedPartName = doorProfile,
+                SlotMemberId = StableId(frameProfile),
+                SlotPartName = frameProfile,
+                SlotFace = "interne, naar elkaar gerichte T-sleuven van deurprofiel en staander",
+                SlotLane = "S1 op beide 40x40 groef-8-profielen",
+                ConnectorId = "techxxl_hinge_8_40x40_light",
+                FastenerStandardId = "techxxl-hinge-8-40x40-4xm6x12-4x-nut-m6",
+                FastenerId = "techxxl_countersunk_socket_m6x12_galvanized",
+                FastenerThreadMm = 6,
+                HexKeyAcrossFlatsMm = 4,
+                FastenerAxisOrder = "vier M6x12-bouten → verzonken scharniergaten → vier S208NSMS6-moeren in groef 8",
+                AccessFace = "intern tussen basisframe en deur; leveranciersmontage volgens TIN 102930",
+                Tool = "inbussleutel SW4",
+                Status = AssemblyDataStatus.Confirmed
+            };
+            model.AssemblyConnections.Add(connection);
         }
 
         private static void AddBlackConnectorHole(WorkbenchModel model, string name, double x, double y, double z, string axis)
@@ -598,12 +648,12 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static void AddStandardConnectorHardware(WorkbenchModel model, int connectionCount)
         {
-            model.Hardware.Add(new HardwareItem { Name = "Standaardverbinder serie 10 grid 40, M8", ArticleNumber = "STD-CONNECTOR-G10-40-M8", Quantity = connectionCount, Unit = "st", Note = "Voor iedere haakse profiel-profielverbinding; aangeleverde S208ZP/TIN 100342 is groef 8 en alleen vormreferentie", ModelStatus = "Functioneel gemodelleerd", BomStatus = "Exact serie-10 artikel koppelen" });
-            model.Hardware.Add(new HardwareItem { Name = "M8 verbindingsschroef standaardverbinder", ArticleNumber = "M8-CONNECTOR-BOLT", Quantity = connectionCount, Unit = "st", Note = "M8 draad in profielkop; Ø7 toegangsgat 20 mm vanaf diezelfde profielkop in de vrije toegangsgroef", ModelStatus = "Bewerking vastgelegd", BomStatus = "Exact artikel koppelen" });
-            model.DesignNotes.Add("Alle profiel-profielverbindingen: één serie-10 M8-standaardverbinder per aansluiting. M8-tap in de kernboring en Ø7,0 toegangsgat in hetzelfde verbindingsprofiel, 20 mm vanaf de profielkop. Bij horizontale profielen ligt het gat in de vrije groef aan de onderzijde; bij verticale verbindingsprofielen op een vrije binnenzijde. De gaten worden zwart weergegeven.");
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL standaardverbinder 8 40", ArticleNumber = "techxxl_standard_connector_8_40", Quantity = connectionCount, Unit = "st", Note = "TIN 100342; exacte plaat-, klauw-, hart- en insteekgeometrie uit componentmasterdata", ModelStatus = "ExactSupplierGeometry", BomStatus = "Inkoop vrijgegeven" });
+            model.Hardware.Add(new HardwareItem { Name = "TechXXL bolkop-inbusbout ISO 7380 M8x25", ArticleNumber = "techxxl_button_head_iso7380_m8x25", Quantity = connectionCount, Unit = "st", Note = "Artikel- en maatvoering uit componentmasterdata", ModelStatus = "Leveranciersartikel gekoppeld", BomStatus = "Exact artikel" });
+            model.DesignNotes.Add("Vaste groef-8 standaardverbinder-volgorde uit masterdata. D0-D3-vlak, S-baan, Ø7-toegangsgat en kop-A-positie worden per fysieke verbinding afgeleid; aanhaalmoment is geen vrijgave-eis.");
         }
 
-        private static int AddProfile(WorkbenchModel model, string name, Material material, double lengthMm, int quantity, string note, ProfileSawingMode sawingMode, bool standardConnections, string connectorAccessFace = "Onderzijde vrije groef")
+        private static int AddProfile(WorkbenchModel model, string name, Material material, double lengthMm, int quantity, string note, ProfileSawingMode sawingMode, bool standardConnections)
         {
             model.Profiles.Add(new ProfilePart { Name = name, Material = material, LengthMm = lengthMm, Quantity = quantity, OrientationNote = note, BomStatus = "Frame fase 1" });
             model.ProfileOperations.Add(new ProfileOperation
@@ -621,18 +671,100 @@ namespace SWWerkplaats.Configurator.Engine
                 ExecutionParty = sawingMode == ProfileSawingMode.InHouse ? "WERKPLAATS" : "INKOOP/LEVERANCIER",
                 Note = note
             });
-            if (standardConnections)
-            {
-                model.ProfileOperations.Add(new ProfileOperation { ProfileId = (material == null ? "profile" : material.Id) + "_" + name.Replace(' ', '_'), PartName = name, Quantity = quantity * 2, Material = material, ProfileLengthMm = lengthMm, Sequence = 2, Kind = ProfileOperationKind.Tap, Side = "Kop A/B", PositionFromEndAMm = 0, DiameterMm = 8, ThroughHole = false, WorkOrigin = "Kop A/B", MachineHint = "TAP_M8", ExecutionParty = "WERKPLAATS/LEVERANCIER", Note = "M8 draad in kernboring voor standaardverbinder" });
-                model.ProfileOperations.Add(new ProfileOperation { ProfileId = (material == null ? "profile" : material.Id) + "_" + name.Replace(' ', '_'), PartName = name, Quantity = quantity * 2, Material = material, ProfileLengthMm = lengthMm, Sequence = 3, Kind = ProfileOperationKind.Drill, Side = connectorAccessFace, PositionFromEndAMm = 20, DiameterMm = 7, ThroughHole = true, WorkOrigin = "Dichtstbijzijnde kop", MachineHint = "DRILL_D7", ExecutionParty = "WERKPLAATS/LEVERANCIER", Note = "Ø7 toegangsgat voor M8 standaardverbinder in hetzelfde profiel; horizontaal standaard aan de onderzijde" });
-                return quantity * 2;
-            }
-            return 0;
+            return standardConnections ? quantity * 2 : 0;
         }
 
-        private static void AddPlacement(WorkbenchModel model, string name, AssemblyComponentKind kind, double length, double width, double height, double x, double y, double z, string visualKind, string shape)
+        private static void AddPlacement(WorkbenchModel model, string name, AssemblyComponentKind kind, double length, double width, double height, double x, double y, double z, string visualKind, string shape, string componentId = null)
         {
-            model.AssemblyPlacements.Add(new AssemblyPlacement { Kind = kind, PartName = name, LengthMm = length, WidthMm = width, HeightMm = height, Xmm = x, Ymm = y, Zmm = z, Orientation = AssemblyOrientation.Default, VisualKind = visualKind, Shape = shape });
+            model.AssemblyPlacements.Add(new AssemblyPlacement { MemberId = StableId(name), Kind = kind, PartName = name, ComponentId = componentId, LengthMm = length, WidthMm = width, HeightMm = height, Xmm = x, Ymm = y, Zmm = z, Orientation = AssemblyOrientation.Default, VisualKind = visualKind, Shape = shape });
+        }
+
+        private static void AddStandardConnection(WorkbenchModel model, string group, string tappedPart, ProfileEnd tappedEnd, string slotPart)
+        {
+            const string connectorId = "techxxl_standard_connector_8_40";
+            const string fastenerId = "techxxl_button_head_iso7380_m8x25";
+            var hardwareCatalog = new AssemblyHardwareRenderContractService();
+            var defaultHexKeyAcrossFlatsMm = hardwareCatalog.RequiredFastenerSocketAcrossFlatsMm(fastenerId);
+            var supplierFastenerThreadMm = hardwareCatalog.RequiredFastenerThreadDiameterMm(fastenerId);
+            var supplierAccessHoleDiameterMm = hardwareCatalog.RequiredConnectorAccessHoleDiameterMm(connectorId);
+            var tappedMaterial = MaterialForPlacement(model, tappedPart);
+            var coreHoleCount = new ProfileSlotGeometryCatalog().FindRequired(tappedMaterial.Id).CalculatedCoreHoleCountPerEnd;
+            for (var coreHoleIndex = 1; coreHoleIndex <= coreHoleCount; coreHoleIndex++)
+            {
+            var connection = new AssemblyConnection
+            {
+                ConnectionId = "machinebasis-" + StableId(tappedPart) + "-" + tappedEnd.ToString().ToLowerInvariant() + "-k" + coreHoleIndex,
+                WorkflowId = "standard-connector-v1",
+                JointType = AssemblyJointType.StandardConnector,
+                InstructionGroup = group,
+                TappedMemberId = StableId(tappedPart),
+                TappedPartName = tappedPart,
+                TappedEnd = tappedEnd,
+                CoreHoleIndex = coreHoleIndex,
+                SlotMemberId = StableId(slotPart),
+                SlotPartName = slotPart,
+                SlotFace = "wordt uit fysieke profielplaatsing afgeleid",
+                SlotLane = "wordt uit fysieke profielplaatsing afgeleid",
+                ConnectorId = connectorId,
+                FastenerStandardId = "standard-profile-connector-groove8-m8",
+                FastenerId = fastenerId,
+                FastenerThreadMm = supplierFastenerThreadMm,
+                HexKeyAcrossFlatsMm = defaultHexKeyAcrossFlatsMm,
+                ToolPassageClearanceMm = 0,
+                DrillIncrementMm = 0,
+                AccessHoleDiameterMm = supplierAccessHoleDiameterMm,
+                AccessHoleCalculation = "Leveranciersveld Toegangsgatdiameter mm uit componentmasterdata",
+                AccessHoleOffsetMm = 0,
+                AccessHoleReference = "wordt uit fysieke profielplaatsing afgeleid",
+                AccessFace = "wordt uit fysieke profielplaatsing afgeleid",
+                FastenerAxisOrder = "inbuskop → standaardverbinder in T-sleuf → bout → getapte kop van kopprofiel",
+                Tool = "inbussleutel SW" + defaultHexKeyAcrossFlatsMm.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture),
+                Status = AssemblyDataStatus.Provisional
+            };
+            connection.OpenData.Add("Fysieke D0-D3/S1..Sn-koppeling en toegangsgatpositie worden na sticker- en traceertoekenning afgeleid.");
+            model.AssemblyConnections.Add(connection);
+            }
+        }
+
+        private static Material MaterialForPlacement(WorkbenchModel model, string partName)
+        {
+            var memberId = StableId(partName);
+            var placement = model.AssemblyPlacements.Single(item => string.Equals(item.MemberId, memberId, StringComparison.OrdinalIgnoreCase));
+            var dimensions = new[] { placement.LengthMm, placement.WidthMm, placement.HeightMm }.OrderBy(value => value).ToArray();
+            var crossA = dimensions[0];
+            var crossB = dimensions[1];
+            var length = dimensions[2];
+            var materials = model.Profiles
+                .Where(profile => profile.Material != null && Math.Abs(profile.LengthMm - length) < 0.01)
+                .Where(profile =>
+                {
+                    var materialCross = new[] { profile.Material.WidthMm, profile.Material.HeightMm }.OrderBy(value => value).ToArray();
+                    return Math.Abs(materialCross[0] - crossA) < 0.01 && Math.Abs(materialCross[1] - crossB) < 0.01;
+                })
+                .Select(profile => profile.Material)
+                .GroupBy(material => material.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToArray();
+            if (materials.Length != 1)
+                throw new InvalidOperationException("Standaardverbinding geblokkeerd: profielmateriaal voor " + partName
+                    + " is niet eenduidig uit de assemblygeometrie af te leiden.");
+            return materials[0];
+        }
+
+        private static string IntermediateSlotBase(string name)
+        {
+            if (name.StartsWith("Onderframe", StringComparison.Ordinal)) return "Onderligger";
+            if (name.StartsWith("Bladframe", StringComparison.Ordinal)) return "Bladligger";
+            return "Bovenligger";
+        }
+
+        private static string StableId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "member";
+            var chars = value.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '-').ToArray();
+            var id = new string(chars);
+            while (id.Contains("--")) id = id.Replace("--", "-");
+            return id.Trim('-');
         }
 
         private static double ProfileVerticalSize(Material profile)

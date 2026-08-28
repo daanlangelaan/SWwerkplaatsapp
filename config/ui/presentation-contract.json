@@ -1,0 +1,60 @@
+{
+  "contractVersion": 1,
+  "designTokens": {
+    "colors": {
+      "pageBackground": "#f5f5f7",
+      "panel": "#ffffff",
+      "text": "#1d1d1f",
+      "mutedText": "#6e6e73",
+      "divider": "#d8d8de",
+      "primaryAction": "#0071e3",
+      "success": "#1d7f5f",
+      "warning": "#bf5b00",
+      "danger": "#b42318",
+      "assemblyActive": "#4b9bd3",
+      "assemblyReceiver": "#c4cbd0",
+      "assemblyTarget": "#e9b46a",
+      "assemblyContext": "#e3e7e9",
+      "assemblyHardware": "#c96f5b",
+      "assemblyMotion": "#1677ff",
+      "assemblyToolAxis": "#26323d",
+      "plywoodFaceBase": "#d8bd94",
+      "plywoodFaceGrain": "#966b43",
+      "plywoodEdgeLight": "#d9b27b",
+      "plywoodEdgeDark": "#8b5a36"
+    }
+  },
+  "assembly": {
+    "animation": {
+      "hardwareIntroMs": 360,
+      "hardwareMoveMs": 820,
+      "betweenItemsMs": 170,
+      "endHoldMs": 620,
+      "returnMs": 560,
+      "flashFrequencyPerMs": 0.0062
+    },
+    "camera": {
+      "minimumZoom": 0.025,
+      "maximumZoom": 5.0,
+      "overviewWidthFill": 0.78,
+      "overviewHeightFill": 0.80,
+      "gatherWidthFill": 0.78,
+      "gatherHeightFill": 0.74,
+      "detailWidthFill": 0.90,
+      "detailHeightFill": 0.86,
+      "toolWidthFill": 0.78,
+      "toolHeightFill": 0.68
+    },
+    "markers": {
+      "profileStickerWidthPx": 129,
+      "profileStickerHeightPx": 41,
+      "profileStickerRadiusPx": 8
+    },
+    "materials": {
+      "plywoodLayerBands": 11,
+      "plywoodTextureWidthPx": 512,
+      "plywoodTextureHeightPx": 128,
+      "plywoodGrainLines": 18
+    }
+  }
+}

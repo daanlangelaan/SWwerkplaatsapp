@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "updatedAt": "2026-08-22",
+  "updatedAt": "2026-08-28",
   "storagePolicy": {
     "binaryLocation": "config/catalog-images/<supplier>/",
     "excelUsage": "preview-only",
@@ -8,30 +8,30 @@
   },
   "images": [
     {
-      "imageId": "IMG-TECHXXL-100831",
+      "imageId": "IMG-TECHXXL-100535",
       "supplierId": "SUP-TECHXXL",
-      "supplierArticleCode": "TIN 100831 / S1108040",
+      "supplierArticleCode": "TIN 100535 / S1088040L",
       "internalId": "alu_system_80x40",
-      "localPath": "config/catalog-images/techxxl/alu-system-80x40.jpg",
-      "sourcePageUrl": "https://www.techxxl.nl/part-100831.html",
-      "sourceImageUrl": "https://www.techxxl.nl/img-100831-b.jpg",
+      "localPath": "config/catalog-images/techxxl/alu-system-80x40-groove8.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100535.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-100535-b.jpg",
       "mediaType": "image/jpeg",
       "purpose": "supplier-product-preview",
       "status": "active",
-      "lastVerified": "2026-08-22"
+      "lastVerified": "2026-08-25"
     },
     {
-      "imageId": "IMG-TECHXXL-101114",
+      "imageId": "IMG-TECHXXL-100545",
       "supplierId": "SUP-TECHXXL",
-      "supplierArticleCode": "TIN 101114 / S1108080",
+      "supplierArticleCode": "TIN 100545 / S1088080L",
       "internalId": "alu_system_80x80",
-      "localPath": "config/catalog-images/techxxl/alu-system-80x80.jpg",
-      "sourcePageUrl": "https://www.techxxl.nl/part-101114.html",
-      "sourceImageUrl": "https://www.techxxl.nl/img-101114-b.jpg",
+      "localPath": "config/catalog-images/techxxl/alu-system-80x80-groove8.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100545.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-100545-b.jpg",
       "mediaType": "image/jpeg",
       "purpose": "supplier-product-preview",
       "status": "active",
-      "lastVerified": "2026-08-22"
+      "lastVerified": "2026-08-25"
     },
     {
       "imageId": "IMG-TECHXXL-100559",
@@ -177,6 +177,19 @@
       "lastVerified": "2026-08-22"
     },
     {
+      "imageId": "IMG-TECHXXL-100261",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100261 / S208NSSB4",
+      "internalId": "techxxl_t_nut_8_sliding_m4",
+      "localPath": "config/catalog-images/techxxl/t-nut-8-sliding-m4.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100261.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-100261-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-27"
+    },
+    {
       "imageId": "IMG-TECHXXL-101068",
       "supplierId": "SUP-TECHXXL",
       "supplierArticleCode": "TIN 101068 / S208BRD100",
@@ -227,6 +240,123 @@
       "purpose": "supplier-product-preview",
       "status": "active",
       "lastVerified": "2026-08-22"
+    },
+    {
+      "imageId": "IMG-TECHXXL-102499",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 102499 / S1084040LF14",
+      "internalId": "alu_system_40x40",
+      "localPath": "config/catalog-images/techxxl/alu-system-40x40-groove8-f14.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-102499.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-102499-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-TECHXXL-102930",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 102930 / S208SCHALL4040",
+      "internalId": "techxxl_hinge_8_40x40_light",
+      "localPath": "config/catalog-images/techxxl/hinge-8-40x40-light.jpg",
+      "sourcePageUrl": "https://www.techxxl.de/part-102930.html",
+      "sourceImageUrl": "https://www.techxxl.de/img-102930-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100242",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100242 / S208NSMS6",
+      "internalId": "techxxl_t_slot_nut_8_bridge_m6",
+      "localPath": "config/catalog-images/techxxl/t-nut-8-m6.jpg",
+      "sourcePageUrl": "https://www.techxxl.de/part-100242.html",
+      "sourceImageUrl": "https://www.techxxl.de/img-100242-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100691",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100691 / S208SKS612V",
+      "internalId": "techxxl_countersunk_socket_m6x12_galvanized",
+      "localPath": "config/catalog-images/techxxl/countersunk-socket-m6x12.jpg",
+      "sourcePageUrl": "https://www.techxxl.de/part-100691.html",
+      "sourceImageUrl": "https://www.techxxl.de/img-100691-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-TECHXXL-100391",
+      "supplierId": "SUP-TECHXXL",
+      "supplierArticleCode": "TIN 100391 / S200BW404020ZN",
+      "internalId": "techxxl_mounting_bracket_8_40x40x20_zn",
+      "localPath": "config/catalog-images/techxxl/mounting-bracket-40x40x20-zn.jpg",
+      "sourcePageUrl": "https://www.techxxl.nl/part-100391.html",
+      "sourceImageUrl": "https://www.techxxl.nl/img-100391-b.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-28"
+    },
+    {
+      "imageId": "IMG-KPS-HPL-WIT-GLAD",
+      "supplierId": "SUP-KUNSTSTOFPLATENSHOP",
+      "supplierArticleCode": "hpl-wit-glad-10-mm / hpl-wit-glad-6-mm",
+      "internalId": "hpl_10_lex;hpl_6_lex_stabilizer",
+      "localPath": "config/catalog-images/kunststofplatenshop/hpl-white-smooth-ral9016.png",
+      "sourcePageUrl": "https://kunststofplatenshop.nl/hpl-plaat/",
+      "sourceImageUrl": "https://production.gateway.kunststofplatenshop.nl/api/commerce/media/content/featured_images/NL/HPL-wit-glad-RAL-9016-1.png",
+      "mediaType": "image/png",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-KPS-PLEXIGLAS-GS-CLEAR",
+      "supplierId": "SUP-KUNSTSTOFPLATENSHOP",
+      "supplierArticleCode": "plexiglas-gs-helder-6-mm",
+      "internalId": "acrylic_clear_6",
+      "localPath": "config/catalog-images/kunststofplatenshop/plexiglas-gs-clear.png",
+      "sourcePageUrl": "https://kunststofplatenshop.nl/plexiglas-plaat/",
+      "sourceImageUrl": "https://production.gateway.kunststofplatenshop.nl/api/commerce/media/content/featured_images/NL/Plexiglas-helder-transparant.png",
+      "mediaType": "image/png",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-25"
+    },
+    {
+      "imageId": "IMG-DATASENSING-SG4-BASE-30",
+      "supplierId": "SUP-AUTOMATION24",
+      "supplierArticleCode": "957901120..957901180 / SG4-30-015..105-OO-E",
+      "internalId": "datasensing_sg4_base_30_family",
+      "localPath": "config/catalog-images/datasensing/sg4-base.jpg",
+      "sourcePageUrl": "https://www.datasensing.com/eng/safety-and-guidance/sg4-base-pd-1566.html",
+      "sourceImageUrl": "https://www.datasensing.com/Media/Imgart/S170.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-27"
+    },
+    {
+      "imageId": "IMG-GGOEDKOOP-0000000732",
+      "supplierId": "SUP-GOEDKOOP",
+      "supplierArticleCode": "0000000732",
+      "internalId": "multiplex_okoume_grandplex_40",
+      "localPath": "config/catalog-images/ggoedkoop/okoume-grandplex-40mm-2500x1220.jpg",
+      "sourcePageUrl": "https://ggoedkoop.nl/okoume-40x2500x1220-mm-grandplex-10-jaar-garantie-0000000732",
+      "sourceImageUrl": "https://ggoedkoop.nl/img/_FgeRPe7IhNI27M5Q1ACZgDxE0UNwFgLobpRd5sWymE/resize%3Afit%3A700%3A700/aHR0cHM6Ly9nZ29lZGtvb3AubmwvbWVkaWEvY2F0YWxvZy9wcm9kdWN0LzAvMC8wMDAwMDAwNzMyXzFfMy5qcGc_d2lkdGg9NzAwJmhlaWdodD03MDA.jpg",
+      "mediaType": "image/jpeg",
+      "purpose": "supplier-product-preview",
+      "status": "active",
+      "lastVerified": "2026-08-28"
     }
   ]
 }

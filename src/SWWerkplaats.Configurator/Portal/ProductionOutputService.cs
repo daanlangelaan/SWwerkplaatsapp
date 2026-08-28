@@ -36,10 +36,34 @@ namespace SWWerkplaats.Configurator.Portal
             var contourTool = factory.DefaultTool();
             var model = new ProductModelBuildService().Build(factory, request);
             ApplyRevisionAfterMilledTestSheetOne(model, request);
+            ApplyCompletedSheetParts(model, request);
             var settings = AppSettings.Load();
-            var nestingPlan = BuildNestingPlan(model, machine, settings, request);
-            var nestingSvg = new NestingExporter().ExportSvg(nestingPlan, contourTool);
+            NestingPlan nestingPlan;
+            string nestingSvg;
+            try
+            {
+                nestingPlan = BuildNestingPlan(model, machine, settings, request);
+                nestingSvg = new NestingExporter().ExportSvg(nestingPlan, contourTool);
+            }
+            catch (InvalidOperationException exception)
+            {
+                var release = new ProductReleaseContractService().LoadRequired(request.Product);
+                if (release.ProductionReleased) throw;
+                nestingPlan = new NestingPlan();
+                model.DesignNotes.Add("Conceptpreview zonder nesting: " + exception.Message);
+                nestingSvg = ConceptNestingUnavailableSvg(exception.Message);
+            }
             return new ProductionOutput { Model = model, NestingPlan = nestingPlan, NestingSvg = nestingSvg };
+        }
+
+        private static string ConceptNestingUnavailableSvg(string reason)
+        {
+            var safe = System.Security.SecurityElement.Escape(reason ?? "Nesting niet beschikbaar.");
+            return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"220\" viewBox=\"0 0 900 220\">"
+                + "<rect x=\"1\" y=\"1\" width=\"898\" height=\"218\" rx=\"18\" fill=\"#f7f8fa\" stroke=\"#d0d5dd\"/>"
+                + "<text x=\"38\" y=\"78\" font-family=\"Arial,sans-serif\" font-size=\"24\" font-weight=\"700\" fill=\"#344054\">Conceptpreview — nesting niet vrijgegeven</text>"
+                + "<text x=\"38\" y=\"124\" font-family=\"Arial,sans-serif\" font-size=\"17\" fill=\"#667085\">" + safe + "</text>"
+                + "<text x=\"38\" y=\"166\" font-family=\"Arial,sans-serif\" font-size=\"15\" fill=\"#b42318\">Geen CAM-, inkoop- of productievrijgave.</text></svg>";
         }
 
         public WorkbenchCabinetAuditResult AuditWorkbenchCabinet(PortalQuoteRequest request)
@@ -50,6 +74,7 @@ namespace SWWerkplaats.Configurator.Portal
 
         public ProductionOutput GenerateOrderFiles(PortalQuoteRequest request, string outputFolder)
         {
+            EnsureProductRelease(request);
             var factory = new PortalConfigurationFactory();
             var contourTool = factory.DefaultTool();
             var holeTool = LibraryCatalog.DefaultEndMill(3, 2.0);
@@ -68,13 +93,14 @@ namespace SWWerkplaats.Configurator.Portal
             var model = new ProductModelBuildService().Build(factory, request);
             var settings = AppSettings.Load();
             WorkbenchCabinetAuditResult fullModelAudit = null;
-            if (request.RevisionAfterMilledTestSheetOne)
+            if (request.RevisionAfterMilledTestSheetOne || HasCompletedSheetParts(request))
             {
                 var fullModelPlan = BuildNestingPlan(model, machine, settings, null);
                 fullModelAudit = new WorkbenchCabinetAuditService().Audit(model, request, fullModelPlan);
                 if (!fullModelAudit.Passed)
                     throw new InvalidOperationException("Revisie-export afgebroken: het volledige meubelmodel bevat " + fullModelAudit.Errors.Count.ToString() + " fout(en): " + string.Join(" | ", fullModelAudit.Errors));
                 ApplyRevisionAfterMilledTestSheetOne(model, request);
+                ApplyCompletedSheetParts(model, request);
             }
             var nestingPlan = BuildNestingPlan(model, machine, settings, request);
 
@@ -97,18 +123,41 @@ namespace SWWerkplaats.Configurator.Portal
 
             if (HasProfiles(model))
             {
-                Write(output, outputFolder, "Afkortlijst.csv", csv.ExportCutList(model.Profiles));
-                Write(output, outputFolder, "Boorlijst.csv", csv.ExportDrillList(model.Profiles));
-                Write(output, outputFolder, "Profielbewerkingen.csv", csv.ExportProfileOperations(model.ProfileOperations));
-                new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder, "Profielbewerkingen.xlsx"), model.ProfileOperations);
+                var profileConfigurationService = new ProfileProjectConfigurationService();
+                var profileConfigurationJson = profileConfigurationService.Serialize(profileConfigurationService.Build(model));
+                Write(output, outputFolder, "Profielconfiguratie.json", profileConfigurationJson);
+
+                // Vanaf dit punt is de opnieuw ingelezen projectconfiguratie de enige bron voor profielproductie-uitvoer.
+                var profileConfiguration = profileConfigurationService.Deserialize(profileConfigurationJson);
+                var profileProductionSequence = profileConfigurationService.ToProductionSequence(profileConfiguration);
+                var profileParts = profileConfigurationService.ToProfileParts(profileConfiguration);
+                var profileOperations = profileConfigurationService.ToOperations(profileConfiguration);
+                var profilePlacements = profileConfigurationService.ToPlacements(profileConfiguration);
+                Write(output, outputFolder, "Profielconfiguratie-validatie.txt", ProfileConfigurationValidationText(profileConfiguration));
+                Write(output, outputFolder, "Afkortlijst.csv", csv.ExportCutList(profileParts));
+                Write(output, outputFolder, "Boorlijst.csv", csv.ExportDrillList(profileProductionSequence));
+                Write(output, outputFolder, "Profielbewerkingen.csv", csv.ExportProfileOperations(profileOperations));
+                Write(output, outputFolder, "Profielstickers.csv", csv.ExportProfileStickers(profilePlacements));
+                new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder, "Profielbewerkingen.xlsx"), profileOperations);
                 output.Files.Add("Profielbewerkingen.xlsx");
-                Write(output, outputFolder, "ProfielStationPlan.txt", csv.ExportProfileStationPlan(model));
+                new ProfileStickerXlsxExporter().Export(Path.Combine(outputFolder, "Profielstickers-freesvolgorde.xlsx"), profileProductionSequence);
+                output.Files.Add("Profielstickers-freesvolgorde.xlsx");
+                var profileTapWorklist = new ProfileTapWorklistService().Build(profileProductionSequence);
+                new ProfileTapWorklistXlsxExporter().Export(Path.Combine(outputFolder, "Profieltappen-werkplaatslijst.xlsx"), profileTapWorklist);
+                output.Files.Add("Profieltappen-werkplaatslijst.xlsx");
+                new ProfileMachiningVisualSvgExporter().Export(Path.Combine(outputFolder, "Profielbewerkingen-visuele-controle.svg"), profileProductionSequence, profileTapWorklist);
+                output.Files.Add("Profielbewerkingen-visuele-controle.svg");
+                Write(output, outputFolder, "ProfielCNC-Operatorprogramma.tap", new ProfileCncOperatorProgramGenerator(profileConfigurationService.ToCncMachineSettings(profileConfiguration)).Generate(profileConfiguration, profileProductionSequence));
+                Write(output, outputFolder, "ProfielStationPlan.txt", csv.ExportProfileStationPlan(profileConfiguration));
             }
 
-            if (HasSheets(model))
+            var sheetCamParts = model.Sheets
+                .Where(sheet => sheet.Material == null || !sheet.Material.IsAdditiveManufactured)
+                .ToList();
+            if (sheetCamParts.Count > 0)
             {
-                Write(output, outputFolder, "Plaatgaten.csv", csv.ExportSheetHoleList(model.Sheets));
-                Write(output, outputFolder, "CAM-operaties.csv", csv.ExportCamOperations(model.Sheets, holeTool, contourTool, vBitTool, enableWoodScrewCountersinks, enableOutsideEdgeChamfer, camJob.EdgeChamferWidthMm, camJob.ThroughCutOvertravelMm));
+                Write(output, outputFolder, "Plaatgaten.csv", csv.ExportSheetHoleList(sheetCamParts));
+                Write(output, outputFolder, "CAM-operaties.csv", csv.ExportCamOperations(sheetCamParts, holeTool, contourTool, vBitTool, enableWoodScrewCountersinks, enableOutsideEdgeChamfer, camJob.EdgeChamferWidthMm, camJob.ThroughCutOvertravelMm));
                 Write(output, outputFolder, "ToolLibrary.csv", csv.ExportToolLibrary(camJob));
             }
 
@@ -127,8 +176,8 @@ namespace SWWerkplaats.Configurator.Portal
             var price = pricing.Calculate(model, nestingPlan);
             Write(output, outputFolder, "BOM.csv", csv.ExportBom(model, price));
             Write(output, outputFolder, "PrijsOverzicht.csv", pricing.ExportCsv(price));
-            new PriceOverviewXlsxExporter().Export(Path.Combine(outputFolder, "PrijsOverzicht.xlsx"), price);
-            output.Files.Add("PrijsOverzicht.xlsx");
+            new PriceOverviewXlsxExporter().Export(Path.Combine(outputFolder, "Projectcalculatie.xlsx"), model, price);
+            output.Files.Add("Projectcalculatie.xlsx");
             Write(output, outputFolder, "Offerte.txt", pricing.ExportOfferText(request, price, "CONCEPT"));
 
             if (string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase))
@@ -137,20 +186,24 @@ namespace SWWerkplaats.Configurator.Portal
                 foreach (var adapterFile in adapterFiles) output.Files.Add(adapterFile);
             }
 
-            if (HasSheets(model))
+            if (sheetCamParts.Count > 0)
             {
                 var gcode = new Mach3GCodeGenerator();
-                foreach (var sheet in model.Sheets)
+                foreach (var sheet in sheetCamParts)
                 {
                     Write(output, outputFolder, SafeFileName(sheet.Name) + ".tap", gcode.GenerateSheetPart(sheet, holeTool, contourTool, vBitTool, enableWoodScrewCountersinks, enableOutsideEdgeChamfer, camJob.EdgeChamferWidthMm, machine, sheet.Material.ThicknessMm, camJob.TabWidthMm, camJob.TabHeightMm, camJob.ThroughCutOvertravelMm, camJob.SafeTravelZMm, camJob.ContourOnionSkinMm, camJob.FinalContourFeedRateMmMin, camJob.FinalContourRampLengthMm));
                 }
 
-                var nestingFolderName = request.RevisionAfterMilledTestSheetOne ? "Revisie_vanaf_plaat_2" : (request.TestFitFirstSheet ? "Testplaat_nesting" : "Nesting");
+                var nestingFolderName = HasCompletedSheetParts(request)
+                    ? "Herstel_na_plaat_2"
+                    : (request.RevisionAfterMilledTestSheetOne ? "Revisie_vanaf_plaat_2" : (request.TestFitFirstSheet ? "Testplaat_nesting" : "Nesting"));
                 var nestingRelativePrefix = nestingFolderName + "\\";
                 var nestingFolder = Path.Combine(outputFolder, nestingFolderName);
                 Directory.CreateDirectory(nestingFolder);
                 var nestingExporter = new NestingExporter();
                 output.NestingSvg = nestingExporter.ExportSvg(nestingPlan, contourTool);
+                if (HasCompletedSheetParts(request))
+                    Write(output, nestingFolder, nestingRelativePrefix + "Herstel-overzicht.txt", RecoveryOverview(request, nestingPlan));
                 Write(output, nestingFolder, nestingRelativePrefix + "NestPlan.csv", nestingExporter.ExportCsv(nestingPlan));
                 Write(output, nestingFolder, nestingRelativePrefix + "NestVisualisatie.svg", output.NestingSvg);
 
@@ -190,10 +243,31 @@ namespace SWWerkplaats.Configurator.Portal
             var includeCam = request.ExportIncludeCam != false;
             var includeSolidWorks = request.ExportIncludeSolidWorks != false;
             var includeCustomerPackage = request.ExportIncludeCustomerPackage != false;
+            var includeInteractiveCustomerModel = request.ExportIncludeInteractiveCustomerModel != false;
+            var includeHighDefinitionCustomerModel = request.ExportIncludeHighDefinitionCustomerModel != false;
             var includeThreeDPrint = request.ExportIncludeThreeDPrint != false;
             var includeControls = request.ExportIncludeControls != false;
-            if (!includeCam && !includeSolidWorks && !includeCustomerPackage && !includeThreeDPrint && !includeControls)
+            var keepSolidWorksArchive = ShouldKeepSolidWorksArchive(request);
+            var includeAnyCustomerOutput = includeCustomerPackage || includeInteractiveCustomerModel || includeHighDefinitionCustomerModel;
+            var releaseContract = new ProductReleaseContractService().LoadRequired(request.Product);
+            var conceptExport = !releaseContract.ProductionReleased;
+            if (!includeCam && !includeSolidWorks && !includeCustomerPackage && !includeInteractiveCustomerModel
+                && !includeHighDefinitionCustomerModel && !includeThreeDPrint && !includeControls)
                 throw new InvalidOperationException("Selecteer minimaal één onderdeel voor de projectexport.");
+            EnsureProjectExportSelectionAllowed(request, releaseContract,
+                includeCam, includeSolidWorks, includeCustomerPackage, includeInteractiveCustomerModel,
+                includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls);
+
+            if (string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase))
+            {
+                var preflightAudit = AuditWorkbenchCabinet(request);
+                if (!preflightAudit.Passed)
+                    throw new InvalidOperationException("Projectexport afgebroken vóór SolidWorks: de geometrie-, frees- of BOM-controle bevat "
+                        + preflightAudit.Errors.Count.ToString(CultureInfo.InvariantCulture) + " fout(en): "
+                        + string.Join(" | ", preflightAudit.Errors));
+            }
 
             var factory = new PortalConfigurationFactory();
             var model = new ProductModelBuildService().Build(factory, request);
@@ -216,12 +290,13 @@ namespace SWWerkplaats.Configurator.Portal
             string assemblyPath = null;
             string customerModelPath = null;
             string customerHtmlPath = null;
+            string interactiveCustomerHtmlPath = null;
             string customerPowerPointPath = null;
             string customerAppendixPdfPath = null;
             string customerDrawingPath = null;
             string customerDrawingPdfPath = null;
 
-            if (includeSolidWorks || includeCustomerPackage)
+            if (includeSolidWorks || includeCustomerPackage || includeHighDefinitionCustomerModel)
             {
                 if (includeControls) macroPath = new SolidWorksMacroExporter().ExportMacro(model, outputFolder);
                 assemblyPath = RunSolidWorksWorker(request, outputFolder);
@@ -232,6 +307,12 @@ namespace SWWerkplaats.Configurator.Portal
                 customerHtmlPath = SolidWorksCustomerPresentation.CustomerHtmlPath(assemblyPath);
                 var drawingOutput = SolidWorksCustomerDrawingExporter.OutputFor(assemblyPath);
                 customerDrawingPath = drawingOutput.DrawingPath;
+
+                if (includeHighDefinitionCustomerModel)
+                {
+                    if (!File.Exists(customerModelPath)) throw new InvalidOperationException("SolidWorks heeft geen GLB-klantmodel aangemaakt: " + customerModelPath);
+                    if (!File.Exists(customerHtmlPath)) throw new InvalidOperationException("SolidWorks heeft geen HTML-klantmodel aangemaakt: " + customerHtmlPath);
+                }
 
                 if (includeCustomerPackage)
                 {
@@ -249,7 +330,7 @@ namespace SWWerkplaats.Configurator.Portal
             // Bouw CAM, controles, 3D-printdelen en statische aanzichten pas op
             // nadat de SolidWorks-basis gereed is. Een mislukte COM-export kan zo
             // nooit een half projectpakket achterlaten dat volledig lijkt.
-            if (includeCam || includeCustomerPackage || includeThreeDPrint || includeControls)
+            if (!conceptExport && (includeCam || includeCustomerPackage || includeInteractiveCustomerModel || includeThreeDPrint || includeControls))
             {
                 var production = GenerateOrderFiles(request, camFolder);
                 model = production.Model;
@@ -269,16 +350,59 @@ namespace SWWerkplaats.Configurator.Portal
             else
                 DeleteDirectoryIfPresent(Path.Combine(camFolder, "3D-print"));
 
+            if (includeAnyCustomerOutput)
+                Directory.CreateDirectory(customerFolder);
+
+            var sourceViewsFolder = Path.Combine(camFolder, "Aanzichten");
+            var customerViewsFolder = Path.Combine(customerFolder, "Aanzichten");
             if (includeCustomerPackage)
             {
-                Directory.CreateDirectory(customerFolder);
-                MoveDirectoryIfPresent(Path.Combine(camFolder, "Aanzichten"), Path.Combine(customerFolder, "Aanzichten"));
+                MoveDirectoryIfPresent(sourceViewsFolder, customerViewsFolder);
+                if (includeInteractiveCustomerModel)
+                    interactiveCustomerHtmlPath = MoveInteractiveCustomerModel(
+                        Path.Combine(customerViewsFolder, "3D-model.html"),
+                        customerFolder);
+                else
+                {
+                    DeleteFileIfPresent(Path.Combine(customerViewsFolder, "3D-model.html"));
+                    DeleteFileIfPresent(Path.Combine(customerViewsFolder, "3D-model.json"));
+                }
+            }
+            else if (includeInteractiveCustomerModel)
+            {
+                interactiveCustomerHtmlPath = MoveInteractiveCustomerModel(Path.Combine(sourceViewsFolder, "3D-model.html"), customerFolder);
+                MoveFileToFolder(Path.Combine(sourceViewsFolder, "3D-model.json"), customerViewsFolder);
+                DeleteDirectoryIfPresent(sourceViewsFolder);
+            }
+            else
+                DeleteDirectoryIfPresent(sourceViewsFolder);
+
+            if (includeCustomerPackage || includeHighDefinitionCustomerModel)
+            {
                 var sourceMaterialFolder = Path.Combine(cadFolder, "Materialen");
                 var customerMaterialFolder = Path.Combine(customerFolder, "Render-assets", "Materialen");
                 MoveDirectoryIfPresent(sourceMaterialFolder, customerMaterialFolder);
                 RelinkRenderMaterialAssets(customerMaterialFolder, sourceMaterialFolder, customerMaterialFolder);
-                customerModelPath = MoveFileToFolder(customerModelPath, customerFolder);
-                customerHtmlPath = MoveFileToFolder(customerHtmlPath, customerFolder);
+            }
+            else
+                DeleteDirectoryIfPresent(Path.Combine(cadFolder, "Materialen"));
+
+            if (includeHighDefinitionCustomerModel)
+            {
+                var highDefinitionFolder = Path.Combine(customerFolder, "3D-high-definition");
+                customerModelPath = MoveFileToFolder(customerModelPath, highDefinitionFolder);
+                customerHtmlPath = MoveFileToFolder(customerHtmlPath, highDefinitionFolder);
+            }
+            else
+            {
+                DeleteFileIfPresent(customerModelPath);
+                DeleteFileIfPresent(customerHtmlPath);
+                customerModelPath = null;
+                customerHtmlPath = null;
+            }
+
+            if (includeCustomerPackage)
+            {
                 customerPowerPointPath = MoveFileToFolder(customerPowerPointPath, customerFolder);
                 customerAppendixPdfPath = MoveFileToFolder(customerAppendixPdfPath, customerFolder);
                 var drawingOutput = SolidWorksCustomerDrawingExporter.OutputFor(assemblyPath);
@@ -289,25 +413,25 @@ namespace SWWerkplaats.Configurator.Portal
             }
             else
             {
-                DeleteDirectoryIfPresent(Path.Combine(camFolder, "Aanzichten"));
-                DeleteDirectoryIfPresent(Path.Combine(cadFolder, "Materialen"));
-                DeleteFileIfPresent(customerModelPath);
-                DeleteFileIfPresent(customerHtmlPath);
                 if (!string.IsNullOrWhiteSpace(assemblyPath))
                 {
                     var drawingOutput = SolidWorksCustomerDrawingExporter.OutputFor(assemblyPath);
                     DeleteFileIfPresent(drawingOutput.PdfPath);
                     DeleteFileIfPresent(drawingOutput.GeneralSheetImagePath);
                 }
-                customerModelPath = null;
-                customerHtmlPath = null;
             }
+
+            if (!conceptExport)
+                EnsureProfileConfigurationInProject(model, camFolder, projectDataFolder, validationFolder);
 
             if (includeControls)
             {
                 Directory.CreateDirectory(projectDataFolder);
                 WriteProjectConfiguration(request, Path.Combine(projectDataFolder, "Configuratie.json"));
-                MoveProjectDataFiles(camFolder, projectDataFolder, validationFolder, generationFolder);
+                if (conceptExport)
+                    WriteConceptReleaseFiles(outputFolder, projectDataFolder, releaseContract, model);
+                else
+                    MoveProjectDataFiles(camFolder, projectDataFolder, validationFolder, generationFolder);
                 macroPath = MoveFileToFolder(macroPath, generationFolder);
                 MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksMacroInstructies.txt"), generationFolder);
                 MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksWorkerInput.json"), generationFolder);
@@ -321,9 +445,13 @@ namespace SWWerkplaats.Configurator.Portal
                 DeleteFileIfPresent(Path.Combine(outputFolder, "SolidWorksWorkerResult.json"));
             }
 
+            if (conceptExport && !includeControls)
+                WriteConceptReleaseFiles(outputFolder, null, releaseContract, model);
+
             if (!includeCam) DeleteDirectoryIfPresent(camFolder);
-            if (!includeSolidWorks)
+            if (!keepSolidWorksArchive)
             {
+                CloseGeneratedSolidWorksDocuments(cadFolder);
                 DeleteDirectoryIfPresent(cadFolder);
                 assemblyPath = null;
                 customerDrawingPath = null;
@@ -333,7 +461,7 @@ namespace SWWerkplaats.Configurator.Portal
                 EnsureSolidWorksFolderContainsOnlyNativeDocuments(cadFolder);
             }
 
-            var partCount = includeSolidWorks && Directory.Exists(cadFolder)
+            var partCount = keepSolidWorksArchive && Directory.Exists(cadFolder)
                 ? Directory.GetFiles(cadFolder, "*.SLDPRT").Length
                 : 0;
 
@@ -343,24 +471,31 @@ namespace SWWerkplaats.Configurator.Portal
                 + "Gegenereerd: " + generatedAt.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine
                 + "Project: " + projectLabel + Environment.NewLine
                 + "Configuratie: " + model.ProjectName + Environment.NewLine
+                + "Vrijgavestatus: " + (conceptExport ? "CONCEPT - NIET PRODUCTIEVRIJGEGEVEN" : "productie-export") + Environment.NewLine
                 + Environment.NewLine
                 + "SELECTIE" + Environment.NewLine
                 + OutputOverviewLine("01_CAM", includeCam, camFolder)
-                + OutputOverviewLine("02_SolidWorks", includeSolidWorks, cadFolder)
-                + OutputOverviewLine("03_Klantvoorstel", includeCustomerPackage, customerFolder)
+                + OutputOverviewLine("02_SolidWorks", keepSolidWorksArchive, cadFolder)
+                + OutputOverviewLine("03_Klantvoorstel", includeAnyCustomerOutput, customerFolder)
+                + "  Klantpresentatie PDF/PPT en aanzichten: " + (includeCustomerPackage ? "geselecteerd" : "niet geselecteerd") + Environment.NewLine
+                + "  Interactief 3D-model met schuifregelaars: " + (includeInteractiveCustomerModel ? "geselecteerd" : "niet geselecteerd") + Environment.NewLine
+                + "  High-definition 3D-model + native SW-naslag: " + (includeHighDefinitionCustomerModel ? "geselecteerd" : "niet geselecteerd") + Environment.NewLine
                 + OutputOverviewLine("04_3D-print", includeThreeDPrint, printFolder)
                 + OutputOverviewLine("05_Projectdata", includeControls, projectDataFolder));
 
             var fileCount = Directory.GetFiles(outputFolder, "*", SearchOption.AllDirectories).Length;
-            return new PortalSolidWorksExportResponse
+            var response = new PortalSolidWorksExportResponse
             {
                 Ok = true,
-                Message = "Projectexport gegenereerd met: " + SelectedOutputNames(includeCam, includeSolidWorks, includeCustomerPackage, includeThreeDPrint, includeControls) + ".",
+                Message = (conceptExport ? "Conceptexport — niet productievrijgegeven — gegenereerd met: " : "Projectexport gegenereerd met: ")
+                    + SelectedOutputNames(includeCam, includeSolidWorks, includeCustomerPackage, includeInteractiveCustomerModel, includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls) + ".",
+                IsConceptExport = conceptExport,
                 OutputFolder = outputFolder,
                 AssemblyPath = assemblyPath,
                 ControlModelPath = assemblyPath,
                 CustomerModelPath = customerModelPath,
                 CustomerHtmlPath = customerHtmlPath,
+                InteractiveCustomerHtmlPath = interactiveCustomerHtmlPath,
                 CustomerPowerPointPath = customerPowerPointPath,
                 CustomerAppendixPdfPath = customerAppendixPdfPath,
                 CustomerDrawingPath = customerDrawingPath,
@@ -370,6 +505,102 @@ namespace SWWerkplaats.Configurator.Portal
                 FileCount = fileCount,
                 PlacementCount = model.AssemblyPlacements.Count
             };
+            response.OpenReleaseItems.AddRange(releaseContract.OpenReleaseItems ?? new string[0]);
+            return response;
+        }
+
+        private static void EnsureProjectExportSelectionAllowed(
+            PortalQuoteRequest request,
+            ProductReleaseContract release,
+            bool cam,
+            bool solidWorks,
+            bool customerPackage,
+            bool interactiveCustomerModel,
+            bool highDefinitionCustomerModel,
+            bool threeDPrint,
+            bool controls)
+        {
+            if (release == null || release.ProductionReleased) return;
+            var allowed = new HashSet<string>(release.ConceptExportOutputs ?? new string[0], StringComparer.OrdinalIgnoreCase);
+            var selected = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "CAM", cam },
+                { "SolidWorks", solidWorks },
+                { "Klantvoorstel", customerPackage },
+                { "Interactief 3D", interactiveCustomerModel },
+                { "High-definition 3D", highDefinitionCustomerModel },
+                { "3D-print", threeDPrint },
+                { "Projectdata", controls }
+            };
+            var unsupported = selected.Where(item => item.Value && !allowed.Contains(item.Key)).Select(item => item.Key).ToArray();
+            if (unsupported.Length > 0)
+                throw new InvalidOperationException("Product is nog niet productievrijgegeven. Alleen conceptexport toegestaan: "
+                    + string.Join(", ", allowed.ToArray()) + ". Niet toegestaan: " + string.Join(", ", unsupported) + ".");
+        }
+
+        private static void WriteConceptReleaseFiles(
+            string outputFolder,
+            string projectDataFolder,
+            ProductReleaseContract release,
+            WorkbenchModel model)
+        {
+            var lines = new List<string>
+            {
+                "CONCEPTEXPORT - NIET PRODUCTIEVRIJGEGEVEN",
+                "",
+                "Product: " + (model == null ? release.ProductId : model.ProjectName),
+                "Doel: parametrische machine-/robotbasis voor verdere handmatige samenbouw in SolidWorks.",
+                "Deze export is niet geschikt voor CAM, inkoopvrijgave, klantvrijgave of productie.",
+                "",
+                "WORKFLOW",
+                string.IsNullOrWhiteSpace(release.ConceptExportNote) ? "Conceptassembly; toepassingsdelen worden later toegevoegd." : release.ConceptExportNote,
+                "",
+                "OPENSTAANDE PUNTEN VOOR RELEASE"
+            };
+            var openItems = release.OpenReleaseItems ?? new string[0];
+            if (openItems.Length == 0) lines.Add("- Geen openstaande punten geregistreerd.");
+            else lines.AddRange(openItems.Select(item => "- " + item));
+            lines.Add("");
+            lines.Add("Vrijgave vereist een expliciete masterdatawijziging en geslaagde controles; deze tekst is geen vrijgave.");
+            var contents = string.Join(Environment.NewLine, lines.ToArray()) + Environment.NewLine;
+            File.WriteAllText(Path.Combine(outputFolder, "CONCEPT_NIET_PRODUCTIEVRIJGEGEVEN.txt"), contents);
+            if (!string.IsNullOrWhiteSpace(projectDataFolder))
+            {
+                Directory.CreateDirectory(projectDataFolder);
+                File.WriteAllText(Path.Combine(projectDataFolder, "Openstaande-vrijgavepunten.txt"), contents);
+            }
+            WriteStructuralCalculationReport(outputFolder, projectDataFolder, model == null ? null : model.StructuralCalculation);
+        }
+
+        private static void WriteStructuralCalculationReport(string outputFolder, string projectDataFolder, StructuralCalculationReport report)
+        {
+            if (report == null) return;
+            var lines = new List<string>
+            {
+                "CONSTRUCTIEBEREKENING - INDICATIEF, GEEN PRODUCTIEVRIJGAVE",
+                "",
+                "Product-ID: " + report.ProductId,
+                "Status: " + report.Status,
+                "Referentiebelasting totaal: " + F(report.ReferenceLoadN) + " N",
+                "Draagprofiel: " + report.ProfileMaterialId,
+                "Overspanning: " + F(report.SpanMm) + " mm",
+                "Parallelle liggers: " + report.ParallelBeamCount,
+                "Elasticiteitsmodulus: " + F(report.ElasticModulusNPerMm2) + " N/mm2",
+                "Sterke-as-traagheidsmoment: " + F(report.StrongAxisInertiaCm4) + " cm4",
+                "Berekende doorbuiging bij referentiebelasting: " + F(report.CalculatedDeflectionMm) + " mm",
+                "Formule: " + report.Formula,
+                "",
+                "OPEN DATA / NOG VAST TE LEGGEN"
+            };
+            lines.AddRange(report.OpenData.Select(item => "- " + item));
+            var text = string.Join(Environment.NewLine, lines.ToArray()) + Environment.NewLine;
+            File.WriteAllText(Path.Combine(outputFolder, "Constructieberekening.txt"), text);
+            var targetFolder = string.IsNullOrWhiteSpace(projectDataFolder) ? outputFolder : projectDataFolder;
+            Directory.CreateDirectory(targetFolder);
+            File.WriteAllText(Path.Combine(targetFolder, "Constructieberekening.json"),
+                new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(report));
+            if (!string.Equals(targetFolder, outputFolder, StringComparison.OrdinalIgnoreCase))
+                File.WriteAllText(Path.Combine(targetFolder, "Constructieberekening.txt"), text);
         }
 
         private static string ProjectFolderLabel(PortalQuoteRequest request, WorkbenchModel model)
@@ -424,7 +655,7 @@ namespace SWWerkplaats.Configurator.Portal
             {
                 "BOM.csv",
                 "PrijsOverzicht.csv",
-                "PrijsOverzicht.xlsx",
+                "Projectcalculatie.xlsx",
                 "Offerte.txt"
             };
         }
@@ -512,12 +743,27 @@ namespace SWWerkplaats.Configurator.Portal
             return label + ": " + (present ? path : "geselecteerd; geen bestanden voor deze configuratie") + Environment.NewLine;
         }
 
-        private static string SelectedOutputNames(bool cam, bool solidWorks, bool customerPackage, bool threeDPrint, bool controls)
+        internal static bool ShouldKeepSolidWorksArchive(PortalQuoteRequest request)
+        {
+            return request != null
+                && (request.ExportIncludeSolidWorks != false || request.ExportIncludeHighDefinitionCustomerModel != false);
+        }
+
+        private static string SelectedOutputNames(
+            bool cam,
+            bool solidWorks,
+            bool customerPackage,
+            bool interactiveCustomerModel,
+            bool highDefinitionCustomerModel,
+            bool threeDPrint,
+            bool controls)
         {
             var names = new List<string>();
             if (cam) names.Add("CAM");
             if (solidWorks) names.Add("SolidWorks");
             if (customerPackage) names.Add("klantvoorstel");
+            if (interactiveCustomerModel) names.Add("interactief 3D-klantmodel");
+            if (highDefinitionCustomerModel) names.Add("high-definition 3D-klantmodel met SW-bronbestanden");
             if (threeDPrint) names.Add("3D-print");
             if (controls) names.Add("projectdata");
             return string.Join(", ", names.ToArray());
@@ -531,6 +777,21 @@ namespace SWWerkplaats.Configurator.Portal
             if (File.Exists(targetPath)) File.Delete(targetPath);
             File.Move(sourcePath, targetPath);
             return targetPath;
+        }
+
+        private static string InteractiveCustomerModelPath(string customerFolder)
+        {
+            return Path.Combine(customerFolder, "3D-model.html");
+        }
+
+        private static string MoveInteractiveCustomerModel(string sourcePath, string customerFolder)
+        {
+            var movedPath = MoveFileToFolder(sourcePath, customerFolder);
+            var expectedPath = InteractiveCustomerModelPath(customerFolder);
+            if (!string.Equals(Path.GetFullPath(movedPath), Path.GetFullPath(expectedPath), StringComparison.OrdinalIgnoreCase)
+                || !File.Exists(expectedPath))
+                throw new InvalidOperationException("Het interactieve 3D-klantmodel kon niet in de hoofdmap Klantvoorstel worden geplaatst.");
+            return expectedPath;
         }
 
         private static string RunSolidWorksWorker(PortalQuoteRequest request, string outputFolder)
@@ -584,6 +845,32 @@ namespace SWWerkplaats.Configurator.Portal
                 }
                 if (!File.Exists(workerResult)) throw new InvalidOperationException("SolidWorks-helper stopte zonder resultaat (exitcode " + process.ExitCode + ").");
                 return serializer.Deserialize<SolidWorksWorkerResult>(File.ReadAllText(workerResult));
+            }
+        }
+
+        private static void CloseGeneratedSolidWorksDocuments(string cadFolder)
+        {
+            if (string.IsNullOrWhiteSpace(cadFolder) || !Directory.Exists(cadFolder)) return;
+            var executable = Process.GetCurrentProcess().MainModule.FileName;
+            var start = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = "--solidworks-close-documents-under " + Q(cadFolder),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+            };
+            using (var process = Process.Start(start))
+            {
+                if (process == null) throw new InvalidOperationException("SolidWorks-documentopruiming kon niet starten.");
+                if (!process.WaitForExit(60 * 1000))
+                {
+                    try { process.Kill(); } catch { }
+                    throw new TimeoutException("SolidWorks-documentopruiming duurde langer dan 60 seconden.");
+                }
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException("SolidWorks-documentopruiming stopte met exitcode " + process.ExitCode + ".");
             }
         }
 
@@ -658,12 +945,15 @@ namespace SWWerkplaats.Configurator.Portal
             if (priorityNames != null && priorityNames.Count > 0) ValidateTestFitFirstSheet(plan, priorityNames);
             if (request != null && request.RevisionAfterMilledTestSheetOne && plan.StockSheets.Count > 0)
             {
+                var recovery = HasCompletedSheetParts(request);
                 for (var index = 0; index < plan.StockSheets.Count; index++)
                 {
                     var stock = plan.StockSheets[index];
                     stock.SheetNumber = index + 2;
                     stock.Name = (stock.Material == null ? "Plaat" : stock.Material.Name.Replace(" ", "_"))
-                        + (index == 0 ? "_RevisiePlaat_02" : "_NestPlaat_" + (index + 2).ToString("00", CultureInfo.InvariantCulture));
+                        + (index == 0
+                            ? (recovery ? "_HerstelPlaat_02" : "_RevisiePlaat_02")
+                            : "_NestPlaat_" + (index + 2).ToString("00", CultureInfo.InvariantCulture));
                 }
             }
             return plan;
@@ -685,12 +975,16 @@ namespace SWWerkplaats.Configurator.Portal
                     "Bovenlade zijde links U3",
                     "Bovenlade zijde rechts U3"
                 };
+                var completed = CompletedSheetPartNames(request);
                 foreach (var name in revisionParts)
                 {
-                    if (model.Sheets.All(part => !string.Equals(part.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    if (model.Sheets.All(part => !string.Equals(part.Name, name, StringComparison.OrdinalIgnoreCase))
+                        && !completed.Contains(name))
                         throw new InvalidOperationException("Revisieplaat 2 kan niet worden gemaakt: vereist onderdeel ontbreekt: " + name + ".");
                 }
-                return revisionParts;
+                return revisionParts
+                    .Where(name => model.Sheets.Any(part => string.Equals(part.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
             }
 
             var required = new List<string>
@@ -742,7 +1036,105 @@ namespace SWWerkplaats.Configurator.Portal
                 "T-stijl deuraanslag X-600",
                 "T-stijl deuraanslag X600"
             };
-            model.Sheets.RemoveAll(part => milledPartNames.Contains(part.Name));
+            RemoveSheetParts(model, milledPartNames);
+        }
+
+        private static void EnsureProfileConfigurationInProject(
+            WorkbenchModel model,
+            string camFolder,
+            string projectDataFolder,
+            string validationFolder)
+        {
+            if (!HasProfiles(model)) return;
+            Directory.CreateDirectory(projectDataFolder);
+            Directory.CreateDirectory(validationFolder);
+            var sourceManifest = Path.Combine(camFolder, "Profielconfiguratie.json");
+            var targetManifest = Path.Combine(projectDataFolder, "Profielconfiguratie.json");
+            if (File.Exists(sourceManifest))
+            {
+                if (File.Exists(targetManifest)) File.Delete(targetManifest);
+                File.Move(sourceManifest, targetManifest);
+            }
+            else
+            {
+                var service = new ProfileProjectConfigurationService();
+                File.WriteAllText(targetManifest, service.Serialize(service.Build(model)));
+            }
+
+            var serviceForValidation = new ProfileProjectConfigurationService();
+            var configuration = serviceForValidation.Deserialize(File.ReadAllText(targetManifest));
+            var sourceValidation = Path.Combine(camFolder, "Profielconfiguratie-validatie.txt");
+            var targetValidation = Path.Combine(validationFolder, "Profielconfiguratie-validatie.txt");
+            if (File.Exists(sourceValidation))
+            {
+                if (File.Exists(targetValidation)) File.Delete(targetValidation);
+                File.Move(sourceValidation, targetValidation);
+            }
+            else
+            {
+                File.WriteAllText(targetValidation, ProfileConfigurationValidationText(configuration));
+            }
+        }
+
+        private static bool HasCompletedSheetParts(PortalQuoteRequest request)
+        {
+            return request != null
+                && request.CompletedSheetPartNames != null
+                && request.CompletedSheetPartNames.Any(name => !string.IsNullOrWhiteSpace(name));
+        }
+
+        private static HashSet<string> CompletedSheetPartNames(PortalQuoteRequest request)
+        {
+            return new HashSet<string>(
+                request == null || request.CompletedSheetPartNames == null
+                    ? Enumerable.Empty<string>()
+                    : request.CompletedSheetPartNames.Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void ApplyCompletedSheetParts(WorkbenchModel model, PortalQuoteRequest request)
+        {
+            var completed = CompletedSheetPartNames(request);
+            if (completed.Count == 0) return;
+
+            var missing = completed
+                .Where(name => model.Sheets.All(part => !string.Equals(part.Name, name, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (missing.Length > 0)
+                throw new InvalidOperationException("Herstel-export afgebroken: reeds bruikbaar gemarkeerde plaatdelen ontbreken in het resterende model: " + string.Join(", ", missing) + ".");
+
+            RemoveSheetParts(model, completed);
+        }
+
+        private static void RemoveSheetParts(WorkbenchModel model, HashSet<string> partNames)
+        {
+            if (model == null || partNames == null || partNames.Count == 0) return;
+            model.Sheets.RemoveAll(part => partNames.Contains(part.Name));
+            model.AssemblyPlacements.RemoveAll(placement =>
+                placement.Kind == AssemblyComponentKind.Sheet && partNames.Contains(placement.PartName));
+        }
+
+        private static string RecoveryOverview(PortalQuoteRequest request, NestingPlan plan)
+        {
+            var completed = CompletedSheetPartNames(request).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+            var remaining = plan.StockSheets
+                .SelectMany(stock => stock.Placements)
+                .Select(placement => placement.Part.Name)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var sb = new StringBuilder();
+            sb.AppendLine("HERSTEL-EXPORT PLAATDELEN");
+            sb.AppendLine();
+            sb.AppendLine("Reeds gefreesd en bruikbaar; niet opnieuw opgenomen:");
+            foreach (var name in completed) sb.AppendLine("- " + name);
+            sb.AppendLine();
+            sb.AppendLine("Opnieuw of nog te frezen (" + remaining.Length.ToString(CultureInfo.InvariantCulture) + " delen):");
+            foreach (var name in remaining) sb.AppendLine("- " + name);
+            sb.AppendLine();
+            sb.AppendLine("Aantal voorraadplaten: " + plan.StockSheets.Count.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("Controleer voor het frezen NestPlan.csv, NestVisualisatie.svg en iedere ToolpathPreview_*.svg.");
+            return sb.ToString();
         }
 
         private static void ValidateTestFitFirstSheet(NestingPlan plan, IList<string> requiredNames)
@@ -788,6 +1180,28 @@ namespace SWWerkplaats.Configurator.Portal
             return model != null && ((model.Profiles != null && model.Profiles.Count > 0) || (model.ProfileOperations != null && model.ProfileOperations.Count > 0));
         }
 
+        private static string ProfileConfigurationValidationText(ProfileProjectConfiguration configuration)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("PROFIELCONFIGURATIE VALIDATIE");
+            sb.AppendLine("Schema: " + configuration.SchemaVersion);
+            sb.AppendLine("Profielstukken: " + configuration.Profiles.Count.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("Verbindingen: " + configuration.Connections.Count.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("Productievrijgave: " + (configuration.ProductionReleased ? "JA" : "NEE"));
+            if (configuration.ProductionBlockers.Count == 0)
+            {
+                sb.AppendLine("Blokkades: geen");
+            }
+            else
+            {
+                sb.AppendLine("Blokkades:");
+                foreach (var blocker in configuration.ProductionBlockers) sb.AppendLine("- " + blocker);
+            }
+            sb.AppendLine();
+            sb.AppendLine("Alle profielproductie-uitvoer in deze map is afgeleid van Profielconfiguratie.json.");
+            return sb.ToString();
+        }
+
         private static double EffectiveNestSpacing(AppSettings settings)
         {
             var configured = settings == null ? 0 : settings.NestSpacingMm;
@@ -805,13 +1219,128 @@ namespace SWWerkplaats.Configurator.Portal
             Directory.CreateDirectory(folder);
 
             var parts = new PortalAssembly3DService().Build(model, request);
+            var motion = new PortalMotionContractService().Build(model, request, parts);
             var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
             Write(output, folder, "Aanzichten\\ProductPreview.svg", new PortalVisualizationService().BuildProductSvg(model, request));
             Write(output, folder, "Aanzichten\\Vooraanzicht.svg", BuildAssemblyViewSvg(parts, "front", "Vooraanzicht"));
             Write(output, folder, "Aanzichten\\Zijaanzicht.svg", BuildAssemblyViewSvg(parts, "side", "Zijaanzicht"));
             Write(output, folder, "Aanzichten\\Bovenaanzicht.svg", BuildAssemblyViewSvg(parts, "top", "Bovenaanzicht"));
+            if (motion != null)
+            {
+                if (motion.Vertical != null) Write(output, folder, "Aanzichten\\Bewegingsbereik-hoogte.svg", BuildMotionRangeSvg(parts, motion, true));
+                if (motion.Horizontal != null) Write(output, folder, "Aanzichten\\Bewegingsbereik-links-midden-rechts.svg", BuildMotionRangeSvg(parts, motion, false));
+            }
             Write(output, folder, "Aanzichten\\3D-model.json", serializer.Serialize(parts));
-            Write(output, folder, "Aanzichten\\3D-model.html", BuildAssembly3DHtml(parts, serializer));
+            Write(output, folder, "Aanzichten\\3D-model.html", BuildAssembly3DHtml(parts, motion, serializer));
+        }
+
+        internal static string BuildMotionRangeSvg(List<PortalAssemblyPart> parts, PortalMotionContract motion, bool heightRange)
+        {
+            var states = heightRange
+                ? new[]
+                {
+                    new MotionState("Laagste stand", motion.Horizontal == null ? 0 : motion.Horizontal.DefaultValue, motion.Vertical.Minimum),
+                    new MotionState("Hoogste stand", motion.Horizontal == null ? 0 : motion.Horizontal.DefaultValue, motion.Vertical.Maximum)
+                }
+                : new[]
+                {
+                    new MotionState("Volledig links", motion.Horizontal.Minimum, motion.Vertical.DefaultValue),
+                    new MotionState("Midden", motion.Horizontal.DefaultValue, motion.Vertical.DefaultValue),
+                    new MotionState("Volledig rechts", motion.Horizontal.Maximum, motion.Vertical.DefaultValue)
+                };
+            var canvasW = 1200.0;
+            var canvasH = heightRange ? 720.0 : 650.0;
+            var title = heightRange ? "Werkhoogte · laagste en hoogste stand" : "Bladverplaatsing · links, midden en rechts";
+            var panelGap = 28.0;
+            var panelW = (canvasW - 80 - panelGap * (states.Length - 1)) / states.Length;
+            var panelY = 100.0;
+            var panelH = canvasH - 190.0;
+            var allRects = states.SelectMany(state => parts.Select(part => ProjectWithMotion(part, "front", state.Horizontal, state.Vertical))).ToArray();
+            var minX = allRects.Min(rect => rect.X0);
+            var maxX = allRects.Max(rect => rect.X1);
+            var minY = allRects.Min(rect => rect.Y0);
+            var maxY = allRects.Max(rect => rect.Y1);
+            var scale = Math.Min((panelW - 36) / Math.Max(1, maxX - minX), (panelH - 48) / Math.Max(1, maxY - minY));
+            var worktop = heightRange ? null : parts.FirstOrDefault(part =>
+                part != null && (part.Name ?? string.Empty).IndexOf("kogelpotblad", StringComparison.OrdinalIgnoreCase) >= 0);
+            var fixedSupports = heightRange
+                ? new PortalAssemblyPart[0]
+                : parts.Where(part => part != null && (part.Name ?? string.Empty).StartsWith("Voetprofiel ", StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (!heightRange && (worktop == null || fixedSupports.Length == 0))
+                throw new InvalidOperationException("Werkblad of vaste pootprofielen ontbreken voor de maatvoering van de bladverplaatsing.");
+            var fixedSupportMin = heightRange ? 0 : fixedSupports.Min(part => part.Xmm - part.SizeXmm / 2.0);
+            var fixedSupportMax = heightRange ? 0 : fixedSupports.Max(part => part.Xmm + part.SizeXmm / 2.0);
+            var centeredOverhang = heightRange ? 0 : (motion.WorktopWidthMm - motion.FixedSupportOuterWidthMm) / 2.0;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1200\" height=\"" + F(canvasH) + "\" viewBox=\"0 0 1200 " + F(canvasH) + "\">");
+            sb.AppendLine("<defs><marker id=\"dimensionArrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto-start-reverse\"><path d=\"M8,1 L0,4 L8,7 Z\" fill=\"#008c95\"/></marker></defs>");
+            sb.AppendLine("<style>text{font-family:Arial,sans-serif}.title{font-size:28px;font-weight:700;fill:#172126}.state{font-size:18px;font-weight:700;fill:#344054}.value{font-size:16px;font-weight:700;fill:#007f87}.part{stroke:#475467;stroke-width:1}.profile{fill:#b9c1c8}.sheet{fill:#f2f1ec}.hardware{fill:#7c8791}.measure{stroke:#008c95;stroke-width:1.5}.dimension{stroke:#008c95;stroke-width:1.4;marker-start:url(#dimensionArrow);marker-end:url(#dimensionArrow)}.dimensionExtension{stroke:#008c95;stroke-width:1;stroke-dasharray:4 4}.dimensionValue{font-size:12px;font-weight:700;fill:#007f87;paint-order:stroke;stroke:#fff;stroke-width:4}.note{font-size:16px;fill:#475467}</style>");
+            sb.AppendLine("<rect width=\"100%\" height=\"100%\" fill=\"#fbfcfd\"/><text class=\"title\" x=\"40\" y=\"48\">" + Xml(title) + "</text>");
+            for (var index = 0; index < states.Length; index++)
+            {
+                var state = states[index];
+                var panelX = 40 + index * (panelW + panelGap);
+                var centerX = panelX + panelW / 2.0;
+                var baseY = panelY + panelH - 24;
+                sb.AppendLine("<rect x=\"" + F(panelX) + "\" y=\"" + F(panelY) + "\" width=\"" + F(panelW) + "\" height=\"" + F(panelH) + "\" rx=\"14\" fill=\"#fff\" stroke=\"#d8dee5\"/>");
+                sb.AppendLine("<text class=\"state\" text-anchor=\"middle\" x=\"" + F(centerX) + "\" y=\"" + F(panelY + 30) + "\">" + Xml(state.Label) + "</text>");
+                foreach (var part in parts.OrderBy(item => item.Zmm))
+                {
+                    var rect = ProjectWithMotion(part, "front", state.Horizontal, state.Vertical);
+                    var x = heightRange
+                        ? centerX + (rect.X0 - (minX + maxX) / 2.0) * scale
+                        : centerX - (rect.X1 - (minX + maxX) / 2.0) * scale;
+                    var y = baseY - (rect.Y1 - minY) * scale;
+                    var w = Math.Max(1, (rect.X1 - rect.X0) * scale);
+                    var h = Math.Max(1, (rect.Y1 - rect.Y0) * scale);
+                    var css = string.Equals(part.Kind, "profile", StringComparison.OrdinalIgnoreCase) ? "profile" : (string.Equals(part.Kind, "sheet", StringComparison.OrdinalIgnoreCase) ? "sheet" : "hardware");
+                    sb.AppendLine("<rect class=\"part " + css + "\" x=\"" + F(x) + "\" y=\"" + F(y) + "\" width=\"" + F(w) + "\" height=\"" + F(h) + "\"/>");
+                }
+                if (!heightRange)
+                {
+                    var worldCenter = (minX + maxX) / 2.0;
+                    var topRect = ProjectWithMotion(worktop, "front", state.Horizontal, state.Vertical);
+                    var topLeftX = centerX - (topRect.X1 - worldCenter) * scale;
+                    var topRightX = centerX - (topRect.X0 - worldCenter) * scale;
+                    var supportLeftX = centerX - (fixedSupportMax - worldCenter) * scale;
+                    var supportRightX = centerX - (fixedSupportMin - worldCenter) * scale;
+                    var topBottomY = baseY - (topRect.Y0 - minY) * scale;
+                    var dimensionY = baseY + 10;
+                    var leftOverhang = centeredOverhang - state.Horizontal;
+                    var rightOverhang = centeredOverhang + state.Horizontal;
+                    sb.AppendLine("<line class=\"dimensionExtension\" x1=\"" + F(topLeftX) + "\" y1=\"" + F(topBottomY) + "\" x2=\"" + F(topLeftX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<line class=\"dimensionExtension\" x1=\"" + F(topRightX) + "\" y1=\"" + F(topBottomY) + "\" x2=\"" + F(topRightX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<line class=\"dimensionExtension\" x1=\"" + F(supportLeftX) + "\" y1=\"" + F(baseY - 16) + "\" x2=\"" + F(supportLeftX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<line class=\"dimensionExtension\" x1=\"" + F(supportRightX) + "\" y1=\"" + F(baseY - 16) + "\" x2=\"" + F(supportRightX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<line class=\"dimension\" x1=\"" + F(topLeftX) + "\" y1=\"" + F(dimensionY) + "\" x2=\"" + F(supportLeftX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<line class=\"dimension\" x1=\"" + F(supportRightX) + "\" y1=\"" + F(dimensionY) + "\" x2=\"" + F(topRightX) + "\" y2=\"" + F(dimensionY) + "\"/>");
+                    sb.AppendLine("<text class=\"dimensionValue\" text-anchor=\"middle\" x=\"" + F((topLeftX + supportLeftX) / 2.0) + "\" y=\"" + F(dimensionY - 5) + "\">" + Xml(F(leftOverhang) + " mm") + "</text>");
+                    sb.AppendLine("<text class=\"dimensionValue\" text-anchor=\"middle\" x=\"" + F((supportRightX + topRightX) / 2.0) + "\" y=\"" + F(dimensionY - 5) + "\">" + Xml(F(rightOverhang) + " mm") + "</text>");
+                }
+                var value = heightRange
+                    ? motion.Vertical.ReferenceValueMm + state.Vertical
+                    : state.Horizontal;
+                var valueText = heightRange
+                    ? F(value) + " mm werkhoogte"
+                    : (Math.Abs(value) < 0.001 ? "0 mm" : (value > 0 ? "+" : "−") + F(Math.Abs(value)) + " mm");
+                sb.AppendLine("<text class=\"value\" text-anchor=\"middle\" x=\"" + F(centerX) + "\" y=\"" + F(panelY + panelH + 30) + "\">" + Xml(valueText) + "</text>");
+            }
+            var footer = heightRange
+                ? "Totale hoogteverstelling " + F(motion.Vertical.Maximum - motion.Vertical.Minimum) + " mm"
+                : "Totale slag " + F(motion.Horizontal.Maximum - motion.Horizontal.Minimum) + " mm · maximale oversteek t.o.v. buitenzijde poten " + F(motion.MaximumOverhangMm) + " mm";
+            sb.AppendLine("<text class=\"note\" x=\"40\" y=\"" + F(canvasH - 28) + "\">" + Xml(footer) + "</text></svg>");
+            return sb.ToString();
+        }
+
+        private static ProjectedRect ProjectWithMotion(PortalAssemblyPart part, string mode, double horizontal, double vertical)
+        {
+            var x = part.Xmm + horizontal * part.MotionTranslateXPerMm;
+            var y = part.Ymm + vertical * part.MotionTranslateYPerMm;
+            var sizeY = part.SizeYmm + vertical * part.MotionSizeYPerMm;
+            if (mode == "side") return new ProjectedRect(part.Zmm - part.SizeZmm / 2.0, y - sizeY / 2.0, part.Zmm + part.SizeZmm / 2.0, y + sizeY / 2.0);
+            if (mode == "top") return new ProjectedRect(x - part.SizeXmm / 2.0, part.Zmm - part.SizeZmm / 2.0, x + part.SizeXmm / 2.0, part.Zmm + part.SizeZmm / 2.0);
+            return new ProjectedRect(x - part.SizeXmm / 2.0, y - sizeY / 2.0, x + part.SizeXmm / 2.0, y + sizeY / 2.0);
         }
 
         private static string BuildAssemblyViewSvg(List<PortalAssemblyPart> parts, string mode, string title)
@@ -868,17 +1397,75 @@ namespace SWWerkplaats.Configurator.Portal
             return new ProjectedRect(part.Xmm - part.SizeXmm / 2.0, part.Ymm - part.SizeYmm / 2.0, part.Xmm + part.SizeXmm / 2.0, part.Ymm + part.SizeYmm / 2.0);
         }
 
-        private static string BuildAssembly3DHtml(List<PortalAssemblyPart> parts, JavaScriptSerializer serializer)
+        private static string BuildAssembly3DHtml(List<PortalAssemblyPart> parts, PortalMotionContract motion, JavaScriptSerializer serializer)
+        {
+            var json = SafeScriptJson(serializer.Serialize(parts));
+            var motionJson = SafeScriptJson(serializer.Serialize(motion));
+            var presentationJson = SafeScriptJson(serializer.Serialize(PortalPresentationContract.LoadRequired()));
+            var sb = new StringBuilder(PortalAssemblyViewerSource.RendererJavaScript.Length + PortalAssemblyViewerSource.ThreeModuleDataUrl.Length + json.Length + presentationJson.Length + 16000);
+            sb.AppendLine("<!doctype html><html lang=\"nl\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>3D klantmodel</title>");
+            sb.AppendLine("<style>:root{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#17202a;background:#eef1f4}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{display:grid;grid-template-rows:auto 1fr;background:radial-gradient(circle at 48% 16%,#fff 0,#f4f6f8 52%,#e7ebef 100%)}header{display:grid;gap:10px;padding:12px 18px;border-bottom:1px solid #d9dee4;background:rgba(255,255,255,.94);box-shadow:0 5px 22px rgba(20,24,33,.05);z-index:2}.top,.controls,.group{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.top{justify-content:space-between}.title{font-size:17px;font-weight:760}.hint{font-size:12px;color:#697581}.controls{justify-content:space-between}.group{padding:6px 9px;border-radius:11px;background:#f2f4f7}.group strong{font-size:11px;color:#667085}button{appearance:none;border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:8px;padding:7px 10px;font:650 12px 'Segoe UI',Arial;cursor:pointer}button.active{border-color:#1f4b73;background:#1f4b73;color:#fff}label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#344054}input[type=range]{width:clamp(120px,16vw,230px);padding:0;accent-color:#0071e3}.value{min-width:92px;color:#1f4b73;font-weight:760}main{position:relative;min-height:0}canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}canvas:active{cursor:grabbing}.status{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:7px 12px;border-radius:999px;background:rgba(31,41,51,.8);color:#fff;font-size:11px;pointer-events:none}.error{display:none;position:absolute;inset:24px;place-items:center;text-align:center;background:#fff;border:1px solid #ebc6c1;border-radius:14px;color:#8a1f17}.hasError .error{display:grid}.hasError canvas{visibility:hidden}@media(max-width:720px){header{padding:9px}.hint{display:none}.controls{align-items:stretch}.group{width:100%}label{width:100%}input[type=range]{flex:1}}</style></head><body>");
+            sb.AppendLine("<header><div class=\"top\"><div class=\"title\">3D klantmodel</div><div class=\"hint\">Dezelfde assembly en renderer als de configurator · sleep om te draaien · scrol om te zoomen</div></div><div class=\"controls\"><div class=\"group\"><strong>Aanzicht</strong><button type=\"button\" data-view=\"iso\" class=\"active\">Iso</button><button type=\"button\" data-view=\"front\">Voor</button><button type=\"button\" data-view=\"side\">Zij</button><button type=\"button\" data-view=\"underside\">Onderzijde</button></div><div class=\"group\"><strong>Kleur</strong><button type=\"button\" data-color=\"realistic\" class=\"active\">Echte kleuren</button><button type=\"button\" data-color=\"technical\">Constructiekleuren</button></div><div class=\"group\" id=\"horizontalControl\"><label>Bladpositie <input id=\"horizontal\" type=\"range\"><span id=\"horizontalValue\" class=\"value\"></span></label></div><div class=\"group\" id=\"verticalControl\"><label>Werkhoogte <input id=\"vertical\" type=\"range\"><span id=\"verticalValue\" class=\"value\"></span></label></div><div class=\"group\"><label>Zoom <input id=\"zoom\" type=\"range\" min=\"55\" max=\"190\" value=\"100\"></label></div></div></header>");
+            sb.AppendLine("<main id=\"stage\"><canvas id=\"assemblyCanvas\"></canvas><div class=\"status\">Interactief offline klantmodel</div><div class=\"error\"><div><strong>Het 3D-model kon niet worden geopend.</strong><br><br>Open dit bestand in een actuele versie van Edge of Chrome.</div></div></main>");
+            sb.AppendLine("<script type=\"module\">");
+            sb.Append("const baseParts=").Append(json).AppendLine(";");
+            sb.Append("const motion=").Append(motionJson).AppendLine(";");
+            sb.Append("const presentationData=").Append(presentationJson).AppendLine(";");
+            sb.Append("const THREE=await import('").Append(PortalAssemblyViewerSource.ThreeModuleDataUrl).AppendLine("');");
+            sb.AppendLine("let ghostLexTop=false,assemblyColorMode='realistic',viewMode='iso',rotationDeg=215,motionHorizontal=0,motionVertical=0,fitZoom=1,dragging=false,lastX=0;");
+            sb.AppendLine(PortalAssemblyViewerSource.RendererJavaScript);
+            sb.AppendLine("const stage=document.getElementById('stage'),canvas=document.getElementById('assemblyCanvas'),horizontal=document.getElementById('horizontal'),vertical=document.getElementById('vertical'),zoom=document.getElementById('zoom');");
+            sb.AppendLine("const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setClearColor(0xf5f7fa,1);renderer.outputColorSpace=THREE.SRGBColorSpace;const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10000),group=new THREE.Group();scene.add(group);scene.add(new THREE.HemisphereLight(0xffffff,0x7d8996,2.35));const keyLight=new THREE.DirectionalLight(0xffffff,3.1);keyLight.position.set(3,5,4);scene.add(keyLight);");
+            sb.AppendLine("function setupMotion(input,axis,host){if(!axis){host.style.display='none';return}input.min=axis.Minimum;input.max=axis.Maximum;input.step=axis.Step;input.value=axis.DefaultValue;input.addEventListener('input',()=>{updateMotionLabels();rebuild(false)})}setupMotion(horizontal,motion&&motion.Horizontal,document.getElementById('horizontalControl'));setupMotion(vertical,motion&&motion.Vertical,document.getElementById('verticalControl'));");
+            sb.AppendLine("function adjustedParts(){if(!motion)return baseParts;const h=Number(horizontal.value),v=Number(vertical.value);return baseParts.map(source=>{const p=JSON.parse(JSON.stringify(source)),dx=h*Number(p.MotionTranslateXPerMm||0),dy=v*Number(p.MotionTranslateYPerMm||0),dsy=v*Number(p.MotionSizeYPerMm||0);p.Xmm+=dx;p.Ymm+=dy;p.SizeYmm+=dsy;(p.Holes||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy});(p.Pockets||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy});(p.CoreHoles||[]).forEach(x=>{if(x.Xmm!=null)x.Xmm+=dx;if(x.Ymm!=null)x.Ymm+=dy});return p})}");
+            sb.AppendLine("function updateMotionLabels(){if(!motion)return;const h=Number(horizontal.value),v=Number(vertical.value),direction=h<0?'links':h>0?'rechts':'midden';document.getElementById('horizontalValue').textContent=direction+' · '+Math.abs(Math.round(h))+' '+motion.Horizontal.Unit;document.getElementById('verticalValue').textContent=Math.round(motion.Vertical.ReferenceValueMm+v)+' '+motion.Vertical.Unit}");
+            sb.AppendLine("function bounds(){group.updateMatrixWorld(true);const box=new THREE.Box3();group.children.filter(x=>!x.userData.excludeFromFit).forEach(x=>box.expandByObject(x));return box}");
+            sb.AppendLine("function fit(){const box=bounds();if(box.isEmpty())return;const size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),span=Math.max(size.x,size.y,size.z,1),w=Math.max(320,stage.clientWidth),h=Math.max(260,stage.clientHeight);camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;camera.up.set(0,1,0);if(viewMode==='front'||viewMode==='side')camera.position.set(center.x,center.y,center.z+span*2);else if(viewMode==='underside')camera.position.set(center.x+span*.82,center.y-span*.38,center.z+span);else camera.position.set(center.x+span*.88,center.y+span*.44,center.z+span);camera.lookAt(center);const diagonal=viewMode==='iso'||viewMode==='underside',wf=diagonal?.70:.84,hf=diagonal?.74:.82;fitZoom=Math.min(3,Math.max(.06,Math.min(w*wf/Math.max(size.x,size.z,1),h*hf/Math.max(size.y,1))));camera.zoom=fitZoom*Number(zoom.value)/100;camera.updateProjectionMatrix();render()}");
+            sb.AppendLine("function render(){group.rotation.y=rotationDeg*Math.PI/180;renderer.render(scene,camera)}function rebuild(refit){group.clear();buildThreeParts(THREE,group,adjustedParts());if(refit)fit();else render()}");
+            sb.AppendLine("function resize(){const w=Math.max(320,stage.clientWidth),h=Math.max(260,stage.clientHeight);renderer.setSize(w,h,false);fit()}addEventListener('resize',resize);zoom.addEventListener('input',()=>{camera.zoom=fitZoom*Number(zoom.value)/100;camera.updateProjectionMatrix();render()});");
+            sb.AppendLine("document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{viewMode=button.dataset.view;rotationDeg=viewMode==='side'?90:viewMode==='front'?180:215;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x===button));rebuild(true)}));document.querySelectorAll('[data-color]').forEach(button=>button.addEventListener('click',()=>{assemblyColorMode=button.dataset.color;document.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('active',x===button));rebuild(false)}));");
+            sb.AppendLine("canvas.addEventListener('pointerdown',event=>{dragging=true;lastX=event.clientX;canvas.setPointerCapture(event.pointerId)});canvas.addEventListener('pointermove',event=>{if(!dragging)return;rotationDeg=(rotationDeg+(event.clientX-lastX)*.45+360)%360;lastX=event.clientX;render()});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);canvas.addEventListener('wheel',event=>{event.preventDefault();zoom.value=Math.max(Number(zoom.min),Math.min(Number(zoom.max),Number(zoom.value)+(event.deltaY<0?8:-8)));zoom.dispatchEvent(new Event('input'))},{passive:false});");
+            sb.AppendLine("try{updateMotionLabels();resize();rebuild(true)}catch(error){console.error(error);stage.classList.add('hasError')}</script></body></html>");
+            return sb.ToString();
+        }
+
+        private static string SafeScriptJson(string value)
+        {
+            return (value ?? "null").Replace("</", "<\\/");
+        }
+
+        private static string BuildLegacyAssembly3DHtml(List<PortalAssemblyPart> parts, PortalMotionContract motion, JavaScriptSerializer serializer)
         {
             var json = serializer.Serialize(parts);
+            var motionJson = serializer.Serialize(motion);
             var sb = new StringBuilder();
             sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>3D model</title>");
-            sb.AppendLine("<style>body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#111827}.bar{display:flex;gap:18px;align-items:center;padding:14px 18px;background:#fff;border-bottom:1px solid #d0d5dd}canvas{display:block;width:100vw;height:calc(100vh - 58px)}label{font-size:13px;font-weight:700}input{width:220px}</style></head><body>");
-            sb.AppendLine("<div class=\"bar\"><strong>3D model</strong><label>Rotatie <input id=\"rot\" type=\"range\" min=\"-180\" max=\"180\" value=\"35\"></label><label>Zoom <input id=\"zoom\" type=\"range\" min=\"30\" max=\"160\" value=\"80\"></label></div><canvas id=\"c\"></canvas>");
+            sb.AppendLine("<style>body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#111827}.bar{display:flex;gap:18px;align-items:center;padding:12px 18px;background:#fff;border-bottom:1px solid #d0d5dd;flex-wrap:wrap}canvas{display:block;width:100vw;height:calc(100vh - 76px)}label{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}input{width:180px}.value{min-width:74px;color:#1f4b73}</style></head><body>");
+            sb.AppendLine("<div class=\"bar\"><strong>3D klantmodel</strong><label>Rotatie <input id=\"rot\" type=\"range\" min=\"-180\" max=\"180\" value=\"35\"></label><label>Zoom <input id=\"zoom\" type=\"range\" min=\"30\" max=\"160\" value=\"80\"></label><label id=\"horizontalControl\">Blad <input id=\"horizontal\" type=\"range\"><span id=\"horizontalValue\" class=\"value\"></span></label><label id=\"verticalControl\">Hoogte <input id=\"vertical\" type=\"range\"><span id=\"verticalValue\" class=\"value\"></span></label></div><canvas id=\"c\"></canvas>");
             sb.AppendLine("<script>const parts=");
             sb.AppendLine(json);
-            sb.AppendLine(";const c=document.getElementById('c'),ctx=c.getContext('2d'),rot=document.getElementById('rot'),zoom=document.getElementById('zoom');function resize(){c.width=innerWidth*devicePixelRatio;c.height=(innerHeight-58)*devicePixelRatio;draw()}addEventListener('resize',resize);rot.oninput=draw;zoom.oninput=draw;function p3(x,y,z,a,s){const ca=Math.cos(a),sa=Math.sin(a);const xr=x*ca-z*sa,zr=x*sa+z*ca;return [c.width/2+xr*s,(c.height*0.58)-y*s+zr*s*.35]}function box(part,a,s){const x=part.Xmm,y=part.Ymm,z=part.Zmm,sx=part.SizeXmm/2,sy=part.SizeYmm/2,sz=part.SizeZmm/2;const pts=[p3(x-sx,y-sy,z-sz,a,s),p3(x+sx,y-sy,z-sz,a,s),p3(x+sx,y+sy,z-sz,a,s),p3(x-sx,y+sy,z-sz,a,s),p3(x-sx,y-sy,z+sz,a,s),p3(x+sx,y-sy,z+sz,a,s),p3(x+sx,y+sy,z+sz,a,s),p3(x-sx,y+sy,z+sz,a,s)];const faces=[[0,1,2,3],[4,5,6,7],[0,4,7,3],[1,5,6,2],[3,2,6,7],[0,1,5,4]];ctx.strokeStyle='#64748b';ctx.lineWidth=1.2*devicePixelRatio;ctx.fillStyle=part.Kind==='profile'?'rgba(174,184,196,.72)':'rgba(228,205,170,.72)';for(const f of faces){ctx.beginPath();ctx.moveTo(...pts[f[0]]);for(let i=1;i<f.length;i++)ctx.lineTo(...pts[f[i]]);ctx.closePath();ctx.fill();ctx.stroke()}}function draw(){ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,c.width,c.height);const a=Number(rot.value)*Math.PI/180,s=Number(zoom.value)/100*devicePixelRatio*.55;[...parts].sort((a,b)=>(a.Zmm+a.Xmm)-(b.Zmm+b.Xmm)).forEach(part=>box(part,a,s));}resize();</script></body></html>");
+            sb.AppendLine(";const motion=" + motionJson + ",c=document.getElementById('c'),ctx=c.getContext('2d'),rot=document.getElementById('rot'),zoom=document.getElementById('zoom'),horizontal=document.getElementById('horizontal'),vertical=document.getElementById('vertical');function setup(input,axis,host){if(!axis){host.style.display='none';return}input.min=axis.Minimum;input.max=axis.Maximum;input.step=axis.Step;input.value=axis.DefaultValue;input.oninput=draw}setup(horizontal,motion&&motion.Horizontal,document.getElementById('horizontalControl'));setup(vertical,motion&&motion.Vertical,document.getElementById('verticalControl'));function resize(){c.width=innerWidth*devicePixelRatio;c.height=(innerHeight-76)*devicePixelRatio;draw()}addEventListener('resize',resize);rot.oninput=draw;zoom.oninput=draw;function p3(x,y,z,a,s){const ca=Math.cos(a),sa=Math.sin(a);const xr=x*ca-z*sa,zr=x*sa+z*ca;return [c.width/2+xr*s,(c.height*0.62)-y*s+zr*s*.35]}function adjusted(source){const p={...source},h=motion?Number(horizontal.value):0,v=motion?Number(vertical.value):0;p.Xmm+=h*(p.MotionTranslateXPerMm||0);p.Ymm+=v*(p.MotionTranslateYPerMm||0);p.SizeYmm+=v*(p.MotionSizeYPerMm||0);return p}function box(part,a,s){const x=part.Xmm,y=part.Ymm,z=part.Zmm,sx=part.SizeXmm/2,sy=part.SizeYmm/2,sz=part.SizeZmm/2;const pts=[p3(x-sx,y-sy,z-sz,a,s),p3(x+sx,y-sy,z-sz,a,s),p3(x+sx,y+sy,z-sz,a,s),p3(x-sx,y+sy,z-sz,a,s),p3(x-sx,y-sy,z+sz,a,s),p3(x+sx,y-sy,z+sz,a,s),p3(x+sx,y+sy,z+sz,a,s),p3(x-sx,y+sy,z+sz,a,s)];const faces=[[0,1,2,3],[4,5,6,7],[0,4,7,3],[1,5,6,2],[3,2,6,7],[0,1,5,4]];ctx.strokeStyle='#64748b';ctx.lineWidth=1.2*devicePixelRatio;ctx.fillStyle=part.Kind==='profile'?'rgba(174,184,196,.72)':'rgba(228,205,170,.72)';for(const f of faces){ctx.beginPath();ctx.moveTo(...pts[f[0]]);for(let i=1;i<f.length;i++)ctx.lineTo(...pts[f[i]]);ctx.closePath();ctx.fill();ctx.stroke()}}function draw(){ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,c.width,c.height);const a=Number(rot.value)*Math.PI/180,s=Number(zoom.value)/100*devicePixelRatio*.55,current=parts.map(adjusted);current.sort((a,b)=>(a.Zmm+a.Xmm)-(b.Zmm+b.Xmm)).forEach(part=>box(part,a,s));if(motion){const h=Number(horizontal.value),v=Number(vertical.value);document.getElementById('horizontalValue').textContent=(h<0?'links ':h>0?'rechts ':'midden ')+Math.abs(Math.round(h))+' mm';document.getElementById('verticalValue').textContent=Math.round(motion.Vertical.ReferenceValueMm+v)+' mm'}}resize();</script></body></html>");
             return sb.ToString();
+        }
+
+        private sealed class MotionState
+        {
+            public MotionState(string label, double horizontal, double vertical)
+            {
+                Label = label;
+                Horizontal = horizontal;
+                Vertical = vertical;
+            }
+
+            public string Label { get; private set; }
+            public double Horizontal { get; private set; }
+            public double Vertical { get; private set; }
+        }
+
+        private static void EnsureProductRelease(PortalQuoteRequest request)
+        {
+            if (request != null && string.Equals(request.Product, "lineaire_robotcel", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Productie-export geblokkeerd: FAIRINO FR5 en HIWIN HGR20/HGH20CA zijn vastgelegd, maar de lineaire robotcel mist nog de volledige HIWIN-bestelcode en raillengte-uitvoering, motor/reductor/tandheugelkeuze, volledige adapterplaatberekening en bevestigers, vloerverankering en veiligheids-PL/SIL-validatie.");
         }
 
         private static void Write(ProductionOutput output, string folder, string relativeName, string contents)

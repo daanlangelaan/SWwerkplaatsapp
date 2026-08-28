@@ -388,11 +388,25 @@ namespace SWWerkplaats.Configurator.UI
                 Directory.CreateDirectory(outputFolder.Text);
 
                 var csv = new CsvExporter();
-                File.WriteAllText(Path.Combine(outputFolder.Text, "Afkortlijst.csv"), csv.ExportCutList(model.Profiles));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "Boorlijst.csv"), csv.ExportDrillList(model.Profiles));
-                File.WriteAllText(Path.Combine(outputFolder.Text, "Profielbewerkingen.csv"), csv.ExportProfileOperations(model.ProfileOperations));
-                new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profielbewerkingen.xlsx"), model.ProfileOperations);
-                File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielStationPlan.txt"), csv.ExportProfileStationPlan(model));
+                var profileConfigurationService = new ProfileProjectConfigurationService();
+                var profileConfigurationJson = profileConfigurationService.Serialize(profileConfigurationService.Build(model));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "Profielconfiguratie.json"), profileConfigurationJson);
+                var profileConfiguration = profileConfigurationService.Deserialize(profileConfigurationJson);
+                var profileProductionSequence = profileConfigurationService.ToProductionSequence(profileConfiguration);
+                var profileParts = profileConfigurationService.ToProfileParts(profileConfiguration);
+                var profileOperations = profileConfigurationService.ToOperations(profileConfiguration);
+                var profilePlacements = profileConfigurationService.ToPlacements(profileConfiguration);
+                File.WriteAllText(Path.Combine(outputFolder.Text, "Afkortlijst.csv"), csv.ExportCutList(profileParts));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "Boorlijst.csv"), csv.ExportDrillList(profileProductionSequence));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "Profielbewerkingen.csv"), csv.ExportProfileOperations(profileOperations));
+                new ProfileOperationsXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profielbewerkingen.xlsx"), profileOperations);
+                File.WriteAllText(Path.Combine(outputFolder.Text, "Profielstickers.csv"), csv.ExportProfileStickers(profilePlacements));
+                new ProfileStickerXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profielstickers-freesvolgorde.xlsx"), profileProductionSequence);
+                var profileTapWorklist = new ProfileTapWorklistService().Build(profileProductionSequence);
+                new ProfileTapWorklistXlsxExporter().Export(Path.Combine(outputFolder.Text, "Profieltappen-werkplaatslijst.xlsx"), profileTapWorklist);
+                new ProfileMachiningVisualSvgExporter().Export(Path.Combine(outputFolder.Text, "Profielbewerkingen-visuele-controle.svg"), profileProductionSequence, profileTapWorklist);
+                File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielCNC-Operatorprogramma.tap"), new ProfileCncOperatorProgramGenerator(profileConfigurationService.ToCncMachineSettings(profileConfiguration)).Generate(profileConfiguration, profileProductionSequence));
+                File.WriteAllText(Path.Combine(outputFolder.Text, "ProfielStationPlan.txt"), csv.ExportProfileStationPlan(profileConfiguration));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "Plaatgaten.csv"), csv.ExportSheetHoleList(model.Sheets));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "CAM-operaties.csv"), csv.ExportCamOperations(model.Sheets, holeTool, contourTool, null, false, false, 0, camJob.ThroughCutOvertravelMm));
                 File.WriteAllText(Path.Combine(outputFolder.Text, "ToolLibrary.csv"), csv.ExportToolLibrary(camJob));
@@ -453,6 +467,10 @@ namespace SWWerkplaats.Configurator.UI
                     + "- Boorlijst.csv" + Environment.NewLine
                     + "- Profielbewerkingen.csv" + Environment.NewLine
                     + "- Profielbewerkingen.xlsx" + Environment.NewLine
+                    + "- Profieltappen-werkplaatslijst.xlsx" + Environment.NewLine
+                    + "- Profielbewerkingen-visuele-controle.svg" + Environment.NewLine
+                    + "- Profielstickers-freesvolgorde.xlsx" + Environment.NewLine
+                    + "- ProfielCNC-Operatorprogramma.tap" + Environment.NewLine
                     + "- ProfielStationPlan.txt" + Environment.NewLine
                     + "- Plaatgaten.csv" + Environment.NewLine
                     + "- CAM-operaties.csv" + Environment.NewLine

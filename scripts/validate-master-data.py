@@ -115,6 +115,7 @@ def main() -> int:
     tools = table(sheets["Gereedschappen"], "Gereedschap-ID")
     recipes = table(sheets["Verbindingsrecepten"], "Recept-ID")
     rules = table(sheets["Product-regels"], "Regel-ID")
+    input_contracts = table(sheets["Product-invoer"], "Invoercontract-ID")
     suppliers = table(sheets["Leveranciers"], "Leverancier-ID")
     preferences = table(sheets["Leveranciers"], "Voorkeur-ID")
     offers = table(sheets["Prijs & inkoop"], "Aanbieding-ID")
@@ -126,8 +127,259 @@ def main() -> int:
     recipe_ids = unique(recipes, "Recept-ID", errors)
     supplier_ids = unique(suppliers, "Leverancier-ID", errors)
     unique(rules, "Regel-ID", errors)
+    unique(input_contracts, "Invoercontract-ID", errors)
     unique(preferences, "Voorkeur-ID", errors)
     unique(offers, "Aanbieding-ID", errors)
+
+    material_appearance_contract = schema.get("materialAppearanceContract", {})
+    material_appearance_field = material_appearance_contract.get("field", "Renderweergave")
+    allowed_material_appearances = set(material_appearance_contract.get("allowedValues", []))
+    if not allowed_material_appearances:
+        errors.append("Schema mist toegestane materialAppearanceContract-waarden")
+    for material in materials:
+        appearance = material.get(material_appearance_field, "").strip()
+        if appearance not in allowed_material_appearances:
+            errors.append(
+                f"Materiaal {material['Materiaal-ID']} heeft ongeldige {material_appearance_field}: {appearance!r}"
+            )
+
+    material_customer_name_contract = schema.get("materialCustomerNameContract", {})
+    material_customer_name_field = material_customer_name_contract.get("field", "Klantnaam")
+    material_customer_name_maximum = int(material_customer_name_contract.get("maximumLength", 80))
+    for material in materials:
+        customer_name = material.get(material_customer_name_field, "").strip()
+        if len(customer_name) > material_customer_name_maximum:
+            errors.append(
+                f"Materiaal {material['Materiaal-ID']} heeft een te lange {material_customer_name_field}"
+            )
+
+    render_contract = schema.get("componentRenderContract", {})
+    render_status_field = render_contract.get("statusField", "Renderstatus")
+    open_render_field = render_contract.get("openDataField", "Open renderdata")
+    provisional_status = render_contract.get("provisionalStatus", "ProvisionalRenderEnvelope")
+    render_numeric_fields = render_contract.get("requiredPositiveNumericFields", [])
+    for component in components:
+        status = component.get(render_status_field, "").strip()
+        if not status:
+            continue
+        for field in render_numeric_fields:
+            try:
+                value = float(component.get(field, ""))
+                if value <= 0:
+                    raise ValueError
+            except ValueError:
+                errors.append(f"Component {component['Component-ID']} mist positieve renderwaarde {field}")
+        if status == provisional_status and not component.get(open_render_field, "").strip():
+            errors.append(f"Component {component['Component-ID']} mist open renderdata bij {provisional_status}")
+        try:
+            rotation_step = float(component.get("Draaistap °", ""))
+            if rotation_step > 0 and abs((360 / rotation_step) - round(360 / rotation_step)) > 1e-9:
+                errors.append(f"Component {component['Component-ID']} heeft een draaistap die 360 graden niet deelt")
+        except ValueError:
+            pass
+
+    hardware_contract = schema.get("assemblyHardwareRenderContract", {})
+    hardware_family_field = hardware_contract.get("familyField", "Hardwarefamilie")
+    hardware_source_field = hardware_contract.get("sourceField", "Hardwaregeometrie-bron")
+    hardware_open_field = hardware_contract.get("openDataField", "Open hardwaregeometrie")
+    connector_fields = hardware_contract.get("connectorFields", [])
+    bolt_fields = hardware_contract.get("boltFields", [])
+    for component in components:
+        family = component.get(hardware_family_field, "").strip()
+        if family not in {"StandardConnector", "ButtonHeadHexSocketBolt"}:
+            continue
+        if not component.get(hardware_source_field, "").strip():
+            errors.append(f"Component {component['Component-ID']} mist Hardwaregeometrie-bron")
+        required_fields = connector_fields if family == "StandardConnector" else bolt_fields
+        missing_fields = []
+        for field in required_fields:
+            try:
+                if float(component.get(field, "")) <= 0:
+                    raise ValueError
+            except ValueError:
+                missing_fields.append(field)
+        open_data = component.get(hardware_open_field, "").strip()
+        if missing_fields and not open_data:
+            errors.append(f"Component {component['Component-ID']} mist open hardwaregeometrie bij ontbrekende velden: {', '.join(missing_fields)}")
+        if not missing_fields and open_data:
+            errors.append(f"Component {component['Component-ID']} heeft complete hardwarevelden maar nog open hardwaregeometrie")
+
+    primitive_contract = schema.get("componentPrimitiveRenderContract", {})
+    primitive_geometry_field = primitive_contract.get("geometryField", "Renderprimitieven JSON")
+    primitive_status_field = primitive_contract.get("statusField", "Primitieve renderstatus")
+    primitive_source_field = primitive_contract.get("sourceField", "Primitieve renderbron")
+    primitive_open_field = primitive_contract.get("openDataField", "Open primitieve renderdata")
+    primitive_version = primitive_contract.get("contractVersion", 1)
+    primitive_shapes = set(primitive_contract.get("allowedShapes", ["box", "cylinder"]))
+    primitive_provisional = primitive_contract.get("provisionalStatus", "ProvisionalRenderEnvelope")
+    primitive_exact = primitive_contract.get("exactStatus", "ExactSupplierGeometry")
+    for component in components:
+        raw_geometry = component.get(primitive_geometry_field, "").strip()
+        if not raw_geometry:
+            continue
+        component_id = component.get("Component-ID", "")
+        status = component.get(primitive_status_field, "").strip()
+        source = component.get(primitive_source_field, "").strip()
+        open_data = component.get(primitive_open_field, "").strip()
+        if status not in {primitive_provisional, primitive_exact}:
+            errors.append(f"Component {component_id} heeft ongeldige primitieve renderstatus {status!r}")
+        if not source:
+            errors.append(f"Component {component_id} mist primitieve renderbron")
+        if status == primitive_provisional and not open_data:
+            errors.append(f"Component {component_id} mist Open primitieve renderdata bij {primitive_provisional}")
+        if status == primitive_exact and open_data:
+            errors.append(f"Component {component_id} is exact gemarkeerd maar heeft nog Open primitieve renderdata")
+        try:
+            geometry = json.loads(raw_geometry)
+        except json.JSONDecodeError as exc:
+            errors.append(f"Component {component_id} heeft ongeldige Renderprimitieven JSON: {exc.msg}")
+            continue
+        primitives = geometry.get("primitives", []) if isinstance(geometry, dict) else []
+        if not isinstance(geometry, dict) or geometry.get("version") != primitive_version or not isinstance(primitives, list) or not primitives:
+            errors.append(f"Component {component_id} mist primitief rendercontract versie {primitive_version} of primitives")
+            continue
+        primitive_ids: set[str] = set()
+        for primitive in primitives:
+            if not isinstance(primitive, dict):
+                errors.append(f"Component {component_id} bevat een ongeldige renderprimitive")
+                continue
+            primitive_id = str(primitive.get("id", "")).strip()
+            if not primitive_id or primitive_id in primitive_ids:
+                errors.append(f"Component {component_id} bevat een leeg of dubbel primitive-ID {primitive_id!r}")
+            primitive_ids.add(primitive_id)
+            if primitive.get("shape") not in primitive_shapes:
+                errors.append(f"Component {component_id}/{primitive_id} gebruikt ongeldige primitivevorm")
+            if not str(primitive.get("role", "")).strip():
+                errors.append(f"Component {component_id}/{primitive_id} mist presentatierol")
+            inherit_placement_dimensions = primitive.get("inheritPlacementDimensions", False)
+            if not isinstance(inherit_placement_dimensions, bool):
+                errors.append(f"Component {component_id} primitive {primitive_id} heeft ongeldige inheritPlacementDimensions")
+                inherit_placement_dimensions = False
+            for field in (() if inherit_placement_dimensions else ("sizeX", "sizeY", "sizeZ")):
+                try:
+                    if float(primitive.get(field, 0)) <= 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    errors.append(f"Component {component_id}/{primitive_id} mist positieve {field}")
+            holes = primitive.get("holes", [])
+            if not isinstance(holes, list):
+                errors.append(f"Component {component_id}/{primitive_id} heeft ongeldige gatenlijst")
+                continue
+            hole_ids: set[str] = set()
+            for hole in holes:
+                if not isinstance(hole, dict):
+                    errors.append(f"Component {component_id}/{primitive_id} bevat een ongeldig gat")
+                    continue
+                hole_id = str(hole.get("id", "")).strip()
+                if not hole_id or hole_id in hole_ids:
+                    errors.append(f"Component {component_id}/{primitive_id} bevat leeg of dubbel gat-ID {hole_id!r}")
+                hole_ids.add(hole_id)
+                if hole.get("plane") not in {"x", "y", "z"}:
+                    errors.append(f"Component {component_id}/{primitive_id}/{hole_id} heeft ongeldig gatvlak")
+                try:
+                    if float(hole.get("diameter", 0)) <= 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    errors.append(f"Component {component_id}/{primitive_id}/{hole_id} mist positieve gatdiameter")
+
+    receiving_thread_contract = schema.get("profileFastenerReceivingThreadContract", {})
+    thread_diameter_field = receiving_thread_contract.get("threadDiameterField", "Draad Ø mm")
+    usable_thread_zone_field = receiving_thread_contract.get("usableThreadZoneField", "Bruikbare draadzone mm")
+    thread_inlet_offset_field = receiving_thread_contract.get("threadInletOffsetField", "Draadinlaat vanaf profielvlak mm")
+    through_thread_field = receiving_thread_contract.get("throughThreadField", "Draadgat doorlopend")
+    thread_source_field = receiving_thread_contract.get("sourceField", "Draadzone-bron")
+    components_by_id = {component.get("Component-ID", ""): component for component in components}
+    for requirement in receiving_thread_contract.get("requiredComponents", []):
+        component_id = str(requirement.get("componentId", "")).strip()
+        component = components_by_id.get(component_id)
+        if component is None:
+            errors.append(f"Vereist profielmoercomponent ontbreekt: {component_id}")
+            continue
+        try:
+            diameter = float(component.get(thread_diameter_field, ""))
+            expected_diameter = float(requirement.get("threadDiameterMm", 0))
+            if diameter <= 0 or abs(diameter - expected_diameter) > 1e-9:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append(f"Component {component_id} mist de verwachte draadmaat in {thread_diameter_field}")
+        try:
+            if float(component.get(usable_thread_zone_field, "")) <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append(f"Component {component_id} mist positieve {usable_thread_zone_field}")
+        try:
+            if float(component.get(thread_inlet_offset_field, "")) < 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append(f"Component {component_id} mist geldige niet-negatieve {thread_inlet_offset_field}")
+        if component.get(through_thread_field, "").strip().lower() not in ("ja", "nee"):
+            errors.append(f"Component {component_id} mist Ja/Nee in {through_thread_field}")
+        if not component.get(thread_source_field, "").strip():
+            errors.append(f"Component {component_id} mist {thread_source_field}")
+
+    profile_geometry_ids = {
+        "alu_system_40x40": (4, 1),
+        "alu_system_80x40": (6, 2),
+        "alu_system_80x80": (8, 4),
+        "alu_system_160x40": (10, 4),
+    }
+    for material in materials:
+        material_id = material.get("Materiaal-ID", "")
+        series = material.get("Profielserie", "").strip()
+        if material_id in profile_geometry_ids and not series:
+            errors.append(f"Materiaal {material_id} mist vrijgegeven sleufasgeometrie")
+            continue
+        if not series:
+            continue
+        try:
+            width = float(material.get("Breedte mm", ""))
+            height = float(material.get("Hoogte mm", ""))
+            edge = float(material.get("Sleufas-randafstand mm", ""))
+            pitch = float(material.get("Sleufas-raster mm", ""))
+            expected = int(float(material.get("Sleufassen rondom", "")))
+            slot_width = float(material.get("Sleufmaat mm", ""))
+            expected_core = int(float(material.get("Kernboringen per kop", "")))
+        except ValueError:
+            errors.append(f"Materiaal {material_id} heeft onvolledige numerieke sleufasgeometrie")
+            continue
+        axes_width = 1 + int(((width - edge) - edge + 1e-9) // pitch)
+        axes_height = 1 + int(((height - edge) - edge + 1e-9) // pitch)
+        calculated = 2 * axes_width + 2 * axes_height
+        calculated_core = axes_width * axes_height
+        if edge != 20 or pitch != 40:
+            errors.append(f"Materiaal {material_id} wijkt af van 20 mm randafstand / 40 mm raster")
+        if slot_width not in (8, 10):
+            errors.append(f"Materiaal {material_id} heeft geen vrijgegeven sleufmaat 8 of 10")
+        if calculated != expected:
+            errors.append(f"Materiaal {material_id}: {calculated} sleufassen berekend, {expected} opgeslagen")
+        if calculated_core != expected_core:
+            errors.append(f"Materiaal {material_id}: {calculated_core} kernboringen per kop berekend, {expected_core} opgeslagen")
+        expected_tap = "M8" if slot_width == 8 else "M12"
+        if material.get("Kopse tapdraad", "").strip() != expected_tap:
+            errors.append(f"Materiaal {material_id} mist kopse tapdraad {expected_tap} voor groef {slot_width:g}")
+        profile_contract = schema.get("profileRenderContract", {})
+        profile_status = material.get(profile_contract.get("statusField", "Profielgeometrie-status"), "").strip()
+        profile_open = material.get(profile_contract.get("openDataField", "Open profielgeometrie"), "").strip()
+        profile_source = material.get(profile_contract.get("sourceField", "Profielgeometrie-bron"), "").strip()
+        missing_profile_fields = []
+        for field in profile_contract.get("positiveNumericFields", []):
+            try:
+                if float(material.get(field, "")) <= 0:
+                    raise ValueError
+            except ValueError:
+                missing_profile_fields.append(field)
+        exact_profile_status = profile_contract.get("exactStatus", "ExactSupplierGeometry")
+        provisional_profile_status = profile_contract.get("provisionalStatus", "ProvisionalRenderEnvelope")
+        if profile_status == exact_profile_status:
+            if missing_profile_fields or not profile_source or profile_open:
+                errors.append(f"Materiaal {material_id} is exact gemarkeerd maar profielgeometrie is niet compleet")
+        elif missing_profile_fields and (profile_status != provisional_profile_status or not profile_open):
+            errors.append(f"Materiaal {material_id} mist exacte profielgeometrie zonder actieve ProvisionalRenderEnvelope/OpenData")
+        frozen = profile_geometry_ids.get(material_id)
+        if frozen is not None and expected != frozen[0]:
+            errors.append(f"Materiaal {material_id}: contract verwacht {frozen[0]} sleufassen rondom")
+        if frozen is not None and expected_core != frozen[1]:
+            errors.append(f"Materiaal {material_id}: contract verwacht {frozen[1]} kernboringen per kop")
 
     for product in products:
         base = product.get("Basisproduct-ID", "").strip()
@@ -153,6 +405,31 @@ def main() -> int:
         recipe = rule.get("Recept-ID", "").strip()
         if recipe and recipe not in recipe_ids:
             errors.append(f"Regel {rule['Regel-ID']} heeft onbekend Recept-ID {recipe}")
+
+    input_signatures: set[tuple[str, str]] = set()
+    allowed_input_types = {"number", "select", "checkbox", "hidden"}
+    for contract in input_contracts:
+        contract_id = contract.get("Invoercontract-ID", "")
+        product_id = contract.get("Product-ID", "").strip()
+        input_id = contract.get("Invoer-ID", "").strip()
+        if product_id not in product_ids:
+            errors.append(f"Invoercontract {contract_id} heeft onbekend Product-ID")
+        signature = (product_id.lower(), input_id.lower())
+        if signature in input_signatures:
+            errors.append(f"Dubbel actief invoercontract voor {product_id}.{input_id}")
+        input_signatures.add(signature)
+        if not input_id or not contract.get("Request-veld", "").strip():
+            errors.append(f"Invoercontract {contract_id} mist Invoer-ID of Request-veld")
+        if contract.get("Invoertype", "").strip() not in allowed_input_types:
+            errors.append(f"Invoercontract {contract_id} heeft ongeldig Invoertype")
+        if contract.get("Actief", "").strip() != "Ja":
+            errors.append(f"Invoercontract {contract_id} is niet actief en hoort niet in de canonieke tabel")
+        if contract.get("Blokkeert configuratie", "").strip() == "Ja" and not contract.get("Toelichting", "").strip():
+            errors.append(f"Blokkerend invoercontract {contract_id} mist een concrete toelichting")
+        if contract.get("Invoertype", "").strip() == "select":
+            has_options = bool(contract.get("Opties", "").strip() or contract.get("Optiebron", "").strip())
+            if not has_options and contract.get("Blokkeert configuratie", "").strip() != "Ja":
+                errors.append(f"Selectiecontract {contract_id} mist opties of optiebron")
 
     active_ranks: set[tuple[str, ...]] = set()
     for preference in preferences:

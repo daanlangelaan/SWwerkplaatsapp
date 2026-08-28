@@ -125,7 +125,7 @@ namespace SWWerkplaats.Configurator.SolidWorks
                 ShowSlidingMovement = true,
                 ShowHeightAdjustment = true,
                 ShowBallTransferDetails = true,
-                HeightTravelMm = 400
+                HeightTravelMm = 0
             };
         }
 

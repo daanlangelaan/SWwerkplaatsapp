@@ -31,10 +31,12 @@ namespace SWWerkplaats.Configurator.Domain
         public int Quantity { get; set; }
         public string OrientationNote { get; set; }
         public string BomStatus { get; set; }
+        public List<string> PieceTraceIds { get; private set; }
         public List<DrillOperation> Drills { get; private set; }
 
         public ProfilePart()
         {
+            PieceTraceIds = new List<string>();
             Drills = new List<DrillOperation>();
         }
     }

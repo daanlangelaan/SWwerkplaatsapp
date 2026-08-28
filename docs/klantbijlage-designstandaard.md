@@ -13,6 +13,11 @@ De huidige Workstation-bijlage is de visuele referentiestandaard. Nieuwe product
 3. **Uitvoering** — materialen, werking en leveringsomvang in gewone taal; geen merken, leveranciers of typenummers.
 4. **Maatcontrole** — alle klantmaten op één pagina met groot boven-, voor- en zijaanzicht.
 
+Bij een horizontaal verstelbaar werkblad toont de bewegingspagina voor iedere
+eind- en middenstand beide overstekmaten: van de buitenzijde van de vaste poten
+tot het linker en rechter bladuiteinde. Deze waarden worden uit het getypeerde
+bewegingscontract afgeleid en niet in de presentatie vastgelegd.
+
 ## Ontwerpregels
 
 - Geef iedere pagina één communicatiedoel en één duidelijke hoofdtitel.

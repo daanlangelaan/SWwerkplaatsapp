@@ -17,8 +17,12 @@ namespace SWWerkplaats.Configurator.Domain
 
     public sealed class AssemblyPlacement
     {
+        public string MemberId { get; set; }
+        public string TraceId { get; set; }
+        public ProfileStickerPlacement Sticker { get; set; }
         public AssemblyComponentKind Kind { get; set; }
         public string PartName { get; set; }
+        public string ComponentId { get; set; }
         public double LengthMm { get; set; }
         public double WidthMm { get; set; }
         public double HeightMm { get; set; }

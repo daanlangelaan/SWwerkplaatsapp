@@ -1,6 +1,6 @@
 ---
 name: detect-profile-assembly
-description: Reconstruct and verify aluminium T-slot profile assemblies and their functional adapter plates from renders, photos, drawings, or assembly-coordinate data. Use when profile type, orientation, endpoints, joints, coplanar faces, plate interfaces, holes, slots, or simplified manufacturable plate contours must be established.
+description: Reconstruct and verify aluminium T-slot profile assemblies, their step-by-step assembly instructions, and functional adapter plates from renders, photos, drawings, or assembly-coordinate data. Use when profile type, orientation, endpoints, joints, movement, coplanar faces, plate interfaces, holes, slots, or simplified manufacturable plate contours must be established.
 ---
 
 # Detect profile assembly
@@ -16,6 +16,7 @@ Determine the construction per individual profile. A visually plausible overall 
 
 Read [references/measurement-method.md](references/measurement-method.md) for image reconstruction. For SWwerkplaats data or portal renders, also read [references/project-integration.md](references/project-integration.md).
 When custom connection, mounting, hinge, or adjustment plates must be inferred or simplified, also read [references/adapter-plate-inference.md](references/adapter-plate-inference.md).
+When generating or reviewing step-by-step profile assembly instructions, also read [references/assembly-instruction-validation.md](references/assembly-instruction-validation.md).
 
 ## Reference-to-candidate comparisons
 

@@ -248,7 +248,9 @@ namespace SWWerkplaats.Configurator.Engine
             if (config.IncludeBackPanel)
             {
                 var back = Sheet("Achterwand werkbankkast", backMaterial, Math.Max(100, config.WidthMm - 2.0 * t), clearBodyHeight);
-                AddSheet(model, back, 0, panelCenterY, config.DepthMm / 2.0 - backT / 2.0, AssemblyOrientation.SheetVerticalX);
+                var hasInternalDivider = AddBackPanelDividerConnections(back, boundaries, config, t);
+                var insertionOffset = hasInternalDivider ? config.BackPanelGrooveDepthMm : 0.0;
+                AddSheet(model, back, 0, panelCenterY, config.DepthMm / 2.0 - backT / 2.0 - insertionOffset, AssemblyOrientation.SheetVerticalX);
             }
 
             var plinthHeight = Math.Max(40, config.PlinthHeightMm - config.PlinthFloorClearanceMm);
@@ -331,6 +333,52 @@ namespace SWWerkplaats.Configurator.Engine
                 AddPlinthAdapterMountingMark(plinth, adapter, sheetX, clipCenterY - screwOffsetY, OperationFace.PositiveZ, "voor grens " + boundary.ToString(CultureInfo.InvariantCulture) + " onder");
                 AddPlinthAdapterMountingMark(plinth, adapter, sheetX + wingSign * adapter.UpperMountingHoleHorizontalOffsetMm, clipCenterY + screwOffsetY, OperationFace.PositiveZ, "voor grens " + boundary.ToString(CultureInfo.InvariantCulture) + " boven op montagevleugel");
             }
+        }
+
+        private static bool AddBackPanelDividerConnections(
+            SheetPart back,
+            IEnumerable<BoundaryPanel> boundaries,
+            WorkbenchCabinetConfig config,
+            double dividerThickness)
+        {
+            var internalDividers = new List<Tuple<SheetPart, double>>();
+            foreach (var boundary in boundaries.Where(item => item.UnitBoundary > 0 && item.UnitBoundary < config.UnitCount))
+            {
+                internalDividers.Add(Tuple.Create(boundary.Sheet, boundary.Xmm));
+                if (boundary.PositiveHingeSheet != null)
+                    internalDividers.Add(Tuple.Create(boundary.PositiveHingeSheet, boundary.Xmm + boundary.PositiveThicknessMm));
+            }
+            if (internalDividers.Count == 0) return false;
+
+            var grooveWidth = dividerThickness + config.BackPanelGrooveClearanceMm;
+            var diameter = config.SheetFastener == null || config.SheetFastener.ClearanceHoleDiameterMm <= 0
+                ? ProductDrawingStrategy.DefaultWoodScrewClearanceHoleDiameterMm
+                : config.SheetFastener.ClearanceHoleDiameterMm;
+            foreach (var divider in internalDividers)
+            {
+                var localX = divider.Item2 + back.LengthMm / 2.0;
+                SheetOperations.AddPocket(
+                    back,
+                    "Achterwandgroef " + divider.Item1.Name,
+                    localX - grooveWidth / 2.0,
+                    0,
+                    grooveWidth,
+                    back.WidthMm,
+                    config.BackPanelGrooveDepthMm,
+                    OperationFace.NegativeZ,
+                    "Doorlopende passingsgroef voor 3mm insteek van " + divider.Item1.Name);
+                SheetOperations.AddMountingLine(
+                    back,
+                    localX,
+                    config.BackPanelFastenerEndInsetMm,
+                    localX,
+                    back.WidthMm - config.BackPanelFastenerEndInsetMm,
+                    diameter,
+                    config.BackPanelFastenerMaxSpacingMm,
+                    "Montagegat achterwand naar " + divider.Item1.Name,
+                    SheetHoleSupportKind.PanelScrew);
+            }
+            return true;
         }
 
         private static void AddSidePlinthAdapterMountingMarks(
@@ -1360,6 +1408,18 @@ namespace SWWerkplaats.Configurator.Engine
             if (config.DoorToCarcassClearanceMm < 0) throw new ArgumentException("Afstand tussen draaideur en kopse kastkant mag niet negatief zijn.");
             if (config.DrawerMaterial == null) config.DrawerMaterial = config.CarcassMaterial;
             if (config.IncludeTopDrawer && config.DrawerRail == null) throw new ArgumentException("Rail-template voor de bovenlades ontbreekt.");
+            if (config.IncludeBackPanel)
+            {
+                var backThickness = MaterialThickness(config.BackMaterial ?? config.CarcassMaterial);
+                if (config.BackPanelGrooveDepthMm <= 0 || config.BackPanelGrooveDepthMm >= backThickness)
+                    throw new ArgumentException("Groefdiepte van de achterwand moet groter zijn dan 0 en kleiner dan de achterwanddikte.");
+                if (config.BackPanelGrooveClearanceMm < 0)
+                    throw new ArgumentException("Passingsruimte van de achterwandgroef mag niet negatief zijn.");
+                if (config.BackPanelFastenerEndInsetMm <= 0 || config.BackPanelFastenerEndInsetMm * 2.0 >= config.WorktopHeightMm)
+                    throw new ArgumentException("Eindinset van het achterwand-gatpatroon is ongeldig.");
+                if (config.BackPanelFastenerMaxSpacingMm <= 0)
+                    throw new ArgumentException("Maximale gatafstand van de achterwand moet groter zijn dan 0.");
+            }
             if (config.TopDrawerHeightMm <= 0) config.TopDrawerHeightMm = 160.0;
             if (config.DrawerSideClearanceMm <= 0 && config.DrawerRail != null) config.DrawerSideClearanceMm = Math.Max(13.0, config.DrawerRail.ThicknessMm);
             if (config.DrawerBackClearanceMm <= 0) config.DrawerBackClearanceMm = 30.0;

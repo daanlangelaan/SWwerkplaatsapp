@@ -20,11 +20,6 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
-      "SolidWorks.Interop.sldworks": {
-        "type": "Transitive",
-        "resolved": "32.1.0",
-        "contentHash": "lq3QmJwBbVE3K+pN5JFSGn1Bj7J1vUyTr4TtT23UAOtd8MXLElZROm9Iee2N8SP8AXsLTpXdBXGs7xYeJT53qw=="
-      },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "Transitive",
         "resolved": "2.1.12",
@@ -83,8 +78,7 @@
       "swwerkplaats.configurator": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Data.Sqlite": "[10.0.11, )",
-          "SolidWorks.Interop.sldworks": "[32.1.0, )"
+          "Microsoft.Data.Sqlite": "[10.0.11, )"
         }
       }
     },
