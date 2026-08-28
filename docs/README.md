@@ -10,6 +10,7 @@ Gebruik actuele contracten en beheerhandleidingen als beslisbron. Iteratieversla
 - `architecture/Data-eigenaarschap-en-UI-grens.md`: beslisboom en verplichte migratieroute voor masterdata, backendcontracten en presentatie.
 - `architecture/SolidWorks-worker.md`: subprocesscontract, time-out en retry voor SolidWorks.
 - `architecture/Operationele-opslag.md`: SQLite-contract, bestandsmirror, back-up en schaalgrens.
+- `architecture/Productwebsites-en-gedeelde-backend.md`: meerdere productwebsites, sitecontext, gebruikers en één interne waarheid.
 - `drawing-strategy/Tekencontract.md`: teken- en oriëntatiecontracten.
 - `drawing-strategy/Code-structuur.md`: huidige lagen van de tekenlogica.
 - `drawing-strategy/Profielvisualisatie-contract.md`: visuele laagopbouw en regressiecontract voor aluminium profielen en assemblage-instructies.
@@ -17,6 +18,7 @@ Gebruik actuele contracten en beheerhandleidingen als beslisbron. Iteratieversla
 - `deployment/Lokale-server.md`: lokale portalconfiguratie.
 - `klantbijlage-designstandaard.md`: klantdocumenten en presentatie-output.
 - `ui/README.md`: grens tussen productdata, renderdata en pure presentatie.
+- `ui/Portal-designsysteem.md`: productbrede UI/UX-, component-, rollen- en toegankelijkheidsregels voor de portalrevisie.
 - `ui/Assemblagevisualisatie.md`: semantische rollen en rendercontract van de assemblage-assistent.
 - `ui/3D-camera-en-animatie.md`: camera-, interactie- en animatiecontract zonder productlogica.
 

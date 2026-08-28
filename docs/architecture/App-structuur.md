@@ -44,6 +44,10 @@ Manufacturing / SolidWorks
 4. Catalogusdata komt stapsgewijs uit bestanden of database, niet uit hardcoded UI-keuzes.
 5. Orderflow is expliciet: klantconfiguratie, controle, vrijgave, freeswachtrij, productie, gereed.
 6. Lokale server blijft voorlopig simpel, maar alle API's moeten later achter een echte server of reverse proxy kunnen draaien.
+7. Publieke productwebsites zijn afzonderlijke presentatiekanalen boven dezelfde application- en backendlaag; zij krijgen geen eigen product-, prijs-, project- of productie-waarheid.
+
+De normatieve multi-sitegrens, sitecontext en gebruikersscheiding staan in
+`Productwebsites-en-gedeelde-backend.md`.
 
 De operationele beslisregels voor deze grens staan in
 `Data-eigenaarschap-en-UI-grens.md`. Die regels zijn normatief: bij twijfel over

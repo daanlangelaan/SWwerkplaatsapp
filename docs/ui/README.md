@@ -4,6 +4,8 @@ Status: **actueel contract**.
 
 Dit document specificeert de portal. De normatieve beslisboom, AI-werkwijze en
 acceptatiegrens staan in `../architecture/Data-eigenaarschap-en-UI-grens.md`.
+De productbrede visuele, interactieve en toegankelijkheidsregels staan in
+`Portal-designsysteem.md` en gelden voor iedere nieuwe of gereviseerde portalpagina.
 
 ## Doel
 

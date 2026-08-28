@@ -6,6 +6,11 @@ Doel: de klant moet binnen enkele seconden begrijpen wat wordt aangeboden, welk 
 
 De huidige Workstation-bijlage is de visuele referentiestandaard. Nieuwe producten gebruiken dezelfde rustige opbouw, typografie, marges, kleuren en paginavolgorde. Alleen de inhoud en relevante productvisualisaties veranderen.
 
+De portal behoort tot dezelfde visuele familie, maar neemt deze documentopbouw
+niet letterlijk over. De taakgerichte vertaling voor formulieren, tabellen,
+wachtrijen, rollen, technische controle en klantweergaven staat in
+`ui/Portal-designsysteem.md`.
+
 ## Vaste opbouw
 
 1. **Voorstel** — klant en project één keer noemen, één sterke 3/4-render, geen maatvoering.
