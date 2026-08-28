@@ -13,6 +13,12 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
+      "SolidWorks.Interop.sldworks": {
+        "type": "Direct",
+        "requested": "[32.1.0, )",
+        "resolved": "32.1.0",
+        "contentHash": "lq3QmJwBbVE3K+pN5JFSGn1Bj7J1vUyTr4TtT23UAOtd8MXLElZROm9Iee2N8SP8AXsLTpXdBXGs7xYeJT53qw=="
+      },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
         "resolved": "10.0.11",
