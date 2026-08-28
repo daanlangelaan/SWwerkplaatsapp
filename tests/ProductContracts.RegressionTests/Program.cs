@@ -688,6 +688,22 @@ internal static class Program
         var heightAdjustableWorkbench = catalog.Products.Single(product => product.Product == "hoogteverstelbare_werktafel");
         var simRig = catalog.Products.Single(product => product.Product == "sim_rig_4080");
         var shippingBox = catalog.Products.Single(product => product.Product == "shipping_box");
+        var cabinet = catalog.Products.Single(product => product.Product == "cabinet");
+        var workbenchCabinet = catalog.Products.Single(product => product.Product == "werkbankkast");
+        var robotCell = catalog.Products.Single(product => product.Product == "robotcel");
+        Require(cabinet.CardImageStatus == "Beschikbaar"
+            && cabinet.CardImageUrl == "/images/product-cabinet.png"
+            && cabinet.CardImageAlt.Contains("cabinet")
+            && machineBase.CardImageUrl == "/images/product-machinebase.png"
+            && lexWorkbench.CardImageUrl == "/images/product-lex-workbench.jpg"
+            && workbenchCabinet.CardImageUrl == "/images/product-workbench-cabinet.jpg"
+            && robotCell.CardImageStatus == "Ontbreekt"
+            && string.IsNullOrWhiteSpace(robotCell.CardImageUrl)
+            && portalHtml.Contains("product.CardImageUrl")
+            && portalHtml.Contains("Productrender nog niet beschikbaar")
+            && !portalHtml.Contains("initials=name.split")
+            && !portalHtml.Contains("choiceGlyph"),
+            "Portalcatalogus: kaartafbeeldingen moeten uit productmasterdata komen en initialen mogen geen afbeeldingsfallback zijn");
         Require(catalog.Profiles.Single(profile => profile.Id == "alu_system_40x40").Name.StartsWith("40×40 — ", StringComparison.Ordinal)
             && catalog.Profiles.Single(profile => profile.Id == "alu_system_80x40").Name.StartsWith("40×80 — ", StringComparison.Ordinal),
             "Portalcatalogus: profielkeuzes moeten hun doorsnedemaat expliciet in het backendlabel tonen");

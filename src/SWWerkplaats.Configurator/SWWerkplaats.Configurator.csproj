@@ -248,6 +248,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>PortalAssets\images\product-cubby.png</Link>
     </Content>
+    <Content Include="Portal\images\product-machinebase.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\images\product-machinebase.png</Link>
+    </Content>
+    <Content Include="Portal\images\product-lex-workbench.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\images\product-lex-workbench.jpg</Link>
+    </Content>
+    <Content Include="Portal\images\product-workbench-cabinet.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\images\product-workbench-cabinet.jpg</Link>
+    </Content>
     <Content Include="SolidWorks\Assets\betonplex-birch-edge.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>SolidWorksAssets\betonplex-birch-edge.png</Link>

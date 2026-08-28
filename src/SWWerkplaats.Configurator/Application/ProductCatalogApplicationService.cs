@@ -11,6 +11,9 @@ namespace SWWerkplaats.Configurator.Application
         public string Name { get; set; }
         public string Category { get; set; }
         public string Status { get; set; }
+        public string CardImageUrl { get; set; }
+        public string CardImageAlt { get; set; }
+        public string CardImageStatus { get; set; }
         public double DefaultWidthMm { get; set; }
         public double DefaultDepthMm { get; set; }
         public double DefaultHeightMm { get; set; }
@@ -105,6 +108,12 @@ namespace SWWerkplaats.Configurator.Application
                 item.Name = Required(row, "Naam");
                 item.Category = Required(row, "Categorie-ID");
                 item.Status = Required(row, "Status");
+                item.CardImageStatus = Required(row, "Kaartafbeelding-status");
+                if (string.Equals(item.CardImageStatus, "Beschikbaar", StringComparison.OrdinalIgnoreCase))
+                {
+                    item.CardImageUrl = Required(row, "Kaartafbeelding-pad");
+                    item.CardImageAlt = Required(row, "Kaartafbeelding-alt");
+                }
                 item.DefaultWidthMm = RequiredDouble(row, "Breedte default mm");
                 item.DefaultDepthMm = RequiredDouble(row, "Diepte default mm");
                 item.DefaultHeightMm = RequiredDouble(row, "Hoogte default mm");
