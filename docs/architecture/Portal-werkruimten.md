@@ -19,14 +19,14 @@ maar maakt geen eigen order-, voorraad- of productwaarheid.
 
 | Route | Primaire taak | Backendbron | Hoofdrollen in de testsimulator |
 |---|---|---|---|
-| `/` | product configureren en aanvraag/order maken | catalogus-, quote- en orderservices | beheerder, verkoop, werkvoorbereider |
-| `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | beheerder; overige rollen openen automatisch hun taakwerkplek |
-| `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | beheerder, verkoop, werkvoorbereider, inkoper |
+| `/` | product configureren en aanvraag/order maken | catalogus-, quote- en orderservices | Systeembeheerder, Verkoop & offertes, Werkvoorbereiding |
+| `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | Systeembeheerder; overige rollen openen automatisch hun taakwerkplek |
+| `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | Systeembeheerder, Verkoop & offertes, Werkvoorbereiding, inkoper |
 | `/app/projects/{ProjectId}` | dossier, documenten, werkgebieden en BOM-snapshot | beperkt of intern projectdetailcontract | intern of eigenaar van gepubliceerd klantproject |
-| `/app/workshop` | gecombineerde profielenmachine-, plaat-CNC-, 3D-print- en assemblagewachtrij | productietaken | beheerder en werkvoorbereider |
+| `/app/workshop` | gecombineerde profielenmachine-, plaat-CNC-, 3D-print- en assemblagewachtrij | productietaken | Systeembeheerder en Werkvoorbereiding |
 | `/app/workshop/{AreaId}` | eigen gefilterde werkplaatswachtrij | productietaken binnen het werkgebied | betreffende operator |
-| `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | beheerder, werkvoorbereider, inkoper |
-| `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | beheerder, inkoper |
+| `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | Systeembeheerder, Werkvoorbereiding, inkoper |
+| `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | Systeembeheerder, inkoper |
 | `/app/customer` | gepubliceerde orders en klantdocumentstatus | beperkt klantcontract | klant/testklant |
 | `/library` | bestaande rail- en dragerbibliotheek | hardwarebibliotheek | bestaand compatibiliteitsbeheer |
 
@@ -55,7 +55,7 @@ gemaakt. Er wordt geen fabricagekennis in de UI afgeleid.
 De backend maakt productietaken voor de werkgebieden die daadwerkelijk in het
 productiemodel voorkomen. De statussen zijn `Voorbereiding`, `Wachtrij`, `Bezig`,
 `Geblokkeerd` en `Gereed`. Een blokkade vereist een reden. Een operatorcapability
-geldt voor één werkgebied; werkvoorbereider en beheerder mogen alle taken
+geldt voor één werkgebied; Werkvoorbereiding en Systeembeheerder mogen alle taken
 bijwerken.
 
 De huidige taakstatus is een operationele werkplaatsstatus naast de bestaande
@@ -113,8 +113,8 @@ moeten voor publieke uitrol worden bevestigd.
 
 De simulator staat niet tussen de hoofdonderdelen, maar in een afzonderlijk
 `Testmodus`-menu. Een rolwissel opent direct de backend-geleverde `HomeRoute`.
-Interne operators krijgen uitsluitend hun eigen werkgebied; beheerder en
-werkvoorbereider houden de gecombineerde werkplaatsweergave. Organisatie wordt
+Interne operators krijgen uitsluitend hun eigen werkgebied; Systeembeheerder en
+Werkvoorbereiding houden de gecombineerde werkplaatsweergave. Organisatie wordt
 alleen gevraagd voor de klantrol. De productsite staat onder een afzonderlijke
 testoptie omdat zij het configuratoraanbod bepaalt en geen intern projectrecht.
 

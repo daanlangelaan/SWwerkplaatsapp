@@ -107,6 +107,9 @@ internal static class Program
         var orderRepository = new FileOrderRepository(root);
         var orders = new OrderApplicationService(orderRepository);
         var roles = new PortalRolePolicy();
+        Require(roles.GetRequired("beheerder").Label == "Systeembeheerder", "Zichtbare naam van de systeembeheerrol klopt niet");
+        Require(roles.GetRequired("verkoop").Label == "Verkoop & offertes", "Zichtbare naam van de verkooprol klopt niet");
+        Require(roles.GetRequired("werkvoorbereider").Label == "Werkvoorbereiding", "Zichtbare naam van de werkvoorbereidingsrol klopt niet");
         var sites = new PortalSiteCatalog();
         var resolver = new PortalActorContextResolver(roles, sites);
         var repository = new SqlitePortalWorkspaceRepository(Path.Combine(root, "workspace.sqlite"));

@@ -257,7 +257,7 @@ afwijkende spacing, focus, foutgedrag of statusbetekenis maken.
 
 ## Test- en acceptatiecontract
 
-Iedere hoofdflow wordt minimaal getest als Beheerder, Verkoop, Werkvoorbereider,
+Iedere hoofdflow wordt minimaal getest als Systeembeheerder, Verkoop & offertes, Werkvoorbereiding,
 Inkoper, relevante Operator en Klant/testklant. Per flow gelden:
 
 - directe route, refresh en terugnavigatie behouden context;
