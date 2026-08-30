@@ -54,7 +54,7 @@ internal static class Program
             var customer = new Dictionary<string, string> { { "X-SW-Test-Role", "klant" }, { "X-SW-Test-Site", "shipping-boxes" }, { "X-SW-Test-Organization", "customer-one" } };
             var context = Get(port, "/api/workspace/context", admin);
             Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\"") && context.Body.Contains("\"HomeLabel\":\"Overzicht\""), "HTTP-actorcontract of startwerkplek ontbreekt");
-            Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AvailableWorkAreas\""), "Pilotrol of gescheiden productiewachtrijen ontbreken in de testcontext");
+            Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && context.Body.Contains("\"RoleId\":\"klant\"") && !context.Body.Contains("\"RoleId\":\"verkoop\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AvailableWorkAreas\""), "Driedelige pilotrolverdeling of gescheiden productiewachtrijen klopt niet");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
             var shell = Get(port, "/app/workshop", admin);
@@ -108,11 +108,14 @@ internal static class Program
         var orderRepository = new FileOrderRepository(root);
         var orders = new OrderApplicationService(orderRepository);
         var roles = new PortalRolePolicy();
-        Require(roles.GetRequired("beheerder").Label == "Systeembeheerder", "Zichtbare naam van de systeembeheerrol klopt niet");
+        Require(roles.GetRequired("beheerder").Label == "Bedrijfsbeheer", "Zichtbare naam van de bedrijfsbeheerrol klopt niet");
         Require(roles.GetRequired("verkoop").Label == "Verkoop & offertes", "Zichtbare naam van de verkooprol klopt niet");
         Require(roles.GetRequired("werkvoorbereider").Label == "Werkvoorbereiding", "Zichtbare naam van de werkvoorbereidingsrol klopt niet");
         Require(roles.GetRequired("productiemedewerker").HomeLabel == "Productieoverzicht", "Productiemedewerker mist het productieoverzicht");
-        Require(roles.ListSimulatorChoices("beheerder").Any(role => role.RoleId == "productiemedewerker") && roles.ListSimulatorChoices("beheerder").All(role => role.DefaultWorkAreaId == null), "Normale testkeuze bevat niet de pilotrol of nog specialistrollen");
+        var businessCapabilities = roles.GetRequired("beheerder").Capabilities;
+        Require(new[] { "verkoop", "werkvoorbereider", "inkoper" }.SelectMany(roleId => roles.GetRequired(roleId).Capabilities).All(capability => businessCapabilities.Contains(capability)), "Bedrijfsbeheer dekt niet alle bewaarde kantoorrollen");
+        Require(roles.ListSimulatorChoices("beheerder").Select(role => role.RoleId).SequenceEqual(new[] { "beheerder", "productiemedewerker", "klant" }), "Normale testkeuze bevat niet exact Bedrijfsbeheer, Productiemedewerker en Klant");
+        Require(roles.ListSimulatorChoices("verkoop").Any(role => role.RoleId == "verkoop") && roles.ListSimulatorChoices("verkoop").All(role => role.RoleId != "werkvoorbereider" && role.RoleId != "inkoper"), "Bewaarde verkooprol kan niet afzonderlijk worden geladen");
         Require(roles.ListSimulatorChoices("cncoperator").Any(role => role.RoleId == "cncoperator") && roles.ListSimulatorChoices("cncoperator").All(role => role.RoleId != "profieloperator"), "CNC-werkplek kan de bewaarde specialistrol niet laden");
         var sites = new PortalSiteCatalog();
         var resolver = new PortalActorContextResolver(roles, sites);

@@ -16,6 +16,8 @@ merkkeuzes of echte toegangsafspraken zijn.
 
 ## Rollen en klantorganisaties
 
+- de normale pilotkeuze bestaat uit `Bedrijfsbeheer`, `Productiemedewerker` en
+  `Klant`; verkoop, werkvoorbereiding en inkoop blijven als latere specialisaties;
 - de pilot gebruikt één algemene `Productiemedewerker` voor alle wachtrijen;
   specialistrollen blijven bewaard voor latere automatische machine-pc-context;
 - definitieve medewerkersrollen en uitzonderingen op de huidige capabilitymatrix;

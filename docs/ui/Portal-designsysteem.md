@@ -263,8 +263,9 @@ afwijkende spacing, focus, foutgedrag of statusbetekenis maken.
 
 ## Test- en acceptatiecontract
 
-Iedere hoofdflow wordt minimaal getest als Systeembeheerder, Verkoop & offertes, Werkvoorbereiding,
-Inkoper, relevante Operator en Klant/testklant. Per flow gelden:
+Iedere hoofdflow wordt minimaal getest als Bedrijfsbeheer, Productiemedewerker en
+Klant/testklant. Bewaarde specialistrollen krijgen gerichte autorisatie- en
+startpaginatests. Per flow gelden:
 
 - directe route, refresh en terugnavigatie behouden context;
 - zichtbare bediening én API-autorisatie passen bij de testrol;

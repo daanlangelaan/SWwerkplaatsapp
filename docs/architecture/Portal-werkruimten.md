@@ -19,14 +19,14 @@ maar maakt geen eigen order-, voorraad- of productwaarheid.
 
 | Route | Primaire taak | Backendbron | Hoofdrollen in de testsimulator |
 |---|---|---|---|
-| `/` | product configureren en aanvraag/order maken | catalogus-, quote- en orderservices | Systeembeheerder, Verkoop & offertes, Werkvoorbereiding |
-| `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | Systeembeheerder; overige rollen openen automatisch hun taakwerkplek |
-| `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | Systeembeheerder, Verkoop & offertes, Werkvoorbereiding, inkoper |
+| `/` | product configureren en aanvraag/order maken | catalogus-, quote- en orderservices | Bedrijfsbeheer |
+| `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | Bedrijfsbeheer; overige rollen openen automatisch hun taakwerkplek |
+| `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | Bedrijfsbeheer |
 | `/app/projects/{ProjectId}` | dossier, documenten, werkgebieden en BOM-snapshot | beperkt of intern projectdetailcontract | intern of eigenaar van gepubliceerd klantproject |
-| `/app/workshop` | totaaloverzicht van alle openstaande productietaken | productietaken uit alle werkgebieden | Systeembeheerder, Werkvoorbereiding en Productiemedewerker |
+| `/app/workshop` | totaaloverzicht van alle openstaande productietaken | productietaken uit alle werkgebieden | Bedrijfsbeheer en Productiemedewerker |
 | `/app/workshop/{AreaId}` | afzonderlijke gefilterde productiewachtrij | productietaken binnen het werkgebied | Productiemedewerker of bewaarde specialistrol |
-| `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | Systeembeheerder, Werkvoorbereiding, inkoper |
-| `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | Systeembeheerder, inkoper |
+| `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | Bedrijfsbeheer |
+| `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | Bedrijfsbeheer |
 | `/app/customer` | gepubliceerde orders en klantdocumentstatus | beperkt klantcontract | klant/testklant |
 | `/library` | bestaande rail- en dragerbibliotheek | hardwarebibliotheek | bestaand compatibiliteitsbeheer |
 
@@ -62,8 +62,8 @@ productieoverzicht toont aantallen en routes voor Profielenmachine, Plaat-CNC,
 De specialistrollen voor één werkgebied blijven als backendrollen bestaan maar
 staan niet in de normale testsimulatielijst. Zo kan een vaste machine-pc later
 rechtstreeks bijvoorbeeld `cncoperator` krijgen en automatisch uitsluitend
-`/app/workshop/sheet-cnc` openen. Werkvoorbereiding en Systeembeheerder mogen
-eveneens alle productietaken bijwerken.
+`/app/workshop/sheet-cnc` openen. De bewaarde rol Werkvoorbereiding en de zichtbare
+rol Bedrijfsbeheer mogen eveneens alle productietaken bijwerken.
 
 De huidige taakstatus is een operationele werkplaatsstatus naast de bestaande
 globale orderworkflow. Het later automatisch afleiden van de globale orderstatus
