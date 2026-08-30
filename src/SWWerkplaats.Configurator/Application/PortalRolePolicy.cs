@@ -34,15 +34,15 @@ namespace SWWerkplaats.Configurator.Application
         {
             roles = new List<PortalRoleDefinition>
             {
-                Role("beheerder", "Beheerder", PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate, PortalCapabilities.Configure, PortalCapabilities.SystemControl, PortalCapabilities.LibraryUpdate),
-                Role("verkoop", "Verkoop", PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.Configure),
-                Role("werkvoorbereider", "Werkvoorbereider", PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.Configure),
-                Role("inkoper", "Inkoper", PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate),
-                Role("profieloperator", "Profieloperator", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.profile-machine"),
-                Role("cncoperator", "Plaat-CNC-operator", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.sheet-cnc"),
-                Role("printoperator", "3D-printoperator", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.3d-print"),
-                Role("assemblage", "Assemblagemedewerker", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.assembly"),
-                Role("klant", "Klant", PortalCapabilities.CustomerProjectRead)
+                Role("beheerder", "Beheerder", "/app", null, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate, PortalCapabilities.Configure, PortalCapabilities.SystemControl, PortalCapabilities.LibraryUpdate),
+                Role("verkoop", "Verkoop", "/app/projects", null, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.Configure),
+                Role("werkvoorbereider", "Werkvoorbereider", "/app/workshop", null, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.Configure),
+                Role("inkoper", "Inkoper", "/app/purchasing", null, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate),
+                Role("profieloperator", "Profieloperator", "/app/workshop/profile-machine", "profile-machine", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.profile-machine"),
+                Role("cncoperator", "Plaat-CNC-operator", "/app/workshop/sheet-cnc", "sheet-cnc", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.sheet-cnc"),
+                Role("printoperator", "3D-printoperator", "/app/workshop/3d-print", "3d-print", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.3d-print"),
+                Role("assemblage", "Assemblagemedewerker", "/app/workshop/assembly", "assembly", PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.assembly"),
+                Role("klant", "Klant", "/app/customer", null, PortalCapabilities.CustomerProjectRead)
             };
         }
 
@@ -74,14 +74,14 @@ namespace SWWerkplaats.Configurator.Application
             throw new PortalAccessDeniedException("Werkplaatstaak niet wijzigbaar voor rol " + (actor == null ? "onbekend" : actor.RoleLabel) + ".");
         }
 
-        private static PortalRoleDefinition Role(string id, string label, params string[] capabilities)
+        private static PortalRoleDefinition Role(string id, string label, string homeRoute, string defaultWorkAreaId, params string[] capabilities)
         {
-            return new PortalRoleDefinition { RoleId = id, Label = label, Capabilities = capabilities.ToList() };
+            return new PortalRoleDefinition { RoleId = id, Label = label, HomeRoute = homeRoute, DefaultWorkAreaId = defaultWorkAreaId, Capabilities = capabilities.ToList() };
         }
 
         private static PortalRoleDefinition Clone(PortalRoleDefinition source)
         {
-            return new PortalRoleDefinition { RoleId = source.RoleId, Label = source.Label, Capabilities = new List<string>(source.Capabilities) };
+            return new PortalRoleDefinition { RoleId = source.RoleId, Label = source.Label, HomeRoute = source.HomeRoute, DefaultWorkAreaId = source.DefaultWorkAreaId, Capabilities = new List<string>(source.Capabilities) };
         }
     }
 
@@ -110,6 +110,8 @@ namespace SWWerkplaats.Configurator.Application
                 SiteId = siteId,
                 RoleId = role.RoleId,
                 RoleLabel = role.Label,
+                HomeRoute = role.HomeRoute,
+                DefaultWorkAreaId = role.DefaultWorkAreaId,
                 IsSimulated = true,
                 Capabilities = new List<string>(role.Capabilities)
             };

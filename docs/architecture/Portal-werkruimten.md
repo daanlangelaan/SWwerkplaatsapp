@@ -20,10 +20,11 @@ maar maakt geen eigen order-, voorraad- of productwaarheid.
 | Route | Primaire taak | Backendbron | Hoofdrollen in de testsimulator |
 |---|---|---|---|
 | `/` | product configureren en aanvraag/order maken | catalogus-, quote- en orderservices | beheerder, verkoop, werkvoorbereider |
-| `/app` | rolgericht overzicht | workspace-dashboard | alle interne rollen; klant krijgt klantstart |
+| `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | beheerder; overige rollen openen automatisch hun taakwerkplek |
 | `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | beheerder, verkoop, werkvoorbereider, inkoper |
 | `/app/projects/{ProjectId}` | dossier, documenten, werkgebieden en BOM-snapshot | beperkt of intern projectdetailcontract | intern of eigenaar van gepubliceerd klantproject |
-| `/app/workshop` | profielenmachine, plaat-CNC, 3D-print en assemblage | productietaken | werkvoorbereider en betreffende operator |
+| `/app/workshop` | gecombineerde profielenmachine-, plaat-CNC-, 3D-print- en assemblagewachtrij | productietaken | beheerder en werkvoorbereider |
+| `/app/workshop/{AreaId}` | eigen gefilterde werkplaatswachtrij | productietaken binnen het werkgebied | betreffende operator |
 | `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | beheerder, werkvoorbereider, inkoper |
 | `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | beheerder, inkoper |
 | `/app/customer` | gepubliceerde orders en klantdocumentstatus | beperkt klantcontract | klant/testklant |
@@ -109,6 +110,13 @@ zichtbaar als testsimulatie en is geen beveiligingsmechanisme voor productie.
 workstations- en robotcellensites. De producttoedeling en conceptnamen zijn
 testconfiguratie; domeinen, merkassets en definitieve commerciële indeling
 moeten voor publieke uitrol worden bevestigd.
+
+De simulator staat niet tussen de hoofdonderdelen, maar in een afzonderlijk
+`Testmodus`-menu. Een rolwissel opent direct de backend-geleverde `HomeRoute`.
+Interne operators krijgen uitsluitend hun eigen werkgebied; beheerder en
+werkvoorbereider houden de gecombineerde werkplaatsweergave. Organisatie wordt
+alleen gevraagd voor de klantrol. De productsite staat onder een afzonderlijke
+testoptie omdat zij het configuratoraanbod bepaalt en geen intern projectrecht.
 
 ## Deploymentpad
 

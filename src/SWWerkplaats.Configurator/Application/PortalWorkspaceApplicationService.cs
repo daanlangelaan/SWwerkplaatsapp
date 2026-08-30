@@ -60,7 +60,9 @@ namespace SWWerkplaats.Configurator.Application
         {
             PortalRolePolicy.Ensure(actor, PortalCapabilities.JobsReadAll);
             Sync();
-            return repository.ListJobs();
+            var jobs = repository.ListJobs();
+            if (PortalRolePolicy.Has(actor, PortalCapabilities.JobsUpdateAll) || string.IsNullOrWhiteSpace(actor.DefaultWorkAreaId)) return jobs;
+            return jobs.Where(job => string.Equals(job.AreaId, actor.DefaultWorkAreaId, StringComparison.OrdinalIgnoreCase)).ToList();
         }
 
         public PortalProjectDetail GetProject(PortalActorContext actor, string projectId)
@@ -233,7 +235,11 @@ namespace SWWerkplaats.Configurator.Application
 
         public PortalWorkspaceDashboard GetDashboard(PortalActorContext actor)
         {
-            var projects = ListProjects(actor);
+            PortalRolePolicy.Ensure(actor, PortalCapabilities.DashboardRead);
+            var projects = PortalRolePolicy.Has(actor, PortalCapabilities.ProjectReadAll)
+                || PortalRolePolicy.Has(actor, PortalCapabilities.CustomerProjectRead)
+                ? ListProjects(actor)
+                : new List<PortalProjectView>();
             var result = new PortalWorkspaceDashboard
             {
                 ProjectCount = projects.Count,
@@ -242,7 +248,7 @@ namespace SWWerkplaats.Configurator.Application
             };
             if (PortalRolePolicy.Has(actor, PortalCapabilities.JobsReadAll))
             {
-                var jobs = repository.ListJobs();
+                var jobs = ListJobs(actor);
                 result.WaitingJobCount = jobs.Count(job => string.Equals(job.Status, "Wachtrij", StringComparison.OrdinalIgnoreCase));
                 result.BlockedJobCount = jobs.Count(job => string.Equals(job.Status, "Geblokkeerd", StringComparison.OrdinalIgnoreCase));
                 result.ActiveJobs = jobs.Where(job => !string.Equals(job.Status, "Gereed", StringComparison.OrdinalIgnoreCase)).Take(8).ToList();

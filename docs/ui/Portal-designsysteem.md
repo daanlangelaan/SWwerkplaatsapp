@@ -113,6 +113,12 @@ onzichtbare labels of kleinere primaire aanraakdoelen.
 
 - Hoofdonderdelen zoals Configurator, Projecten, Werkplaats en Inkoop zijn echte
   routes. Zij zijn direct te openen, te vernieuwen en te bookmarken.
+- De eerste navigatieactie heet `Mijn werk` en opent de door de backend geleverde
+  rolstart. Een operator landt direct in het eigen werkgebied; rol-, site- en
+  organisatiekeuze zijn testcontext en geen gelijkwaardige hoofdnavigatie.
+- De testsimulator staat in een apart, herkenbaar `Testmodus`-menu. Rolwissels
+  worden direct toegepast. Klantorganisatie wordt alleen bij de klantrol
+  gevraagd en productsite staat als afzonderlijke geavanceerde testcontext.
 - De actieve route is zowel visueel als semantisch herkenbaar.
 - Tabs zijn alleen voor nauw verwante informatie binnen één pagina wanneer de
   gebruiker niet alles tegelijk hoeft te zien. Tabs zijn geen vervanging voor de

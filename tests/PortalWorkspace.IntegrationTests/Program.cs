@@ -50,13 +50,16 @@ internal static class Program
         {
             server.Start();
             var admin = new Dictionary<string, string> { { "X-SW-Test-Role", "beheerder" }, { "X-SW-Test-Site", "shipping-boxes" } };
+            var assemblyOperator = new Dictionary<string, string> { { "X-SW-Test-Role", "assemblage" }, { "X-SW-Test-Site", "internal" }, { "X-SW-Test-Organization", "internal" } };
             var customer = new Dictionary<string, string> { { "X-SW-Test-Role", "klant" }, { "X-SW-Test-Site", "shipping-boxes" }, { "X-SW-Test-Organization", "customer-one" } };
             var context = Get(port, "/api/workspace/context", admin);
-            Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\""), "HTTP-actorcontract ontbreekt");
+            Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\""), "HTTP-actorcontract of startwerkplek ontbreekt");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
             var shell = Get(port, "/app/workshop", admin);
-            Require(shell.Status == 200 && !shell.Body.Contains("/*DESIGN_TOKENS*/") && shell.Body.Contains("/app/inventory"), "Portal-shell of designtokens ontbreken");
+            Require(shell.Status == 200 && !shell.Body.Contains("/*DESIGN_TOKENS*/") && shell.Body.Contains("Bekijk portal als") && !shell.Body.Contains("Pas testcontext toe"), "Rolgerichte portal-shell of designtokens ontbreken");
+            var operatorDashboard = Get(port, "/api/workspace/dashboard", assemblyOperator);
+            Require(operatorDashboard.Status == 200 && !operatorDashboard.Body.Contains("project.read.all"), "Operator-dashboard vraagt ten onrechte volledige projectrechten");
             Require(Get(port, "/api/orders", customer).Status == 403, "Klant kan legacy-orderlijst via HTTP lezen");
         }
     }
@@ -113,6 +116,8 @@ internal static class Program
         var otherCustomer = Actor(resolver, "klant", "workstations", "customer-two");
         var profileOperator = Actor(resolver, "profieloperator", "internal", "internal");
         var cncOperator = Actor(resolver, "cncoperator", "internal", "internal");
+        Require(profileOperator.HomeRoute == "/app/workshop/profile-machine" && profileOperator.DefaultWorkAreaId == "profile-machine", "Profieloperator mist rolgerichte startwerkplek");
+        Require(cncOperator.HomeRoute == "/app/workshop/sheet-cnc" && cncOperator.DefaultWorkAreaId == "sheet-cnc", "CNC-operator mist rolgerichte startwerkplek");
 
         var candidate = service.ListInventoryCandidates(admin).First(value => value.Category == "Component");
         var orderFolder = orderRepository.CreateOrderFolder("SW-PORTAL-001");
@@ -152,8 +157,11 @@ internal static class Program
         Require(service.ListProjects(otherCustomer).Count == 0, "Project lekt naar een andere klantorganisatie");
 
         var profileJob = service.ListJobs(profileOperator).Single(job => job.AreaId == "profile-machine");
-        var sheetJob = service.ListJobs(profileOperator).Single(job => job.AreaId == "sheet-cnc");
+        Require(service.ListJobs(profileOperator).All(job => job.AreaId == "profile-machine"), "Profieloperator ziet taken buiten de eigen wachtrij");
+        var sheetJob = service.ListJobs(admin).Single(job => job.AreaId == "sheet-cnc");
         Require(sheetJob.Documents.Any(document => document.FileName == "intern-programma.tap"), "Plaat-CNC-taak mist het interne productieoverzicht");
+        var operatorDashboard = service.GetDashboard(profileOperator);
+        Require(operatorDashboard.ProjectCount == 0 && operatorDashboard.ActiveJobs.All(job => job.AreaId == "profile-machine"), "Operator-dashboard lekt projecten of andere werkgebieden");
         service.ChangeJobStatus(profileOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Bezig" });
         Require(repository.LoadJob(profileJob.JobId).Status == "Bezig", "Profieloperator kon eigen taak niet starten");
         ExpectDenied(() => service.ChangeJobStatus(cncOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Gereed" }), "CNC-operator wijzigde profielenmachinetaak");
