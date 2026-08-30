@@ -113,9 +113,12 @@ onzichtbare labels of kleinere primaire aanraakdoelen.
 
 - Hoofdonderdelen zoals Configurator, Projecten, Werkplaats en Inkoop zijn echte
   routes. Zij zijn direct te openen, te vernieuwen en te bookmarken.
-- De eerste navigatieactie heet `Mijn werk` en opent de door de backend geleverde
-  rolstart. Een operator landt direct in het eigen werkgebied; rol-, site- en
+- De eerste navigatieactie gebruikt het door de backend geleverde rollabel en
+  opent de rolstart: `Overzicht`, `Offertes & projecten`, `Productieplanning`,
+  `Inkoopplanning`, `Mijn wachtrij` of `Mijn orders`. Rol-, site- en
   organisatiekeuze zijn testcontext en geen gelijkwaardige hoofdnavigatie.
+- Vaste hoofdnavigatie gebruikt taakgerichte termen: `Product configureren`,
+  `Projecten`, `Productie`, `Inkoop` en `Voorraad`.
 - De testsimulator staat in een apart, herkenbaar `Testmodus`-menu. Rolwissels
   worden direct toegepast. Klantorganisatie wordt alleen bij de klantrol
   gevraagd en productsite staat als afzonderlijke geavanceerde testcontext.

@@ -53,7 +53,7 @@ internal static class Program
             var assemblyOperator = new Dictionary<string, string> { { "X-SW-Test-Role", "assemblage" }, { "X-SW-Test-Site", "internal" }, { "X-SW-Test-Organization", "internal" } };
             var customer = new Dictionary<string, string> { { "X-SW-Test-Role", "klant" }, { "X-SW-Test-Site", "shipping-boxes" }, { "X-SW-Test-Organization", "customer-one" } };
             var context = Get(port, "/api/workspace/context", admin);
-            Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\""), "HTTP-actorcontract of startwerkplek ontbreekt");
+            Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\"") && context.Body.Contains("\"HomeLabel\":\"Overzicht\""), "HTTP-actorcontract of startwerkplek ontbreekt");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
             var shell = Get(port, "/app/workshop", admin);
@@ -119,8 +119,8 @@ internal static class Program
         var otherCustomer = Actor(resolver, "klant", "workstations", "customer-two");
         var profileOperator = Actor(resolver, "profieloperator", "internal", "internal");
         var cncOperator = Actor(resolver, "cncoperator", "internal", "internal");
-        Require(profileOperator.HomeRoute == "/app/workshop/profile-machine" && profileOperator.DefaultWorkAreaId == "profile-machine", "Profieloperator mist rolgerichte startwerkplek");
-        Require(cncOperator.HomeRoute == "/app/workshop/sheet-cnc" && cncOperator.DefaultWorkAreaId == "sheet-cnc", "CNC-operator mist rolgerichte startwerkplek");
+        Require(profileOperator.HomeRoute == "/app/workshop/profile-machine" && profileOperator.HomeLabel == "Mijn wachtrij" && profileOperator.DefaultWorkAreaId == "profile-machine", "Profieloperator mist rolgerichte startwerkplek");
+        Require(cncOperator.HomeRoute == "/app/workshop/sheet-cnc" && cncOperator.HomeLabel == "Mijn wachtrij" && cncOperator.DefaultWorkAreaId == "sheet-cnc", "CNC-operator mist rolgerichte startwerkplek");
 
         var candidate = service.ListInventoryCandidates(admin).First(value => value.Category == "Component");
         var orderFolder = orderRepository.CreateOrderFolder("SW-PORTAL-001");

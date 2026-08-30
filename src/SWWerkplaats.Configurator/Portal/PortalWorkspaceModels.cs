@@ -37,6 +37,7 @@ namespace SWWerkplaats.Configurator.Portal
         public string RoleId { get; set; }
         public string Label { get; set; }
         public string HomeRoute { get; set; }
+        public string HomeLabel { get; set; }
         public string DefaultWorkAreaId { get; set; }
         public List<string> Capabilities { get; set; }
 
@@ -54,6 +55,7 @@ namespace SWWerkplaats.Configurator.Portal
         public string RoleId { get; set; }
         public string RoleLabel { get; set; }
         public string HomeRoute { get; set; }
+        public string HomeLabel { get; set; }
         public string DefaultWorkAreaId { get; set; }
         public bool IsSimulated { get; set; }
         public List<string> Capabilities { get; set; }

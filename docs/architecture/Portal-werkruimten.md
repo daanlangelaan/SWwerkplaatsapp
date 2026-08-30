@@ -112,7 +112,8 @@ testconfiguratie; domeinen, merkassets en definitieve commerciële indeling
 moeten voor publieke uitrol worden bevestigd.
 
 De simulator staat niet tussen de hoofdonderdelen, maar in een afzonderlijk
-`Testmodus`-menu. Een rolwissel opent direct de backend-geleverde `HomeRoute`.
+`Testmodus`-menu. Een rolwissel opent direct de backend-geleverde `HomeRoute`;
+het bijbehorende `HomeLabel` benoemt de taakwerkplek voor die rol.
 Interne operators krijgen uitsluitend hun eigen werkgebied; Systeembeheerder en
 Werkvoorbereiding houden de gecombineerde werkplaatsweergave. Organisatie wordt
 alleen gevraagd voor de klantrol. De productsite staat onder een afzonderlijke
