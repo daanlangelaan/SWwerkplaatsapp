@@ -123,6 +123,13 @@ namespace SWWerkplaats.Configurator.Portal
         public string ProductName { get; set; }
         public string CustomerName { get; set; }
         public string CustomerEmail { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public decimal? AssemblyPriceExVat { get; set; }
+        public string AssemblyPriceStatus { get; set; }
+        public decimal? ShippingPriceExVat { get; set; }
+        public string ShippingPriceStatus { get; set; }
+        public string FulfillmentStatus { get; set; }
         public string Status { get; set; }
         public string CustomerStatus { get; set; }
         public bool CustomerPublished { get; set; }
@@ -152,6 +159,13 @@ namespace SWWerkplaats.Configurator.Portal
         public string ProductName { get; set; }
         public string CustomerName { get; set; }
         public string Status { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public decimal? AssemblyPriceExVat { get; set; }
+        public string AssemblyPriceStatus { get; set; }
+        public decimal? ShippingPriceExVat { get; set; }
+        public string ShippingPriceStatus { get; set; }
+        public string FulfillmentStatus { get; set; }
         public bool CustomerPublished { get; set; }
         public string CreatedAt { get; set; }
         public decimal PriceIncVat { get; set; }
@@ -306,5 +320,11 @@ namespace SWWerkplaats.Configurator.Portal
     public sealed class PortalProjectPublicationRequest
     {
         public bool Published { get; set; }
+    }
+
+    public sealed class PortalDeliveryPricingRequest
+    {
+        public decimal? AssemblyPriceExVat { get; set; }
+        public decimal? ShippingPriceExVat { get; set; }
     }
 }

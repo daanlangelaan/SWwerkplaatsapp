@@ -38,6 +38,8 @@ namespace SWWerkplaats.Configurator.Portal
         public string CustomerEmail { get; set; }
         public string CustomerPhone { get; set; }
         public string Notes { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
         public bool IncludeLowerShelf { get; set; }
         public bool IncludeMiddleShelf { get; set; }
         public double LowerShelfHeightMm { get; set; }
@@ -117,6 +119,9 @@ namespace SWWerkplaats.Configurator.Portal
         public decimal Vat { get; set; }
         public decimal PriceIncVat { get; set; }
         public string LeadTime { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public string DeliveryPriceNote { get; set; }
         public int SheetPartCount { get; set; }
         public int ProfilePartCount { get; set; }
         public string PreviewSvg { get; set; }
@@ -242,6 +247,12 @@ namespace SWWerkplaats.Configurator.Portal
         public string ProductName { get; set; }
         public string CustomerName { get; set; }
         public string CustomerEmail { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public decimal? AssemblyPriceExVat { get; set; }
+        public string AssemblyPriceStatus { get; set; }
+        public decimal? ShippingPriceExVat { get; set; }
+        public string ShippingPriceStatus { get; set; }
         public decimal PriceExVat { get; set; }
         public decimal PriceIncVat { get; set; }
         public string OutputFolder { get; set; }

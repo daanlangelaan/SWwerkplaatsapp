@@ -141,6 +141,29 @@ def main() -> int:
     unique(preferences, "Voorkeur-ID", errors)
     unique(offers, "Aanbieding-ID", errors)
 
+    delivery_contract = schema.get("productDeliveryContract", {})
+    delivery_field = delivery_contract.get("deliveryFormRequestField", "DeliveryForm")
+    receipt_field = delivery_contract.get("receiptMethodRequestField", "ReceiptMethod")
+    allowed_delivery_forms = set(delivery_contract.get("allowedDeliveryForms", []))
+    allowed_receipt_methods = set(delivery_contract.get("allowedReceiptMethods", []))
+    default_delivery_form = delivery_contract.get("defaultDeliveryForm", "")
+    if not allowed_delivery_forms or not allowed_receipt_methods or default_delivery_form not in allowed_delivery_forms:
+        errors.append("Schema bevat geen compleet productDeliveryContract")
+    root_product_ids = {product["Product-ID"] for product in products if not product.get("Basisproduct-ID", "").strip()}
+    for product_id in root_product_ids:
+        rows = [row for row in input_contracts if row.get("Product-ID", "").strip() == product_id]
+        delivery_rows = [row for row in rows if row.get("Request-veld", "").strip() == delivery_field]
+        receipt_rows = [row for row in rows if row.get("Request-veld", "").strip() == receipt_field]
+        if len(delivery_rows) != 1 or len(receipt_rows) != 1:
+            errors.append(f"Basisproduct {product_id} mist exact één levervorm- en ontvangstcontract")
+            continue
+        delivery_options = {entry.split("|", 1)[0].strip() for entry in delivery_rows[0].get("Opties", "").split(";") if entry.strip()}
+        receipt_options = {entry.split("|", 1)[0].strip() for entry in receipt_rows[0].get("Opties", "").split(";") if entry.strip()}
+        if delivery_options != allowed_delivery_forms or delivery_rows[0].get("Standaardwaarde", "").strip() != default_delivery_form:
+            errors.append(f"Basisproduct {product_id} heeft een onjuist levervormcontract")
+        if receipt_options != allowed_receipt_methods or receipt_rows[0].get("Standaardwaarde", "").strip():
+            errors.append(f"Basisproduct {product_id} heeft een onjuist ontvangstcontract")
+
     card_contract = schema.get("productCardImageContract", {})
     card_path_field = card_contract.get("pathField", "Kaartafbeelding-pad")
     card_alt_field = card_contract.get("altField", "Kaartafbeelding-alt")

@@ -54,11 +54,11 @@ internal static class Program
             var customer = new Dictionary<string, string> { { "X-SW-Test-Role", "klant" }, { "X-SW-Test-Site", "shipping-boxes" }, { "X-SW-Test-Organization", "customer-one" } };
             var context = Get(port, "/api/workspace/context", admin);
             Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\"") && context.Body.Contains("\"HomeLabel\":\"Overzicht\""), "HTTP-actorcontract of startwerkplek ontbreekt");
-            Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && context.Body.Contains("\"RoleId\":\"klant\"") && !context.Body.Contains("\"RoleId\":\"verkoop\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AvailableWorkAreas\""), "Driedelige pilotrolverdeling of gescheiden productiewachtrijen klopt niet");
+            Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && context.Body.Contains("\"RoleId\":\"klant\"") && !context.Body.Contains("\"RoleId\":\"verkoop\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AreaId\":\"dispatch\""), "Driedelige pilotrolverdeling of gescheiden productiewachtrijen klopt niet");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
             var shell = Get(port, "/app/workshop", admin);
-            Require(shell.Status == 200 && !shell.Body.Contains("/*DESIGN_TOKENS*/") && shell.Body.Contains("Bekijk portal als") && !shell.Body.Contains("Pas testcontext toe"), "Rolgerichte portal-shell of designtokens ontbreken");
+            Require(shell.Status == 200 && !shell.Body.Contains("/*DESIGN_TOKENS*/") && shell.Body.Contains("Bekijk portal als") && shell.Body.Contains("role-choices") && !shell.Body.Contains("<select id=\"role\"") && !shell.Body.Contains("Pas testcontext toe"), "Directe rolkeuzes of designtokens ontbreken");
             var operatorDashboard = Get(port, "/api/workspace/dashboard", assemblyOperator);
             Require(operatorDashboard.Status == 200 && !operatorDashboard.Body.Contains("project.read.all"), "Operator-dashboard vraagt ten onrechte volledige projectrechten");
             Require(Get(port, "/api/orders", customer).Status == 403, "Klant kan legacy-orderlijst via HTTP lezen");
@@ -142,6 +142,10 @@ internal static class Program
             ProductName = "Werktafel",
             ProjectName = "Testwerktafel",
             CustomerName = "Testklant",
+            DeliveryForm = "gemonteerd",
+            ReceiptMethod = "verzenden",
+            AssemblyPriceStatus = "Op aanvraag",
+            ShippingPriceStatus = "Op aanvraag",
             Status = "Te controleren",
             CreatedAt = "2026-08-28T12:00:00Z",
             OutputFolder = orderFolder,
@@ -151,6 +155,8 @@ internal static class Program
         record.PurchaseLines.Add(new PortalPurchaseSnapshotLine { StableItemId = candidate.StableItemId, Description = candidate.Description, Category = "Beslag", RequiredQuantity = 120m, Unit = "stuks", PurchaseUnitPrice = 0.25m, Supplier = "Testleverancier" });
         record.ProductionAreas.Add(new PortalProductionAreaSnapshot { AreaId = "profile-machine", Label = "Profielenmachine", ItemCount = 8 });
         record.ProductionAreas.Add(new PortalProductionAreaSnapshot { AreaId = "sheet-cnc", Label = "Plaat-CNC", ItemCount = 3 });
+        record.ProductionAreas.Add(new PortalProductionAreaSnapshot { AreaId = "assembly", Label = "Assemblage", ItemCount = 11 });
+        record.ProductionAreas.Add(new PortalProductionAreaSnapshot { AreaId = "dispatch", Label = "Completeren & verzending", ItemCount = 1 });
         record.Files.Add(Path.Combine(orderFolder, "Klantbijlage.html"));
         record.Files.Add(Path.Combine(orderFolder, "Nesting", "intern-programma.tap"));
         record.Files.Add(Path.Combine(orderFolder, "AssemblageControle.csv"));
@@ -158,10 +164,13 @@ internal static class Program
 
         service.Sync();
         Require(service.ListProjects(admin).Count == 1, "Intern project ontbreekt");
+        var priced = service.UpdateDeliveryPricing(admin, "P-PORTAL-001", new PortalDeliveryPricingRequest { AssemblyPriceExVat = 250m, ShippingPriceExVat = 65m });
+        Require(priced.Project.AssemblyPriceExVat == 250m && priced.Project.ShippingPriceExVat == 65m && priced.Project.AssemblyPriceStatus == "Vastgesteld" && priced.Project.ShippingPriceStatus == "Vastgesteld", "Bedrijfsbeheer kon montage- en verzendkosten niet vaststellen");
         Require(service.ListProjects(customer).Count == 0, "Niet-gepubliceerd project lekt naar klant");
         service.SetCustomerPublication(admin, "P-PORTAL-001", new PortalProjectPublicationRequest { Published = true });
         var customerProject = service.ListProjects(customer).Single();
         Require(customerProject.OrganizationId == null && customerProject.CustomerName == null, "Klantcontract bevat interne organisatie- of klantvelden");
+        Require(customerProject.DeliveryForm == "gemonteerd" && customerProject.ReceiptMethod == "verzenden" && customerProject.AssemblyPriceExVat == 250m && customerProject.ShippingPriceExVat == 65m, "Klantcontract mist vastgelegde levervorm of leveringskosten");
         var customerDetail = service.GetProject(customer, "P-PORTAL-001");
         Require(customerDetail.Documents.Count == 1 && customerDetail.Documents.All(document => document.CustomerVisible), "Klantdetail bevat een intern document");
         Require(customerDetail.PurchaseLines.Count == 0 && customerDetail.ProductionAreas.Count == 0, "Klantdetail bevat inkoop- of productiegegevens");
@@ -171,18 +180,26 @@ internal static class Program
         var profileJob = service.ListJobs(profileOperator).Single(job => job.AreaId == "profile-machine");
         Require(service.ListJobs(profileOperator).All(job => job.AreaId == "profile-machine"), "Profieloperator ziet taken buiten de eigen wachtrij");
         var productionJobs = service.ListJobs(productionOperator);
-        Require(productionJobs.Count == 2 && productionJobs.Select(job => job.AreaId).Distinct().Count() == 2, "Productiemedewerker mist het totale productieoverzicht");
+        Require(productionJobs.Count == 4 && productionJobs.Select(job => job.AreaId).Distinct().Count() == 4 && productionJobs.Any(job => job.AreaId == "dispatch"), "Productiemedewerker mist het totale productie- en verzendoverzicht");
         var sheetJob = productionJobs.Single(job => job.AreaId == "sheet-cnc");
         Require(sheetJob.Documents.Any(document => document.FileName == "intern-programma.tap"), "Plaat-CNC-taak mist het interne productieoverzicht");
         var productionDashboard = service.GetDashboard(productionOperator);
-        Require(productionDashboard.ProjectCount == 0 && productionDashboard.ActiveJobs.Count == 2, "Productiedashboard bevat geen volledig taakoverzicht of lekt projecten");
+        Require(productionDashboard.ProjectCount == 0 && productionDashboard.ActiveJobs.Count == 4, "Productiedashboard bevat geen volledig taakoverzicht of lekt projecten");
         var operatorDashboard = service.GetDashboard(profileOperator);
         Require(operatorDashboard.ProjectCount == 0 && operatorDashboard.ActiveJobs.All(job => job.AreaId == "profile-machine"), "Operator-dashboard lekt projecten of andere werkgebieden");
+        var dispatchJob = productionJobs.Single(job => job.AreaId == "dispatch");
+        ExpectInvalid(() => service.ChangeJobStatus(productionOperator, dispatchJob.JobId, new PortalJobStatusRequest { Status = "Bezig" }), "Afrondingstaak startte voordat productie gereed was");
         service.ChangeJobStatus(productionOperator, sheetJob.JobId, new PortalJobStatusRequest { Status = "Bezig" });
         Require(repository.LoadJob(sheetJob.JobId).Status == "Bezig", "Productiemedewerker kon de CNC-taak niet starten");
         service.ChangeJobStatus(profileOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Bezig" });
         Require(repository.LoadJob(profileJob.JobId).Status == "Bezig", "Profieloperator kon eigen taak niet starten");
         ExpectDenied(() => service.ChangeJobStatus(cncOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Gereed" }), "CNC-operator wijzigde profielenmachinetaak");
+        foreach (var job in service.ListJobs(productionOperator).Where(job => job.AreaId != "dispatch"))
+            service.ChangeJobStatus(productionOperator, job.JobId, new PortalJobStatusRequest { Status = "Gereed" });
+        Require(service.GetProject(admin, "P-PORTAL-001").Project.FulfillmentStatus == "Productie gereed", "Gereed productiewerk leidt niet tot Productie gereed");
+        dispatchJob = service.ListJobs(productionOperator).Single(job => job.AreaId == "dispatch");
+        service.ChangeJobStatus(productionOperator, dispatchJob.JobId, new PortalJobStatusRequest { Status = "Gereed" });
+        Require(service.GetProject(customer, "P-PORTAL-001").Project.Status == "Klaar voor verzending", "Afrondingstaak leidt niet tot klantstatus Klaar voor verzending");
 
         var stock = service.SaveInventoryItem(admin, new PortalInventoryItem
         {

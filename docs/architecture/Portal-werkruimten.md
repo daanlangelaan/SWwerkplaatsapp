@@ -57,7 +57,11 @@ productiemodel voorkomen. De statussen zijn `Voorbereiding`, `Wachtrij`, `Bezig`
 `Geblokkeerd` en `Gereed`. Een blokkade vereist een reden. De pilotrol
 `Productiemedewerker` kan alle openstaande taken zien en bijwerken. Het
 productieoverzicht toont aantallen en routes voor Profielenmachine, Plaat-CNC,
-3D-print en Assemblage; de records en wachtrijen blijven per `AreaId` gescheiden.
+3D-print, Assemblage en Completeren & verzending; de records en wachtrijen
+blijven per `AreaId` gescheiden. Assemblage wordt alleen aangemaakt voor de
+levervorm `gemonteerd`. Iedere order krijgt een afrondingstaak voor completeren,
+verpakken en verzenden/afhalen. Na alle productietaken volgt `Productie gereed`;
+na de afrondingstaak wordt dit `Klaar voor verzending` of `Klaar voor afhalen`.
 
 De specialistrollen voor één werkgebied blijven als backendrollen bestaan maar
 staan niet in de normale testsimulatielijst. Zo kan een vaste machine-pc later
@@ -66,8 +70,24 @@ rechtstreeks bijvoorbeeld `cncoperator` krijgen en automatisch uitsluitend
 rol Bedrijfsbeheer mogen eveneens alle productietaken bijwerken.
 
 De huidige taakstatus is een operationele werkplaatsstatus naast de bestaande
-globale orderworkflow. Het later automatisch afleiden van de globale orderstatus
-uit alle deeltaken vereist een afzonderlijk, getest workflowbesluit.
+globale orderworkflow. De klantgerichte fulfillmentstatus wordt al uit de
+deeltaken afgeleid; een volledige vervanging van de globale orderworkflow blijft
+een afzonderlijk, getest workflowbesluit.
+
+## Levervorm en logistiek
+
+Het productcontract levert voor iedere productfamilie twee onafhankelijke
+keuzes: `bouwpakket` of `gemonteerd`, en `verzenden` of `afhalen`. Bouwpakket is
+de masterdata-default; de ontvangstwijze heeft bewust geen default en moet door
+de gebruiker worden gekozen. Montage bij gemonteerd en verpakking/verzending
+bij verzenden staan eerst op `Op aanvraag`. Alleen Bedrijfsbeheer kan in de pilot
+de bedragen excl. btw vaststellen. De getoonde productprijs blijft herkenbaar
+gescheiden zolang niet alle leveringskosten bekend zijn.
+
+Automatische verzendberekening blijft geblokkeerd totdat klant-/adresdata,
+verpakkingsmaten, langste profiel- en plaatmaat, gewichten en vervoerderstarieven
+als betrouwbare backendbronnen beschikbaar zijn. De browser bevat hiervoor geen
+schattingen of fallbacktarieven.
 
 ## Inkoop en voorraad
 

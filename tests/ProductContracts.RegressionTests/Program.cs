@@ -91,6 +91,7 @@ internal static class Program
             VerifyWorkbenchBackPanelConnections(models.Single(item => item.Contract.ProductId == "werkbankkast").Model);
             VerifyPortalPresentationBoundary();
             VerifyWorkbenchQuotePreview();
+            VerifyDeliveryOrderFlow();
             VerifySolidWorksGlbDeliveryContract();
             VerifyDamagedSheetRecovery();
             Console.WriteLine("PASS  Productaantallen, voeten, eindkappen, bevestigingen, profieloriëntatie, coplanaire buitenvlakken en moduulbanen voldoen aan de contracten.");
@@ -105,14 +106,80 @@ internal static class Program
 
     private static void VerifyWorkbenchQuotePreview()
     {
-        var response = new QuoteApplicationService().BuildQuote(Request("werktafel", 1500, 750, 900, null));
+        var response = new QuoteApplicationService().BuildQuote(Request("werktafel", 1500, 750, 900, request =>
+        {
+            request.DeliveryForm = "gemonteerd";
+            request.ReceiptMethod = "verzenden";
+        }));
         Require(response.ProfilePartCount == 12
                 && response.Assembly3D.Count(part => string.Equals(part.Kind, "profile", StringComparison.OrdinalIgnoreCase)) == 12
                 && response.Assembly3D.Any(part => string.Equals(part.Kind, "sheet", StringComparison.OrdinalIgnoreCase))
                 && response.PriceIncVat > 0
                 && response.NestingSvg.StartsWith("<svg", StringComparison.OrdinalIgnoreCase)
-                && !response.Files.Contains("Profieltappen-werkplaatslijst.xlsx"),
+                && !response.Files.Contains("Profieltappen-werkplaatslijst.xlsx")
+                && response.DeliveryForm == "gemonteerd"
+                && response.ReceiptMethod == "verzenden"
+                && response.DeliveryPriceNote.Contains("exclusief montage, verpakking en verzending"),
             "Werktafelpreview: prijs, nesting en 12 getraceerde profielen moeten zonder niet-vrijgegeven CAM-taplijst renderen");
+    }
+
+    private static void VerifyDeliveryOrderFlow()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "sww-delivery-order-regression-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var service = new OrderApplicationService(new FileOrderRepository(folder));
+            var kit = Request("shipping_box", 1200, 800, 800, request =>
+            {
+                request.SheetMaterialId = "osb_18";
+                request.ShippingBoxIncludeHandles = true;
+                request.DeliveryForm = "bouwpakket";
+                request.ReceiptMethod = "afhalen";
+                request.ProjectName = "Bouwpakket regressie";
+            });
+            var kitOrder = service.CreateOrder(kit);
+            Require(!kitOrder.ProductionAreas.Any(area => area.AreaId == "assembly")
+                && kitOrder.ProductionAreas.Any(area => area.AreaId == "dispatch")
+                && kitOrder.AssemblyPriceStatus == "Niet van toepassing"
+                && kitOrder.ShippingPriceStatus == "Niet van toepassing",
+                "Bouwpakket: assemblage moet vervallen en completeren/afhalen moet als afzonderlijke taak blijven bestaan");
+
+            var assembled = Request("shipping_box", 1200, 800, 800, request =>
+            {
+                request.SheetMaterialId = "osb_18";
+                request.ShippingBoxIncludeHandles = true;
+                request.DeliveryForm = "gemonteerd";
+                request.ReceiptMethod = "verzenden";
+                request.ProjectName = "Gemonteerde regressie";
+            });
+            var assembledOrder = service.CreateOrder(assembled);
+            Require(assembledOrder.ProductionAreas.Any(area => area.AreaId == "assembly")
+                && assembledOrder.ProductionAreas.Any(area => area.AreaId == "dispatch")
+                && assembledOrder.AssemblyPriceStatus == "Op aanvraag"
+                && assembledOrder.ShippingPriceStatus == "Op aanvraag",
+                "Gemonteerd: assemblage, completeren en openstaande leveringsprijzen moeten worden vastgelegd");
+
+            var missingReceipt = Request("shipping_box", 1200, 800, 800, request =>
+            {
+                request.SheetMaterialId = "osb_18";
+                request.ShippingBoxIncludeHandles = true;
+                request.DeliveryForm = "bouwpakket";
+            });
+            try
+            {
+                service.CreateOrder(missingReceipt);
+                throw new InvalidOperationException("Order zonder ontvangstwijze is ten onrechte geaccepteerd.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Require(ex.Message.Contains("Ontvangst"), "Order zonder ontvangstwijze geeft geen bruikbare validatiefout");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
     }
 
     private static void VerifyGenericCustomerPresentationDrawing(PortalQuoteRequest request, WorkbenchModel model)
@@ -722,6 +789,16 @@ internal static class Program
             "Portalcatalogus: de losse Werktafel moet uit expliciete maat- en groef-8-regels configureren");
         var machineBaseWorktop = machineBase.ConfigurationInputs.Single(input => input.RequestField == "MachineBaseWorktopMaterialId");
         var machineBaseLowerBeam = machineBase.ConfigurationInputs.Single(input => input.RequestField == "MachineBaseLowerBeamProfileId");
+        foreach (var product in catalog.Products)
+        {
+            var delivery = product.ConfigurationInputs.Single(input => input.RequestField == "DeliveryForm");
+            var receipt = product.ConfigurationInputs.Single(input => input.RequestField == "ReceiptMethod");
+            Require(delivery.DefaultValue == "bouwpakket"
+                && delivery.Options.Select(option => option.Value).SequenceEqual(new[] { "bouwpakket", "gemonteerd" })
+                && string.IsNullOrWhiteSpace(receipt.DefaultValue)
+                && receipt.Options.Select(option => option.Value).SequenceEqual(new[] { "verzenden", "afhalen" }),
+                product.Product + ": levervorm en ontvangstwijze moeten uit het erfbare masterdatacontract komen");
+        }
         Require(machineBase.CanConfigure && machineBase.MissingConfigurationData.Length == 0
             && machineBase.DefaultQuantity == 1
             && Close(machineBase.InputConstraints.Single(rule => rule.InputId == "widthMm").Maximum, 3050)
@@ -765,7 +842,8 @@ internal static class Program
             "Portalcatalogus: sim-riggrenzen en profieldefault moeten uit productmasterdata komen");
         Require(shippingBox.DefaultSheetMaterialId == "osb_18"
             && portalHtml.Contains("applyProductCatalogContract(meta)")
-            && portalHtml.Contains("if(meta.CanConfigure)quote();")
+            && !portalHtml.Contains("if(meta.CanConfigure)quote();")
+            && !portalHtml.Contains("bouwpakket|Bouwpakket")
             && portalHtml.Contains("threeState.preserveCameraOnNextRebuild=true")
             && portalHtml.Contains("if(!threeState.preserveCameraOnNextRebuild)threeState.forceFit=true")
             && portalHtml.Contains("$('quantity').value=meta.DefaultQuantity")

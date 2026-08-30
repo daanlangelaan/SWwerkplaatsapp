@@ -273,6 +273,13 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "POST" && path.StartsWith("/api/workspace/projects/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/delivery-pricing", StringComparison.OrdinalIgnoreCase))
+            {
+                var projectId = ExtractResourceId(path, "/api/workspace/projects/", "/delivery-pricing");
+                WriteJson(stream, 200, workspace.UpdateDeliveryPricing(actor, Uri.UnescapeDataString(projectId), serializer.Deserialize<PortalDeliveryPricingRequest>(request.Body)));
+                return;
+            }
+
             if (request.Method == "GET" && path == "/api/library")
             {
                 PortalRolePolicy.Ensure(actor, PortalCapabilities.Configure);

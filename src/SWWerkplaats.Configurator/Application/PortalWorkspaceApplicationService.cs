@@ -13,7 +13,8 @@ namespace SWWerkplaats.Configurator.Application
             new PortalWorkAreaDefinition { AreaId = "profile-machine", Label = "Profielenmachine" },
             new PortalWorkAreaDefinition { AreaId = "sheet-cnc", Label = "Plaat-CNC" },
             new PortalWorkAreaDefinition { AreaId = "3d-print", Label = "3D-print" },
-            new PortalWorkAreaDefinition { AreaId = "assembly", Label = "Assemblage" }
+            new PortalWorkAreaDefinition { AreaId = "assembly", Label = "Assemblage" },
+            new PortalWorkAreaDefinition { AreaId = "dispatch", Label = "Completeren & verzending" }
         };
         private readonly IPortalWorkspaceRepository repository;
         private readonly OrderApplicationService orders;
@@ -61,7 +62,9 @@ namespace SWWerkplaats.Configurator.Application
                 PortalRolePolicy.Ensure(actor, PortalCapabilities.ProjectReadAll);
             }
 
-            return projects.Select(project => ToView(project, customerView)).ToList();
+            var values = projects.ToList();
+            foreach (var project in values) RefreshFulfillmentStatus(project);
+            return values.Select(project => ToView(project, customerView)).ToList();
         }
 
         public List<PortalProductionJob> ListJobs(PortalActorContext actor)
@@ -86,6 +89,7 @@ namespace SWWerkplaats.Configurator.Application
                     throw new PortalAccessDeniedException("Dit project is niet gepubliceerd voor de gekozen klantorganisatie.");
             }
             else PortalRolePolicy.Ensure(actor, PortalCapabilities.ProjectReadAll);
+            RefreshFulfillmentStatus(project);
 
             var detail = new PortalProjectDetail
             {
@@ -115,10 +119,29 @@ namespace SWWerkplaats.Configurator.Application
             if (status == null) throw new InvalidOperationException("Ongeldige werkplaatsstatus: " + request.Status);
             if (string.Equals(status, "Geblokkeerd", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(request.BlockedReason))
                 throw new InvalidOperationException("Geef een reden op wanneer een werkplaatstaak wordt geblokkeerd.");
+            if (string.Equals(job.AreaId, "dispatch", StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(status, "Bezig", StringComparison.OrdinalIgnoreCase) || string.Equals(status, "Gereed", StringComparison.OrdinalIgnoreCase))
+                && repository.ListJobs().Any(other => string.Equals(other.ProjectId, job.ProjectId, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(other.AreaId, "dispatch", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(other.Status, "Gereed", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Completeren en verzending kan pas starten nadat alle productietaken gereed zijn.");
             job.Status = status;
             job.BlockedReason = string.Equals(status, "Geblokkeerd", StringComparison.OrdinalIgnoreCase) ? request.BlockedReason.Trim() : null;
             repository.SaveJob(job);
+            RefreshFulfillmentStatus(repository.LoadProject(job.ProjectId));
             return job;
+        }
+
+        public PortalProjectDetail UpdateDeliveryPricing(PortalActorContext actor, string projectId, PortalDeliveryPricingRequest request)
+        {
+            PortalRolePolicy.Ensure(actor, PortalCapabilities.DeliveryPricingUpdate);
+            if (request == null) throw new ArgumentNullException("request");
+            Sync();
+            var project = repository.LoadProject(projectId);
+            if (project == null) throw new InvalidOperationException("Project niet gevonden: " + projectId);
+            orders.UpdateDeliveryPricing(project.OrderId, request);
+            Sync();
+            return GetProject(actor, projectId);
         }
 
         public List<PortalPurchaseRequirement> ListPurchaseRequirements(PortalActorContext actor)
@@ -280,10 +303,38 @@ namespace SWWerkplaats.Configurator.Application
                 ProductName = project.ProductName,
                 CustomerName = customerView ? null : project.CustomerName,
                 Status = customerView ? project.CustomerStatus : project.Status,
+                DeliveryForm = project.DeliveryForm,
+                ReceiptMethod = project.ReceiptMethod,
+                AssemblyPriceExVat = project.AssemblyPriceExVat,
+                AssemblyPriceStatus = project.AssemblyPriceStatus,
+                ShippingPriceExVat = project.ShippingPriceExVat,
+                ShippingPriceStatus = project.ShippingPriceStatus,
+                FulfillmentStatus = project.FulfillmentStatus,
                 CustomerPublished = project.CustomerPublished,
                 CreatedAt = project.CreatedAt,
                 PriceIncVat = project.PriceIncVat
             };
+        }
+
+        private void RefreshFulfillmentStatus(PortalProjectRecord project)
+        {
+            if (project == null) return;
+            var jobs = repository.ListJobs().Where(job => string.Equals(job.ProjectId, project.ProjectId, StringComparison.OrdinalIgnoreCase)).ToList();
+            var dispatch = jobs.FirstOrDefault(job => string.Equals(job.AreaId, "dispatch", StringComparison.OrdinalIgnoreCase));
+            var production = jobs.Where(job => !string.Equals(job.AreaId, "dispatch", StringComparison.OrdinalIgnoreCase)).ToList();
+            string value;
+            if (dispatch != null && string.Equals(dispatch.Status, "Gereed", StringComparison.OrdinalIgnoreCase))
+                value = string.Equals(project.ReceiptMethod, "afhalen", StringComparison.OrdinalIgnoreCase) ? "Klaar voor afhalen" : "Klaar voor verzending";
+            else if (production.Count > 0 && production.All(job => string.Equals(job.Status, "Gereed", StringComparison.OrdinalIgnoreCase)))
+                value = "Productie gereed";
+            else if (jobs.Any(job => string.Equals(job.Status, "Bezig", StringComparison.OrdinalIgnoreCase))) value = "In productie";
+            else if (jobs.Any(job => string.Equals(job.Status, "Wachtrij", StringComparison.OrdinalIgnoreCase))) value = "In productiewachtrij";
+            else value = "In voorbereiding";
+            if (string.Equals(project.FulfillmentStatus, value, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(project.CustomerStatus, value, StringComparison.OrdinalIgnoreCase)) return;
+            project.FulfillmentStatus = value;
+            project.CustomerStatus = value;
+            repository.SaveProject(project);
         }
 
         private static string FirstValue(params string[] values)

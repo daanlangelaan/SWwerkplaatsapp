@@ -16,6 +16,7 @@ namespace SWWerkplaats.Configurator.Application
         public const string ProjectReadAll = "project.read.all";
         public const string CustomerProjectRead = "project.read.customer";
         public const string CustomerPublish = "customer.publish";
+        public const string DeliveryPricingUpdate = "delivery.pricing.update";
         public const string JobsReadAll = "jobs.read.all";
         public const string JobsUpdateAll = "jobs.update.all";
         public const string PurchasingRead = "purchasing.read";
@@ -34,7 +35,7 @@ namespace SWWerkplaats.Configurator.Application
         {
             roles = new List<PortalRoleDefinition>
             {
-                Role("beheerder", "Bedrijfsbeheer", "/app", "Overzicht", null, true, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate, PortalCapabilities.Configure, PortalCapabilities.SystemControl, PortalCapabilities.LibraryUpdate),
+                Role("beheerder", "Bedrijfsbeheer", "/app", "Overzicht", null, true, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.DeliveryPricingUpdate, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate, PortalCapabilities.Configure, PortalCapabilities.SystemControl, PortalCapabilities.LibraryUpdate),
                 Role("verkoop", "Verkoop & offertes", "/app/projects", "Offertes & projecten", null, false, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.CustomerPublish, PortalCapabilities.Configure),
                 Role("werkvoorbereider", "Werkvoorbereiding", "/app/workshop", "Productieplanning", null, false, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.JobsReadAll, PortalCapabilities.JobsUpdateAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.Configure),
                 Role("inkoper", "Inkoper", "/app/purchasing", "Inkoopplanning", null, false, PortalCapabilities.DashboardRead, PortalCapabilities.ProjectReadAll, PortalCapabilities.PurchasingRead, PortalCapabilities.InventoryRead, PortalCapabilities.InventoryUpdate),

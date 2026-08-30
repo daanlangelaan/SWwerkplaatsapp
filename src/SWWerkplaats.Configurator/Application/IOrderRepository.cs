@@ -20,6 +20,7 @@ namespace SWWerkplaats.Configurator.Application
 
     public sealed class FileOrderRepository : IOrderRepository
     {
+        private static readonly object RecordMirrorLock = new object();
         private readonly string rootFolder;
         private readonly JavaScriptSerializer serializer;
 
@@ -61,10 +62,13 @@ namespace SWWerkplaats.Configurator.Application
             foreach (var folder in Directory.GetDirectories(OrdersFolder))
             {
                 var statusFile = Path.Combine(folder, "order-status.json");
-                if (!File.Exists(statusFile)) continue;
                 try
                 {
-                    orders.Add(serializer.Deserialize<PortalOrderRecord>(File.ReadAllText(statusFile)));
+                    lock (RecordMirrorLock)
+                    {
+                        if (!File.Exists(statusFile)) continue;
+                        orders.Add(serializer.Deserialize<PortalOrderRecord>(File.ReadAllText(statusFile)));
+                    }
                 }
                 catch
                 {
@@ -83,8 +87,11 @@ namespace SWWerkplaats.Configurator.Application
         {
             if (string.IsNullOrWhiteSpace(orderId)) return null;
             var statusFile = Path.Combine(OrdersFolder, ProductionOutputService.SafeFileName(orderId), "order-status.json");
-            if (!File.Exists(statusFile)) return null;
-            return serializer.Deserialize<PortalOrderRecord>(File.ReadAllText(statusFile));
+            lock (RecordMirrorLock)
+            {
+                if (!File.Exists(statusFile)) return null;
+                return serializer.Deserialize<PortalOrderRecord>(File.ReadAllText(statusFile));
+            }
         }
 
         public void SaveRequest(string orderFolder, PortalQuoteRequest request)
@@ -94,8 +101,11 @@ namespace SWWerkplaats.Configurator.Application
 
         public void SaveRecord(PortalOrderRecord record)
         {
-            Directory.CreateDirectory(record.OutputFolder);
-            File.WriteAllText(Path.Combine(record.OutputFolder, "order-status.json"), serializer.Serialize(record));
+            lock (RecordMirrorLock)
+            {
+                Directory.CreateDirectory(record.OutputFolder);
+                File.WriteAllText(Path.Combine(record.OutputFolder, "order-status.json"), serializer.Serialize(record));
+            }
         }
 
         public void SaveOfferText(string orderFolder, string contents)

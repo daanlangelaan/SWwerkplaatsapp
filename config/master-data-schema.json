@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "3.5",
+  "schemaVersion": "3.6",
   "workbook": "config/product-master-data.xlsx",
   "canonicalTables": {
     "ProductsTable": { "sheet": "Producten", "primaryKey": "Product-ID" },
@@ -50,6 +50,16 @@
     "assetRoot": "src/SWWerkplaats.Configurator/Portal",
     "allowedExtensions": [".png", ".jpg", ".jpeg"],
     "semantics": "Productkaartafbeeldingen zijn beheerde productpresentatie. De backend levert pad, alt-tekst en status; de browser koppelt nooit op product-ID."
+  },
+  "productDeliveryContract": {
+    "inputTable": "ProductInputContractsTable",
+    "deliveryFormRequestField": "DeliveryForm",
+    "receiptMethodRequestField": "ReceiptMethod",
+    "allowedDeliveryForms": ["bouwpakket", "gemonteerd"],
+    "defaultDeliveryForm": "bouwpakket",
+    "allowedReceiptMethods": ["verzenden", "afhalen"],
+    "pricingSemantics": "Montage bij gemonteerd en verpakking/verzending bij verzenden blijven op aanvraag totdat Bedrijfsbeheer een bedrag vaststelt. Afhalen is toegestaan en heeft geen verzendkosten.",
+    "automaticShippingOpenData": ["klant- en afleveradres", "verpakkingsmaten", "langste profiel- en plaatmaat", "totaalgewicht", "vervoerdersregels en tarieven"]
   },
   "componentRenderContract": {
     "statusField": "Renderstatus",

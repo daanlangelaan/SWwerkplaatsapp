@@ -1,6 +1,6 @@
 # Beslissingen voor de portalpilot
 
-Status: **toekomst — input nodig vóór de interne/publieke pilot**.
+Status: **toekomst — resterende input nodig vóór de interne/publieke pilot**.
 
 De revisie kan met de huidige testcontracten worden doorontwikkeld. De volgende
 punten zijn bewust niet door de software ingevuld omdat zij bedrijfskeuzes,
@@ -53,6 +53,15 @@ niet als browserdefaults.
 - blokkadecategorieën, escalatie en wie een blokkade mag vrijgeven;
 - welke plaat-, tap-, profiel- en printoverzichten als primaire operatorweergave
   gelden en welke alleen projectdocument zijn.
+
+## Reeds besloten: levering
+
+- toegestane levervormen: bouwpakket en gemonteerd;
+- standaard levervorm: bouwpakket;
+- montageprijs: op aanvraag, handmatig vast te stellen door Bedrijfsbeheer;
+- ontvangst: verzenden of afhalen; afhalen is toegestaan;
+- automatische verpakking/verzendkosten volgen pas met gevalideerde klant-,
+  maat-, gewicht- en vervoerdersdata en worden tot die tijd niet geschat.
 
 ## Uitrol
 

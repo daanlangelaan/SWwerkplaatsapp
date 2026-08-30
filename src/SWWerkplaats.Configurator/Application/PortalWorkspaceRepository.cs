@@ -261,6 +261,12 @@ namespace SWWerkplaats.Configurator.Application
             project.ProductName = order.ProductName;
             project.CustomerName = order.CustomerName;
             project.CustomerEmail = order.CustomerEmail;
+            project.DeliveryForm = order.DeliveryForm;
+            project.ReceiptMethod = order.ReceiptMethod;
+            project.AssemblyPriceExVat = order.AssemblyPriceExVat;
+            project.AssemblyPriceStatus = order.AssemblyPriceStatus;
+            project.ShippingPriceExVat = order.ShippingPriceExVat;
+            project.ShippingPriceStatus = order.ShippingPriceStatus;
             project.Status = order.Status;
             project.CustomerStatus = CustomerStatus(order.Status);
             project.PriceExVat = order.PriceExVat;
@@ -323,6 +329,7 @@ namespace SWWerkplaats.Configurator.Application
                 if (string.Equals(areaId, "sheet-cnc", StringComparison.OrdinalIgnoreCase)) return document.Category == "Productiebestand" || name.Contains("plaat") || name.Contains("nest") || name.Contains("toolpath");
                 if (string.Equals(areaId, "3d-print", StringComparison.OrdinalIgnoreCase)) return name.Contains("3d-print") || name.Contains("print");
                 if (string.Equals(areaId, "assembly", StringComparison.OrdinalIgnoreCase)) return document.Category == "Assemblage-instructie" || document.Category == "Assemblagecontrole";
+                if (string.Equals(areaId, "dispatch", StringComparison.OrdinalIgnoreCase)) return document.CustomerVisible || document.Category == "Offerte" || document.Category == "Factuur";
                 return false;
             }).ToList();
         }
@@ -406,6 +413,7 @@ namespace SWWerkplaats.Configurator.Application
             if (files.Any(file => file.IndexOf("Nesting", StringComparison.OrdinalIgnoreCase) >= 0 || file.StartsWith("Plaat", StringComparison.OrdinalIgnoreCase))) result.Add(new PortalProductionAreaSnapshot { AreaId = "sheet-cnc", Label = "Plaat-CNC", ItemCount = 1 });
             if (files.Any(file => file.IndexOf("3D-print", StringComparison.OrdinalIgnoreCase) >= 0)) result.Add(new PortalProductionAreaSnapshot { AreaId = "3d-print", Label = "3D-print", ItemCount = 1 });
             if (files.Any(file => file.StartsWith("Assemblage", StringComparison.OrdinalIgnoreCase))) result.Add(new PortalProductionAreaSnapshot { AreaId = "assembly", Label = "Assemblage", ItemCount = 1 });
+            result.Add(new PortalProductionAreaSnapshot { AreaId = "dispatch", Label = "Completeren & verzending", ItemCount = 1 });
             return result;
         }
 
