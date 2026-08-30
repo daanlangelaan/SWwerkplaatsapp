@@ -16,6 +16,8 @@ merkkeuzes of echte toegangsafspraken zijn.
 
 ## Rollen en klantorganisaties
 
+- de pilot gebruikt één algemene `Productiemedewerker` voor alle wachtrijen;
+  specialistrollen blijven bewaard voor latere automatische machine-pc-context;
 - definitieve medewerkersrollen en uitzonderingen op de huidige capabilitymatrix;
 - wie klantpublicatie, voorraadcorrectie en gereedmelding mag uitvoeren;
 - bron en beheerproces voor klantorganisaties, vestigingen en gebruikers;

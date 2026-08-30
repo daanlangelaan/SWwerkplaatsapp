@@ -39,6 +39,7 @@ namespace SWWerkplaats.Configurator.Portal
         public string HomeRoute { get; set; }
         public string HomeLabel { get; set; }
         public string DefaultWorkAreaId { get; set; }
+        public bool IsSimulatorVisible { get; set; }
         public List<string> Capabilities { get; set; }
 
         public PortalRoleDefinition()
@@ -70,13 +71,21 @@ namespace SWWerkplaats.Configurator.Portal
     {
         public PortalActorContext Actor { get; set; }
         public List<PortalRoleDefinition> AvailableRoles { get; set; }
+        public List<PortalWorkAreaDefinition> AvailableWorkAreas { get; set; }
         public List<PortalSiteDefinition> AvailableSites { get; set; }
 
         public PortalWorkspaceContextResponse()
         {
             AvailableRoles = new List<PortalRoleDefinition>();
+            AvailableWorkAreas = new List<PortalWorkAreaDefinition>();
             AvailableSites = new List<PortalSiteDefinition>();
         }
+    }
+
+    public sealed class PortalWorkAreaDefinition
+    {
+        public string AreaId { get; set; }
+        public string Label { get; set; }
     }
 
     public sealed class PortalPurchaseSnapshotLine

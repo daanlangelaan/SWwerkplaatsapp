@@ -8,6 +8,13 @@ namespace SWWerkplaats.Configurator.Application
     public sealed class PortalWorkspaceApplicationService
     {
         private static readonly string[] AllowedJobStatuses = { "Voorbereiding", "Wachtrij", "Bezig", "Geblokkeerd", "Gereed" };
+        private static readonly PortalWorkAreaDefinition[] WorkAreas =
+        {
+            new PortalWorkAreaDefinition { AreaId = "profile-machine", Label = "Profielenmachine" },
+            new PortalWorkAreaDefinition { AreaId = "sheet-cnc", Label = "Plaat-CNC" },
+            new PortalWorkAreaDefinition { AreaId = "3d-print", Label = "3D-print" },
+            new PortalWorkAreaDefinition { AreaId = "assembly", Label = "Assemblage" }
+        };
         private readonly IPortalWorkspaceRepository repository;
         private readonly OrderApplicationService orders;
         private readonly PortalRolePolicy roles;
@@ -32,7 +39,8 @@ namespace SWWerkplaats.Configurator.Application
             return new PortalWorkspaceContextResponse
             {
                 Actor = actor,
-                AvailableRoles = roles.List(),
+                AvailableRoles = roles.ListSimulatorChoices(actor.RoleId),
+                AvailableWorkAreas = WorkAreas.Select(area => new PortalWorkAreaDefinition { AreaId = area.AreaId, Label = area.Label }).ToList(),
                 AvailableSites = sites.List()
             };
         }

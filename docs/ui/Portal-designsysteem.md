@@ -115,7 +115,7 @@ onzichtbare labels of kleinere primaire aanraakdoelen.
   routes. Zij zijn direct te openen, te vernieuwen en te bookmarken.
 - De eerste navigatieactie gebruikt het door de backend geleverde rollabel en
   opent de rolstart: `Overzicht`, `Offertes & projecten`, `Productieplanning`,
-  `Inkoopplanning`, `Mijn wachtrij` of `Mijn orders`. Rol-, site- en
+  `Inkoopplanning`, `Productieoverzicht`, `Mijn wachtrij` of `Mijn orders`. Rol-, site- en
   organisatiekeuze zijn testcontext en geen gelijkwaardige hoofdnavigatie.
 - Vaste hoofdnavigatie gebruikt taakgerichte termen: `Product configureren`,
   `Projecten`, `Productie`, `Inkoop` en `Voorraad`.
@@ -126,6 +126,9 @@ onzichtbare labels of kleinere primaire aanraakdoelen.
 - Tabs zijn alleen voor nauw verwante informatie binnen één pagina wanneer de
   gebruiker niet alles tegelijk hoeft te zien. Tabs zijn geen vervanging voor de
   hoofdroutering en verbergen geen verplichte stapvolgorde.
+- Het productieoverzicht toont alle openstaande taken en afzonderlijke
+  wachtrijlinks met aantallen. Een wachtrijroute filtert één backend-geleverd
+  werkgebied; een specialistische machinecontext toont uitsluitend die route.
 - Een lineaire voortgangsindicator wordt alleen gebruikt voor minstens drie
   stabiele hoofdstappen. Niet-lineaire project- of productiestatussen gebruiken
   een statusoverzicht of takenlijst.

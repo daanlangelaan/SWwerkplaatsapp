@@ -54,6 +54,7 @@ internal static class Program
             var customer = new Dictionary<string, string> { { "X-SW-Test-Role", "klant" }, { "X-SW-Test-Site", "shipping-boxes" }, { "X-SW-Test-Organization", "customer-one" } };
             var context = Get(port, "/api/workspace/context", admin);
             Require(context.Status == 200 && context.Body.Contains("\"RoleId\":\"beheerder\"") && context.Body.Contains("\"HomeRoute\":\"/app\"") && context.Body.Contains("\"HomeLabel\":\"Overzicht\""), "HTTP-actorcontract of startwerkplek ontbreekt");
+            Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AvailableWorkAreas\""), "Pilotrol of gescheiden productiewachtrijen ontbreken in de testcontext");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
             var shell = Get(port, "/app/workshop", admin);
@@ -110,6 +111,9 @@ internal static class Program
         Require(roles.GetRequired("beheerder").Label == "Systeembeheerder", "Zichtbare naam van de systeembeheerrol klopt niet");
         Require(roles.GetRequired("verkoop").Label == "Verkoop & offertes", "Zichtbare naam van de verkooprol klopt niet");
         Require(roles.GetRequired("werkvoorbereider").Label == "Werkvoorbereiding", "Zichtbare naam van de werkvoorbereidingsrol klopt niet");
+        Require(roles.GetRequired("productiemedewerker").HomeLabel == "Productieoverzicht", "Productiemedewerker mist het productieoverzicht");
+        Require(roles.ListSimulatorChoices("beheerder").Any(role => role.RoleId == "productiemedewerker") && roles.ListSimulatorChoices("beheerder").All(role => role.DefaultWorkAreaId == null), "Normale testkeuze bevat niet de pilotrol of nog specialistrollen");
+        Require(roles.ListSimulatorChoices("cncoperator").Any(role => role.RoleId == "cncoperator") && roles.ListSimulatorChoices("cncoperator").All(role => role.RoleId != "profieloperator"), "CNC-werkplek kan de bewaarde specialistrol niet laden");
         var sites = new PortalSiteCatalog();
         var resolver = new PortalActorContextResolver(roles, sites);
         var repository = new SqlitePortalWorkspaceRepository(Path.Combine(root, "workspace.sqlite"));
@@ -117,6 +121,7 @@ internal static class Program
         var admin = Actor(resolver, "beheerder", "internal", "customer-one");
         var customer = Actor(resolver, "klant", "workstations", "customer-one");
         var otherCustomer = Actor(resolver, "klant", "workstations", "customer-two");
+        var productionOperator = Actor(resolver, "productiemedewerker", "internal", "internal");
         var profileOperator = Actor(resolver, "profieloperator", "internal", "internal");
         var cncOperator = Actor(resolver, "cncoperator", "internal", "internal");
         Require(profileOperator.HomeRoute == "/app/workshop/profile-machine" && profileOperator.HomeLabel == "Mijn wachtrij" && profileOperator.DefaultWorkAreaId == "profile-machine", "Profieloperator mist rolgerichte startwerkplek");
@@ -158,13 +163,20 @@ internal static class Program
         Require(customerDetail.Documents.Count == 1 && customerDetail.Documents.All(document => document.CustomerVisible), "Klantdetail bevat een intern document");
         Require(customerDetail.PurchaseLines.Count == 0 && customerDetail.ProductionAreas.Count == 0, "Klantdetail bevat inkoop- of productiegegevens");
         Require(service.ListProjects(otherCustomer).Count == 0, "Project lekt naar een andere klantorganisatie");
+        ExpectDenied(() => service.ListProjects(productionOperator), "Productiemedewerker kan volledige projectdossiers lezen");
 
         var profileJob = service.ListJobs(profileOperator).Single(job => job.AreaId == "profile-machine");
         Require(service.ListJobs(profileOperator).All(job => job.AreaId == "profile-machine"), "Profieloperator ziet taken buiten de eigen wachtrij");
-        var sheetJob = service.ListJobs(admin).Single(job => job.AreaId == "sheet-cnc");
+        var productionJobs = service.ListJobs(productionOperator);
+        Require(productionJobs.Count == 2 && productionJobs.Select(job => job.AreaId).Distinct().Count() == 2, "Productiemedewerker mist het totale productieoverzicht");
+        var sheetJob = productionJobs.Single(job => job.AreaId == "sheet-cnc");
         Require(sheetJob.Documents.Any(document => document.FileName == "intern-programma.tap"), "Plaat-CNC-taak mist het interne productieoverzicht");
+        var productionDashboard = service.GetDashboard(productionOperator);
+        Require(productionDashboard.ProjectCount == 0 && productionDashboard.ActiveJobs.Count == 2, "Productiedashboard bevat geen volledig taakoverzicht of lekt projecten");
         var operatorDashboard = service.GetDashboard(profileOperator);
         Require(operatorDashboard.ProjectCount == 0 && operatorDashboard.ActiveJobs.All(job => job.AreaId == "profile-machine"), "Operator-dashboard lekt projecten of andere werkgebieden");
+        service.ChangeJobStatus(productionOperator, sheetJob.JobId, new PortalJobStatusRequest { Status = "Bezig" });
+        Require(repository.LoadJob(sheetJob.JobId).Status == "Bezig", "Productiemedewerker kon de CNC-taak niet starten");
         service.ChangeJobStatus(profileOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Bezig" });
         Require(repository.LoadJob(profileJob.JobId).Status == "Bezig", "Profieloperator kon eigen taak niet starten");
         ExpectDenied(() => service.ChangeJobStatus(cncOperator, profileJob.JobId, new PortalJobStatusRequest { Status = "Gereed" }), "CNC-operator wijzigde profielenmachinetaak");

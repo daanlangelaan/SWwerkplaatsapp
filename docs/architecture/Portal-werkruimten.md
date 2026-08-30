@@ -23,8 +23,8 @@ maar maakt geen eigen order-, voorraad- of productwaarheid.
 | `/app` | beheerdersoverzicht en doorstuurpunt naar de rolstart | workspace-dashboard | Systeembeheerder; overige rollen openen automatisch hun taakwerkplek |
 | `/app/projects` | centrale projecten/database | projectrecords en documentsnapshots | Systeembeheerder, Verkoop & offertes, Werkvoorbereiding, inkoper |
 | `/app/projects/{ProjectId}` | dossier, documenten, werkgebieden en BOM-snapshot | beperkt of intern projectdetailcontract | intern of eigenaar van gepubliceerd klantproject |
-| `/app/workshop` | gecombineerde profielenmachine-, plaat-CNC-, 3D-print- en assemblagewachtrij | productietaken | Systeembeheerder en Werkvoorbereiding |
-| `/app/workshop/{AreaId}` | eigen gefilterde werkplaatswachtrij | productietaken binnen het werkgebied | betreffende operator |
+| `/app/workshop` | totaaloverzicht van alle openstaande productietaken | productietaken uit alle werkgebieden | Systeembeheerder, Werkvoorbereiding en Productiemedewerker |
+| `/app/workshop/{AreaId}` | afzonderlijke gefilterde productiewachtrij | productietaken binnen het werkgebied | Productiemedewerker of bewaarde specialistrol |
 | `/app/purchasing` | behoefte per artikel, project en leverancier | project-BOM plus voorraad | Systeembeheerder, Werkvoorbereiding, inkoper |
 | `/app/inventory` | fysieke voorraad, reserveringen en verpakkingen | voorraadartikelen en boekingen | Systeembeheerder, inkoper |
 | `/app/customer` | gepubliceerde orders en klantdocumentstatus | beperkt klantcontract | klant/testklant |
@@ -54,9 +54,16 @@ gemaakt. Er wordt geen fabricagekennis in de UI afgeleid.
 
 De backend maakt productietaken voor de werkgebieden die daadwerkelijk in het
 productiemodel voorkomen. De statussen zijn `Voorbereiding`, `Wachtrij`, `Bezig`,
-`Geblokkeerd` en `Gereed`. Een blokkade vereist een reden. Een operatorcapability
-geldt voor één werkgebied; Werkvoorbereiding en Systeembeheerder mogen alle taken
-bijwerken.
+`Geblokkeerd` en `Gereed`. Een blokkade vereist een reden. De pilotrol
+`Productiemedewerker` kan alle openstaande taken zien en bijwerken. Het
+productieoverzicht toont aantallen en routes voor Profielenmachine, Plaat-CNC,
+3D-print en Assemblage; de records en wachtrijen blijven per `AreaId` gescheiden.
+
+De specialistrollen voor één werkgebied blijven als backendrollen bestaan maar
+staan niet in de normale testsimulatielijst. Zo kan een vaste machine-pc later
+rechtstreeks bijvoorbeeld `cncoperator` krijgen en automatisch uitsluitend
+`/app/workshop/sheet-cnc` openen. Werkvoorbereiding en Systeembeheerder mogen
+eveneens alle productietaken bijwerken.
 
 De huidige taakstatus is een operationele werkplaatsstatus naast de bestaande
 globale orderworkflow. Het later automatisch afleiden van de globale orderstatus
@@ -113,9 +120,10 @@ moeten voor publieke uitrol worden bevestigd.
 
 De simulator staat niet tussen de hoofdonderdelen, maar in een afzonderlijk
 `Testmodus`-menu. Een rolwissel opent direct de backend-geleverde `HomeRoute`;
-het bijbehorende `HomeLabel` benoemt de taakwerkplek voor die rol.
-Interne operators krijgen uitsluitend hun eigen werkgebied; Systeembeheerder en
-Werkvoorbereiding houden de gecombineerde werkplaatsweergave. Organisatie wordt
+het bijbehorende `HomeLabel` benoemt de taakwerkplek voor die rol. De zichtbare
+pilotrol Productiemedewerker krijgt het totale productieoverzicht. Een actief
+ingestelde specialistrol wordt nog in zijn eigen context aangeboden, maar andere
+specialistrollen blijven uit de normale keuze. Organisatie wordt
 alleen gevraagd voor de klantrol. De productsite staat onder een afzonderlijke
 testoptie omdat zij het configuratoraanbod bepaalt en geen intern projectrecht.
 
