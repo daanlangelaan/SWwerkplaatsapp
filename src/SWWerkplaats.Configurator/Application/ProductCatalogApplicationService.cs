@@ -159,7 +159,7 @@ namespace SWWerkplaats.Configurator.Application
             item.AllowedSheetMaterialIds = MaterialIds(rules, "Materiaalkeuze");
             item.AllowedProfileMaterialIds = MaterialIds(rules, "Profielkeuze");
             item.DefaultSheetMaterialId = item.AllowedSheetMaterialIds.FirstOrDefault();
-            item.DefaultProfileMaterialId = item.AllowedProfileMaterialIds.Length == 1 ? item.AllowedProfileMaterialIds[0] : null;
+            item.DefaultProfileMaterialId = item.AllowedProfileMaterialIds.FirstOrDefault();
             if (!item.SupportsProfiles && item.AllowedSheetMaterialIds.Length == 0) missing.Add("Standaard plaatmateriaal ontbreekt in productmasterdata.");
             if (item.SupportsProfiles && item.AllowedProfileMaterialIds.Length == 0) missing.Add("Standaard profielmateriaal ontbreekt in productmasterdata.");
             item.ConfigurationInputs = inputRows

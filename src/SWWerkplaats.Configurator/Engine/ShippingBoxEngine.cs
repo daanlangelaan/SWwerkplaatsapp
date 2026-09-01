@@ -297,7 +297,8 @@ namespace SWWerkplaats.Configurator.Engine
                 foreach (var sx in new[] { -1.0, 1.0 })
                 foreach (var sz in new[] { -1.0, 1.0 })
                 {
-                    AddClipPlacement(model, "hoek", "crate-clip-corner", sx * outerWidth / 2.0, y, sz * outerDepth / 2.0, config.Clip);
+                    AddClipPlacement(model, "hoek", sx * outerWidth / 2.0, y, sz * outerDepth / 2.0,
+                        0, sz > 0 ? 180 : 0, sx > 0 ? 90 : -90, config.Clip);
                 }
             }
 
@@ -305,34 +306,63 @@ namespace SWWerkplaats.Configurator.Engine
             foreach (var sz in new[] { -1.0, 1.0 })
             {
                 var x = position - config.InternalWidthMm / 2.0;
-                AddClipPlacement(model, "bodem voor/achter", "crate-clip-seam-x-bottom", x, 0, sz * outerDepth / 2.0, config.Clip);
-                AddClipPlacement(model, "deksel voor/achter", "crate-clip-seam-x-top", x, config.InternalHeightMm + 2.0 * t, sz * outerDepth / 2.0, config.Clip);
+                AddClipPlacement(model, "bodem voor/achter", x, 0, sz * outerDepth / 2.0,
+                    0, sz > 0 ? 180 : 0, 0, config.Clip);
+                AddClipPlacement(model, "deksel voor/achter", x, config.InternalHeightMm + 2.0 * t, sz * outerDepth / 2.0,
+                    sz > 0 ? 180 : 0, 0, sz < 0 ? 180 : 0, config.Clip);
             }
 
             foreach (var position in Positions(outerDepth, config.Clip))
             foreach (var sx in new[] { -1.0, 1.0 })
             {
                 var z = position - outerDepth / 2.0;
-                AddClipPlacement(model, "bodem zijwand", "crate-clip-seam-z-bottom", sx * outerWidth / 2.0, 0, z, config.Clip);
-                AddClipPlacement(model, "deksel zijwand", "crate-clip-seam-z-top", sx * outerWidth / 2.0, config.InternalHeightMm + 2.0 * t, z, config.Clip);
+                AddClipPlacement(model, "bodem zijwand", sx * outerWidth / 2.0, 0, z,
+                    0, sx > 0 ? -90 : 90, 0, config.Clip);
+                AddClipPlacement(model, "deksel zijwand", sx * outerWidth / 2.0, config.InternalHeightMm + 2.0 * t, z,
+                    180, sx > 0 ? 90 : -90, 0, config.Clip);
             }
         }
 
-        private static void AddClipPlacement(WorkbenchModel model, string location, string shape, double x, double y, double z, CrateClipTemplate clip)
+        private static void AddClipPlacement(WorkbenchModel model, string location, double x, double y, double z,
+            double rotationXDeg, double rotationYDeg, double rotationZDeg, CrateClipTemplate clip)
         {
+            // Het lokale clipcontract heeft zijn naadnulpunt op de binnenvlakken
+            // van beide cliparmen. Verplaats dat nulpunt één plaatdikte van de
+            // clip naar buiten, zodat de armen tegen het hout liggen in plaats
+            // van coplanair met/in het plaatvolume te worden gerenderd.
+            var outsideOffset = RotateLocal(0, -clip.ThicknessMm, -clip.ThicknessMm,
+                rotationXDeg, rotationYDeg, rotationZDeg);
             model.AssemblyPlacements.Add(new AssemblyPlacement
             {
                 Kind = AssemblyComponentKind.Purchased,
                 PartName = "Liangyue LY103-12 clip " + location,
-                LengthMm = Math.Max(35, clip.WidthMm),
-                WidthMm = Math.Max(35, clip.WidthMm),
-                HeightMm = 48,
-                Xmm = x,
-                Ymm = y,
-                Zmm = z,
+                ComponentId = clip.Id,
+                LengthMm = clip.WidthMm,
+                WidthMm = clip.ArmLengthAMm,
+                HeightMm = clip.ArmLengthBMm,
+                Xmm = x + outsideOffset[0],
+                Ymm = y + outsideOffset[1],
+                Zmm = z + outsideOffset[2],
                 VisualKind = "crate-clip",
-                Shape = shape
+                Shape = "component-primitives",
+                RotationXDeg = rotationXDeg,
+                RotationYDeg = rotationYDeg,
+                RotationZDeg = rotationZDeg
             });
+        }
+
+        private static double[] RotateLocal(double x, double y, double z,
+            double rotationXDeg, double rotationYDeg, double rotationZDeg)
+        {
+            var rx = rotationXDeg * Math.PI / 180.0;
+            var ry = rotationYDeg * Math.PI / 180.0;
+            var rz = rotationZDeg * Math.PI / 180.0;
+            var cosX = Math.Cos(rx); var sinX = Math.Sin(rx);
+            var y1 = y * cosX - z * sinX; var z1 = y * sinX + z * cosX;
+            var cosY = Math.Cos(ry); var sinY = Math.Sin(ry);
+            var x2 = x * cosY + z1 * sinY; var z2 = -x * sinY + z1 * cosY;
+            var cosZ = Math.Cos(rz); var sinZ = Math.Sin(rz);
+            return new[] { x2 * cosZ - y1 * sinZ, x2 * sinZ + y1 * cosZ, z2 };
         }
 
         private static SheetPart Sheet(string name, Material material, double length, double width)
@@ -350,8 +380,38 @@ namespace SWWerkplaats.Configurator.Engine
         {
             if (config == null) throw new ArgumentNullException("config");
             if (config.PanelMaterial == null || config.PanelMaterial.ThicknessMm <= 0) throw new InvalidOperationException("Shipping box mist geldig plaatmateriaal.");
+            if (config.PanelMaterial.SheetLengthMm <= 0 || config.PanelMaterial.SheetWidthMm <= 0) throw new InvalidOperationException("Shipping box mist een geldige handelsmaat voor het plaatmateriaal.");
             if (config.Clip == null) throw new InvalidOperationException("Shipping box mist cliptemplate.");
             if (config.InternalWidthMm <= 0 || config.InternalDepthMm <= 0 || config.InternalHeightMm <= 0) throw new InvalidOperationException("Shipping box heeft ongeldige binnenmaten.");
+
+            var thickness = config.PanelMaterial.ThicknessMm;
+            var outerWidth = config.InternalWidthMm + 2.0 * thickness;
+            var outerDepth = config.InternalDepthMm + 2.0 * thickness;
+            var localizedTabs = string.Equals(config.JointMode, "localized_tabs", StringComparison.OrdinalIgnoreCase);
+            var wallHeight = localizedTabs ? config.InternalHeightMm + 2.0 * thickness : config.InternalHeightMm;
+            var endWidth = localizedTabs ? outerWidth : config.InternalWidthMm;
+
+            RequirePanelFits(config.PanelMaterial, "bodem/deksel", outerWidth, outerDepth, config.StockAllowanceMm);
+            RequirePanelFits(config.PanelMaterial, "zijpaneel", outerDepth, wallHeight, config.StockAllowanceMm);
+            RequirePanelFits(config.PanelMaterial, "voor-/achterpaneel", endWidth, wallHeight, config.StockAllowanceMm);
+        }
+
+        private static void RequirePanelFits(Material material, string panelName, double lengthMm, double widthMm, double stockAllowanceMm)
+        {
+            var usableLength = material.SheetLengthMm - stockAllowanceMm;
+            var usableWidth = material.SheetWidthMm - stockAllowanceMm;
+            if (usableLength <= 0 || usableWidth <= 0)
+                throw new InvalidOperationException("De plaatmarge laat geen bruikbaar plaatformaat over.");
+            var fits = (lengthMm <= usableLength && widthMm <= usableWidth)
+                || (widthMm <= usableLength && lengthMm <= usableWidth);
+            if (fits) return;
+
+            throw new InvalidOperationException(
+                "De gekozen binnenmaten leveren een " + panelName + " van "
+                + lengthMm.ToString("0.#") + " x " + widthMm.ToString("0.#")
+                + " mm op. Dit paneel past ook na draaien niet uit plaat "
+                + usableLength.ToString("0.#") + " x " + usableWidth.ToString("0.#")
+                + " mm na " + stockAllowanceMm.ToString("0.#") + " mm totale plaatmarge.");
         }
     }
 }

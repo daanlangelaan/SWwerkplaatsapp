@@ -917,7 +917,10 @@ namespace SWWerkplaats.Configurator.Engine
             if (panel == null || drawerMaterial == null) return;
             var grooveHeight = Math.Min(panel.WidthMm - 2.0, MaterialThickness(drawerMaterial) + ProductDrawingStrategy.DefaultDrawerGrooveClearanceMm);
             if (grooveHeight <= 0) return;
-            SheetOperations.AddPocket(panel, "Ladebodem rabat", 0, 0, panel.LengthMm, grooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, face, "Rabat voor de ladebodem.");
+            SheetOperations.RequireAssemblyOccupant(
+                SheetOperations.AddPocket(panel, "Ladebodem rabat", 0, 0, panel.LengthMm, grooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, face, "Rabat voor de ladebodem."),
+                "workbench-cabinet-drawer-bottom-" + panel.Name,
+                0.6);
         }
 
         private static void AddDrawerBackGroove(SheetPart sidePanel, Material drawerMaterial, OperationFace face)
@@ -925,7 +928,10 @@ namespace SWWerkplaats.Configurator.Engine
             if (sidePanel == null || drawerMaterial == null) return;
             var grooveWidth = Math.Min(sidePanel.LengthMm - 2.0, MaterialThickness(drawerMaterial) + ProductDrawingStrategy.DefaultDrawerGrooveClearanceMm);
             if (grooveWidth <= 0) return;
-            SheetOperations.AddPocket(sidePanel, "Ladeachter rabat", sidePanel.LengthMm - grooveWidth, 0, grooveWidth, sidePanel.WidthMm, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, face, "Rabat voor de ladeachterzijde.");
+            SheetOperations.RequireAssemblyOccupant(
+                SheetOperations.AddPocket(sidePanel, "Ladeachter rabat", sidePanel.LengthMm - grooveWidth, 0, grooveWidth, sidePanel.WidthMm, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, face, "Rabat voor de ladeachterzijde."),
+                "workbench-cabinet-drawer-back-" + sidePanel.Name,
+                0.6);
         }
 
         private static void AddDrawerFrontGrooves(SheetPart front, double boxWidth, double boxHeight, Material drawerMaterial)
@@ -935,9 +941,9 @@ namespace SWWerkplaats.Configurator.Engine
             var grooveHeight = Math.Min(front.WidthMm, MaterialThickness(drawerMaterial) + ProductDrawingStrategy.DefaultDrawerGrooveClearanceMm);
             var sideGrooveHeight = Math.Min(front.WidthMm - 1.0, Math.Max(10.0, boxHeight + ProductDrawingStrategy.DefaultDrawerGrooveDepthMm));
             var sideInset = Math.Max(0, (front.LengthMm - boxWidth) / 2.0);
-            SheetOperations.AddPocket(front, "Ladefront linker zij-rabat", sideInset, 0, grooveWidth, sideGrooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Blind eindigende rabat voor linker ladezijde; bovenrand van het front blijft gesloten.");
-            SheetOperations.AddPocket(front, "Ladefront rechter zij-rabat", front.LengthMm - sideInset - grooveWidth, 0, grooveWidth, sideGrooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Blind eindigende rabat voor rechter ladezijde; bovenrand van het front blijft gesloten.");
-            SheetOperations.AddPocket(front, "Ladefront bodem-rabat", sideInset, 0, Math.Max(10, front.LengthMm - 2.0 * sideInset), grooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Rabat voor ladebodem.");
+            SheetOperations.RequireAssemblyOccupant(SheetOperations.AddPocket(front, "Ladefront linker zij-rabat", sideInset, 0, grooveWidth, sideGrooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Blind eindigende rabat voor linker ladezijde; bovenrand van het front blijft gesloten."), "workbench-cabinet-drawer-front-left-" + front.Name, 0.5);
+            SheetOperations.RequireAssemblyOccupant(SheetOperations.AddPocket(front, "Ladefront rechter zij-rabat", front.LengthMm - sideInset - grooveWidth, 0, grooveWidth, sideGrooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Blind eindigende rabat voor rechter ladezijde; bovenrand van het front blijft gesloten."), "workbench-cabinet-drawer-front-right-" + front.Name, 0.5);
+            SheetOperations.RequireAssemblyOccupant(SheetOperations.AddPocket(front, "Ladefront bodem-rabat", sideInset, 0, Math.Max(10, front.LengthMm - 2.0 * sideInset), grooveHeight, ProductDrawingStrategy.DefaultDrawerGrooveDepthMm, OperationFace.PositiveZ, "Rabat voor ladebodem."), "workbench-cabinet-drawer-front-bottom-" + front.Name, 0.5);
         }
 
         private static void AddDrawerPullCutout(SheetPart front, WorkbenchCabinetConfig config)
@@ -1058,7 +1064,10 @@ namespace SWWerkplaats.Configurator.Engine
         {
             var grooveWidth = width + AlignmentGrooveClearanceMm;
             var localX = worldX + sheet.LengthMm / 2.0 - grooveWidth / 2.0;
-            SheetOperations.AddPocket(sheet, "Positioneergroef " + label, localX, depthStart, grooveWidth, depth, grooveDepth, face, "Positionering van dragend deel in doorlopende plaat.");
+            SheetOperations.RequireAssemblyOccupant(
+                SheetOperations.AddPocket(sheet, "Positioneergroef " + label, localX, depthStart, grooveWidth, depth, grooveDepth, face, "Positionering van dragend deel in doorlopende plaat."),
+                "workbench-cabinet-support-groove-" + label + "-" + face,
+                0.7);
         }
 
         private static void AddHorizontalSupportMountingHoles(SheetPart bottom, SheetPart worktop, WorkbenchCabinetConfig config, double worldX, double firstDepth, double secondDepth, string label)

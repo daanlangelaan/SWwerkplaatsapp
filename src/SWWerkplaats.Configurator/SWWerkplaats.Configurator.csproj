@@ -62,6 +62,8 @@
     <Compile Include="Application\AssemblyHardwareRenderContractService.cs" />
     <Compile Include="Application\ComponentPrimitiveRenderContractService.cs" />
     <Compile Include="Application\FastenerToolAccessCalculator.cs" />
+    <Compile Include="Application\FoldingWorkbenchMasterDataSettings.cs" />
+    <Compile Include="Application\FoldingWorkbenchProductBuilder.cs" />
     <Compile Include="Application\CamMasterSettings.cs" />
     <Compile Include="Application\CubbyCabinetProductBuilder.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
@@ -80,6 +82,7 @@
     <Compile Include="Application\LinearRobotCellProductBuilder.cs" />
     <Compile Include="Application\SimRigProductBuilder.cs" />
     <Compile Include="Application\ShippingBoxProductBuilder.cs" />
+    <Compile Include="Application\ShippingBoxMasterDataSettings.cs" />
     <Compile Include="Application\LexRevolutionProductBuilder.cs" />
     <Compile Include="Application\MasterDataRuntimeCatalog.cs" />
     <Compile Include="Application\MachineBaseMasterDataSettings.cs" />
@@ -96,6 +99,7 @@
     <Compile Include="Application\StructuralCalculationService.cs" />
     <Compile Include="Application\WorktopBracketPlacementService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
+    <Compile Include="Application\ProductRequestDimensionValidationService.cs" />
     <Compile Include="Application\ProfileTraceabilityService.cs" />
     <Compile Include="Application\ProfileConnectionTapOperationService.cs" />
     <Compile Include="Application\ProfileConnectionGeometryService.cs" />
@@ -135,6 +139,7 @@
     <Compile Include="Domain\DrawingContracts.cs" />
     <Compile Include="Domain\DrillOperation.cs" />
     <Compile Include="Domain\FastenerDefinition.cs" />
+    <Compile Include="Domain\FoldingWorkbenchConfig.cs" />
     <Compile Include="Domain\HardwareItem.cs" />
     <Compile Include="Domain\LibraryCatalog.cs" />
     <Compile Include="Domain\LexWorkbenchConfig.cs" />
@@ -178,6 +183,7 @@
     <Compile Include="Drawing\SheetOperations.cs" />
     <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
+    <Compile Include="Engine\FoldingWorkbenchEngine.cs" />
     <Compile Include="Engine\MachineBaseEngine.cs" />
     <Compile Include="Engine\MaterialCartEngine.cs" />
     <Compile Include="Engine\RobotCellEngine.cs" />
@@ -225,6 +231,7 @@
     <Compile Include="Portal\WorkbenchCabinetAuditService.cs" />
     <Compile Include="SolidWorks\ISolidWorksExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksComPartExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksAssemblyAudit.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerHtmlExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerDrawingExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerPowerPointExporter.cs" />

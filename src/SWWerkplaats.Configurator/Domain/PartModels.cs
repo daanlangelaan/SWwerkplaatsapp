@@ -127,5 +127,13 @@ namespace SWWerkplaats.Configurator.Domain
         public OperationFace Face { get; set; }
         public OperationDepthMode DepthMode { get; set; }
         public string Note { get; set; }
+        /// <summary>
+        /// Stable backend contract ID for a pocket that must be occupied by an
+        /// adjoining assembly member. Empty clearance, handle and access pockets
+        /// deliberately leave this value empty.
+        /// </summary>
+        public string AssemblyFitContractId { get; set; }
+        public bool RequiresAssemblyOccupant { get; set; }
+        public double MinimumAssemblyOccupancyRatio { get; set; }
     }
 }

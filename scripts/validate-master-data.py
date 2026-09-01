@@ -147,7 +147,10 @@ def main() -> int:
     allowed_delivery_forms = set(delivery_contract.get("allowedDeliveryForms", []))
     allowed_receipt_methods = set(delivery_contract.get("allowedReceiptMethods", []))
     default_delivery_form = delivery_contract.get("defaultDeliveryForm", "")
-    if not allowed_delivery_forms or not allowed_receipt_methods or default_delivery_form not in allowed_delivery_forms:
+    default_receipt_method = delivery_contract.get("defaultReceiptMethod", "")
+    if (not allowed_delivery_forms or not allowed_receipt_methods
+            or default_delivery_form not in allowed_delivery_forms
+            or default_receipt_method not in allowed_receipt_methods):
         errors.append("Schema bevat geen compleet productDeliveryContract")
     root_product_ids = {product["Product-ID"] for product in products if not product.get("Basisproduct-ID", "").strip()}
     for product_id in root_product_ids:
@@ -161,7 +164,7 @@ def main() -> int:
         receipt_options = {entry.split("|", 1)[0].strip() for entry in receipt_rows[0].get("Opties", "").split(";") if entry.strip()}
         if delivery_options != allowed_delivery_forms or delivery_rows[0].get("Standaardwaarde", "").strip() != default_delivery_form:
             errors.append(f"Basisproduct {product_id} heeft een onjuist levervormcontract")
-        if receipt_options != allowed_receipt_methods or receipt_rows[0].get("Standaardwaarde", "").strip():
+        if receipt_options != allowed_receipt_methods or receipt_rows[0].get("Standaardwaarde", "").strip() != default_receipt_method:
             errors.append(f"Basisproduct {product_id} heeft een onjuist ontvangstcontract")
 
     card_contract = schema.get("productCardImageContract", {})

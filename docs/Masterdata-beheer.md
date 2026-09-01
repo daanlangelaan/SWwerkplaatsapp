@@ -20,6 +20,22 @@ De werkmap wordt niet rechtstreeks door de actieve pricing- en CAM-code gelezen.
 
 De bedoelde tabelnamen en relaties staan in `config/master-data-schema.json`. Validator en snapshotgenerator gebruiken dit contract voor tabellen, sleutels en verboden legacy-tabbladen.
 
+## Productovererving en configuratieblokkades
+
+De cataloguscontrole is app-breed, maar technische waarden zijn niet automatisch
+voor ieder product gelijk. Een product erft productregels en invoercontracten
+uitsluitend langs zijn expliciete `Basisproduct-ID`-keten. Zet een gedeelde
+materiaalkeuze of parametergrens daarom op het hoogste basisproduct waarvoor die
+waarde technisch geldig is; een afgeleid product legt alleen een expliciete
+override vast wanneer zijn grens strenger of zijn keuze anders is.
+
+Een wijziging aan `shipping_box` geeft dus geen kast- of werkbankproduct vrij.
+Een wijziging aan basisproduct `cabinet` stroomt wel door naar `vakjeskast` en
+`werkbankkast`, tenzij een van die producten dezelfde regelsoort overschrijft.
+De backend gebruikt het opgeloste contract zowel voor `CanConfigure` als voor de
+werkelijke invoerklemming en materiaaldefault. Daardoor mag de modelbouwer geen
+afwijkende hardcoded grens of anonieme materiaalfallback meer gebruiken.
+
 ## Leveranciersselectie
 
 Een voorkeur is geen productregel maar een relatie tussen categorie, subcategorie, leverancier en scope. De app filtert eerst op `Categorie`, `Subcategorie` en `Scope-type`/`Scope-ID`; vervolgens wint de laagste actieve `Rang`. `Alle producten` geldt ook voor producten die later worden toegevoegd. Een kandidaataanbieder krijgt pas invloed wanneer zijn voorkeur de status `Actief` heeft.

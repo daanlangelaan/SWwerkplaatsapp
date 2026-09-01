@@ -30,7 +30,7 @@
   ,
   "materialAppearanceContract": {
     "field": "Renderweergave",
-    "allowedValues": ["standaard", "multiplex-gelaagd"],
+    "allowedValues": ["standaard", "multiplex-gelaagd", "betonplex-donker", "osb-vlokken"],
     "renderSemantics": "De backend geeft de beheerde materiaalweergave en de plaatdikte-as door. De UI tekent alleen de bijbehorende generieke presentatie en koppelt nooit op materiaal-ID of productnaam."
   },
   "materialCustomerNameContract": {
@@ -58,6 +58,7 @@
     "allowedDeliveryForms": ["bouwpakket", "gemonteerd"],
     "defaultDeliveryForm": "bouwpakket",
     "allowedReceiptMethods": ["verzenden", "afhalen"],
+    "defaultReceiptMethod": "verzenden",
     "pricingSemantics": "Montage bij gemonteerd en verpakking/verzending bij verzenden blijven op aanvraag totdat Bedrijfsbeheer een bedrag vaststelt. Afhalen is toegestaan en heeft geen verzendkosten.",
     "automaticShippingOpenData": ["klant- en afleveradres", "verpakkingsmaten", "langste profiel- en plaatmaat", "totaalgewicht", "vervoerdersregels en tarieven"]
   },

@@ -15,6 +15,7 @@ namespace SWWerkplaats.Configurator.Domain
         public double HandleCenterHeightRatio { get; set; }
         public double RabbetClearanceMm { get; set; }
         public double RabbetDepthFactor { get; set; }
+        public double StockAllowanceMm { get; set; }
     }
 
     public sealed class CrateClipTemplate

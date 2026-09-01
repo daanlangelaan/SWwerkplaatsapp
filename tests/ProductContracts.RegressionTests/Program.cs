@@ -63,7 +63,9 @@ internal static class Program
                 VerifyProfileStickerPolicy(item.Contract.ProductId, item.Model);
                 VerifyProfileProductionSequence(item.Contract.ProductId, item.Model);
                 VerifyProfileProjectConfiguration(item.Contract.ProductId, item.Model);
+                VerifyUniversalSolidWorksSourceGeometry(item.Contract.Request, item.Model);
             }
+            VerifyPrimaryDimensionBoundsAreRejected();
             VerifyRobotCellGeometry(models.Single(item => item.Contract.ProductId == "robotcel").Model);
             VerifyLinearRobotCellGeometry(models.Single(item => item.Contract.ProductId == "lineaire_robotcel").Model);
             VerifyLinearRobotCellConceptReleaseContract(models.Single(item => item.Contract.ProductId == "lineaire_robotcel").Contract.Request);
@@ -87,6 +89,10 @@ internal static class Program
                 models.Single(item => item.Contract.ProductId == "hoogteverstelbare_werktafel").Contract.Request,
                 models.Single(item => item.Contract.ProductId == "hoogteverstelbare_werktafel").Model);
             VerifyHeightAdjustableWorkbenchVariants();
+            VerifyShippingBoxSheetFit();
+            VerifyShippingBoxSharedClipAndMaterialRender();
+            VerifySolidWorksAssemblyProbeContract();
+            VerifyFoldingWorkbenchConcept();
             VerifyProfileSlotGeometryMasterdata();
             VerifyWorkbenchBackPanelConnections(models.Single(item => item.Contract.ProductId == "werkbankkast").Model);
             VerifyPortalPresentationBoundary();
@@ -121,6 +127,333 @@ internal static class Program
                 && response.ReceiptMethod == "verzenden"
                 && response.DeliveryPriceNote.Contains("exclusief montage, verpakking en verzending"),
             "Werktafelpreview: prijs, nesting en 12 getraceerde profielen moeten zonder niet-vrijgegeven CAM-taplijst renderen");
+    }
+
+    private static void VerifyPrimaryDimensionBoundsAreRejected()
+    {
+        var products = new ProductCatalogApplicationService().ListProducts();
+        var validator = new ProductRequestDimensionValidationService();
+        foreach (var product in products)
+        foreach (var constraint in product.InputConstraints)
+        {
+            var request = Request(product.Product, product.DefaultWidthMm, product.DefaultDepthMm, product.DefaultHeightMm, null);
+            var rejectedValue = constraint.Minimum - 1.0;
+            if (constraint.InputId == "widthMm") request.WidthMm = rejectedValue;
+            else if (constraint.InputId == "depthMm") request.DepthMm = rejectedValue;
+            else if (constraint.InputId == "heightMm") request.HeightMm = rejectedValue;
+            else throw new InvalidOperationException("Onbekende primaire testmaat: " + constraint.InputId);
+            var rejected = false;
+            try
+            {
+                validator.Validate(request);
+            }
+            catch (ProductInputValidationException ex)
+            {
+                rejected = ex.Message.Contains("minimummaat") && ex.Message.Contains(constraint.SourceRuleId);
+            }
+            Require(rejected, product.Product + ": maat onder minimum werd niet door het gedeelde backendcontract geweigerd voor " + constraint.InputId);
+        }
+
+        var foldingRejected = false;
+        try
+        {
+            new ProductModelBuildService().Build(Request("opvouwbare_werktafel", 1800, 800, 400, null));
+        }
+        catch (ProductInputValidationException ex)
+        {
+            foldingRejected = ex.Message.Contains("minimummaat") && ex.Message.Contains("Hoogte");
+        }
+        Require(foldingRejected, "Opvouwbare werktafel: 400 mm hoogte mag niet stilzwijgend naar de minimumhoogte worden geklemd");
+    }
+
+    private static void VerifyShippingBoxSheetFit()
+    {
+        var shippingBox = new ProductCatalogApplicationService().ListProducts()
+            .Single(product => product.Product == "shipping_box");
+        Require(shippingBox.CanConfigure
+            && shippingBox.MissingConfigurationData.Length == 0
+            && Close(shippingBox.InputConstraints.Single(rule => rule.InputId == "widthMm").Minimum, 200)
+            && Close(shippingBox.InputConstraints.Single(rule => rule.InputId == "widthMm").Maximum, 2364)
+            && Close(shippingBox.InputConstraints.Single(rule => rule.InputId == "depthMm").Maximum, 2364)
+            && Close(shippingBox.InputConstraints.Single(rule => rule.InputId == "heightMm").Maximum, 2400)
+            && Close(ShippingBoxMasterDataSettings.LoadRequired().StockAllowanceMm, 40),
+            "Shipping box: globale binnenmaatgrenzen moeten uit productmasterdata komen");
+
+        var elongated = new ProductModelBuildService().Build(Request("shipping_box", 2364, 800, 800, request =>
+        {
+            request.SheetMaterialId = "osb_18";
+            request.ShippingBoxJointMode = "rabbet";
+        }));
+        Require(elongated.Sheets.Any(part => Close(part.LengthMm, 2400) && Close(part.WidthMm, 836)),
+            "Shipping box: een lang, smal bodempaneel moet geroteerd uit de handelsplaat kunnen worden gehaald");
+
+        var exactLocalized = new ProductModelBuildService().Build(Request("shipping_box", 2364, 1144, 1144, request =>
+        {
+            request.SheetMaterialId = "osb_18";
+            request.ShippingBoxJointMode = "localized_tabs";
+        }));
+        Require(exactLocalized.Sheets.Any(part => Close(part.LengthMm, 2400) && Close(part.WidthMm, 1180)),
+            "Shipping box: de bruikbare 2400 x 1180 grens moet met lokale montagetappen geldig blijven");
+
+        try
+        {
+            new ProductModelBuildService().Build(Request("shipping_box", 2364, 2364, 800, request =>
+            {
+                request.SheetMaterialId = "osb_18";
+                request.ShippingBoxJointMode = "rabbet";
+            }));
+            throw new InvalidOperationException("Shipping box met te groot bodempaneel is ten onrechte geaccepteerd.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Require(ex.Message.Contains("past ook na draaien niet uit plaat"),
+                "Shipping box: onmogelijke maatcombinatie geeft geen bruikbare plaatpassing-fout");
+        }
+    }
+
+    private static void VerifyShippingBoxSharedClipAndMaterialRender()
+    {
+        const string clipId = "liangyue_ly103_12_candidate";
+        var request = Request("shipping_box", 1200, 800, 800, item =>
+        {
+            item.SheetMaterialId = "osb_18";
+            item.ShippingBoxIncludeHandles = true;
+        });
+        var model = new ProductModelBuildService().Build(request);
+        var clipPlacements = model.AssemblyPlacements
+            .Where(item => item.Kind == AssemblyComponentKind.Purchased)
+            .ToArray();
+        Require(clipPlacements.Length == 40
+                && clipPlacements.All(item => string.Equals(item.ComponentId, clipId, StringComparison.OrdinalIgnoreCase))
+                && clipPlacements.Select(item => item.RotationZDeg).Distinct().Count() > 1,
+            "Shipping box: alle klemplaatsingen moeten naar één globaal componentcontract verwijzen en hun naadoriëntatie behouden");
+
+        var clipThickness = ProductDefaults.ShippingBoxCrateClip().ThicknessMm;
+        var bottomFront = clipPlacements.First(item => item.PartName.Contains("bodem voor/achter") && item.Zmm < 0);
+        var topBack = clipPlacements.First(item => item.PartName.Contains("deksel voor/achter") && item.Zmm > 0);
+        Require(Close(bottomFront.Ymm, -clipThickness)
+                && Close(bottomFront.Zmm, -(800 + 2 * 18) / 2.0 - clipThickness)
+                && Close(topBack.Ymm, 800 + 2 * 18 + clipThickness)
+                && Close(topBack.Zmm, (800 + 2 * 18) / 2.0 + clipThickness),
+            "Shipping box: clipankers moeten met de clipdikte buiten beide houten huidvlakken liggen om coplanaire 3D-weergave te voorkomen");
+
+        var contract = new ComponentPrimitiveRenderContractService().BuildRequired(clipId);
+        Require(contract.Status == "ProvisionalRenderEnvelope"
+                && contract.OpenData.Count > 0
+                && contract.Primitives.Count == 5
+                && contract.Primitives.All(item => string.Equals(item.AppearanceRole, "black-hardware", StringComparison.OrdinalIgnoreCase)),
+            "Shipping box: het globale klemmodel moet vijf gedeelde proefprimitieven en expliciete open meetdata bevatten");
+
+        var rendered = new PortalAssembly3DService().Build(model, request);
+        Require(rendered.Count(item => string.Equals(item.ComponentId, clipId, StringComparison.OrdinalIgnoreCase)) == 200
+                && rendered.Where(item => item.Kind == "sheet").All(item => item.MaterialAppearance == "osb-vlokken")
+                && rendered.Where(item => string.Equals(item.ComponentId, clipId, StringComparison.OrdinalIgnoreCase))
+                    .All(item => item.ComponentRenderOpenData.Count > 0),
+            "Shipping box: web-3D moet dezelfde globale klemprimitieven en de OSB-materiaalweergave uit backendcontracten ontvangen");
+
+        var folder = Path.Combine(Path.GetTempPath(), "sww-shipping-box-clip-macro-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var macroPath = new SolidWorksMacroExporter().ExportMacro(model, folder);
+            var macro = File.ReadAllText(macroPath, Encoding.Default);
+            Require(macro.Contains(clipId + "__render.SLDASM")
+                    && macro.Contains(clipId + "__arm-horizontal.SLDPRT")
+                    && macro.Contains("Sub SaveActiveAssembly")
+                    && macro.Contains("Left(orientation, 2) = \"M:\"")
+                    && macro.Contains("OpenDoc6(partPath, documentType"),
+                "Shipping box: SolidWorks-proefmacro moet dezelfde globale klemgeometrie als herbruikbare subassembly genereren en plaatsen");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    private static void VerifySolidWorksAssemblyProbeContract()
+    {
+        var method = typeof(SolidWorksComPartExporter).GetMethod("ProbeExternalAssemblyInsertion");
+        var auditMethod = typeof(SolidWorksComPartExporter).GetMethod("ExportAuditedAssembly");
+        var waitMethod = typeof(SolidWorksComPartExporter).GetMethod("WaitForRunningSolidWorks", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var processMethod = typeof(SolidWorksComPartExporter).GetMethod("SolidWorksProcessIds", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Require(method != null && method.ReturnType == typeof(SolidWorksAssemblyProbeResult),
+            "SolidWorks: de losse WAC-/assemblyproef moet naast de bestaande multibody-export beschikbaar zijn");
+        Require(auditMethod != null && auditMethod.ReturnType == typeof(SolidWorksAuditedAssemblyResult),
+            "SolidWorks: de geaudite SLDASM-export moet naast de bestaande multibody-export beschikbaar zijn");
+        Require(waitMethod != null && processMethod != null,
+            "SolidWorks: de worker moet een bestaande lokale sessie afwachten en mag niet blind een tweede instantie starten");
+
+        var result = new SolidWorksAssemblyProbeResult
+        {
+            ContractVersion = 1,
+            Status = "Passed",
+            Ok = true,
+            AssemblyInsertionAvailable = true,
+            InsertedComponentCount = 2,
+            ReopenedComponentCount = 2
+        };
+        var json = new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(result);
+        Require(json.Contains("\"AssemblyInsertionAvailable\":true")
+                && json.Contains("\"InsertedComponentCount\":2")
+                && json.Contains("\"ReopenedComponentCount\":2")
+                && json.Contains("\"FailureStage\":"),
+            "SolidWorks: het assemblyproefrapport moet invoeg-, heropen- en faalfasebewijs serialiseren");
+
+        var transformType = typeof(SolidWorksComPartExporter).Assembly.GetType("SWWerkplaats.Configurator.SolidWorks.SolidWorksTransformMath");
+        var transformMethod = transformType == null ? null : transformType.GetMethod("Transform", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var transform = transformMethod == null ? null : (double[])transformMethod.Invoke(null, new object[] { 100.0, 200.0, 300.0, 0.0, 0.0, 90.0 });
+        Require(transform != null
+                && Close(transform[0], 0) && Close(transform[1], 1) && Close(transform[2], 0)
+                && Close(transform[3], -1) && Close(transform[4], 0) && Close(transform[5], 0)
+                && Close(transform[9], 0.1) && Close(transform[10], 0.2) && Close(transform[11], 0.3),
+            "SolidWorks: de gedeelde XYZ-Eulertransform moet rotatie en millimeter-naar-metertranslatie exact vastleggen");
+    }
+
+    private static void VerifyFoldingWorkbenchConcept()
+    {
+        const string productId = "opvouwbare_werktafel";
+        const string hingeId = "ggoedkoop_axa_ball_bearing_hinge_rvs_76x76x25";
+        var catalog = new ProductCatalogApplicationService().ListProducts().Single(product => product.Product == productId);
+        var longEdgeInsetInput = catalog.ConfigurationInputs.Single(input => input.RequestField == "FoldingWorkbenchUnderframeInsetLongEdgeMm");
+        var shortEdgeInsetInput = catalog.ConfigurationInputs.Single(input => input.RequestField == "FoldingWorkbenchUnderframeInsetShortEdgeMm");
+        Require(catalog.CanConfigure
+                && Close(catalog.DefaultWidthMm, 2400)
+                && Close(catalog.DefaultDepthMm, 1180)
+                && Close(catalog.DefaultHeightMm, 900)
+                && catalog.AllowedSheetMaterialIds.SequenceEqual(new[] { "betonplex_18" })
+                && longEdgeInsetInput.InputType == "number"
+                && longEdgeInsetInput.DefaultValue == "80"
+                && Close(longEdgeInsetInput.Minimum.Value, 40)
+                && Close(longEdgeInsetInput.Maximum.Value, 100)
+                && shortEdgeInsetInput.InputType == "number"
+                && shortEdgeInsetInput.DefaultValue == "80"
+                && Close(shortEdgeInsetInput.Minimum.Value, 40)
+                && Close(shortEdgeInsetInput.Maximum.Value, 160)
+                && !catalog.ProductionReleased
+                && catalog.OpenReleaseItems.Length >= 5,
+            "Opvouwbare werktafel: configureerbare conceptdefaults, twee ondersteloffsets, betonplexkeuze en vrijgaveblokkades moeten uit masterdata komen");
+
+        var request = Request(productId, 2400, 1180, 900, item =>
+        {
+            item.SheetMaterialId = "betonplex_18";
+            item.DeliveryForm = "bouwpakket";
+            item.ReceiptMethod = "afhalen";
+        });
+        var model = new ProductModelBuildService().Build(request);
+        var settings = FoldingWorkbenchMasterDataSettings.LoadRequired();
+        var top = model.Sheets.Single(sheet => sheet.Name == "Uitneembaar werkblad");
+        var longPanels = model.Sheets.Where(sheet => sheet.Name.StartsWith("Langspaneel ", StringComparison.Ordinal)).ToArray();
+        var shortPanels = model.Sheets.Where(sheet => sheet.Name.StartsWith("Vouwpaneel ", StringComparison.Ordinal)).ToArray();
+        var hingeContract = new ComponentPrimitiveRenderContractService().BuildRequired(hingeId);
+        Require(model.Sheets.Count == 7
+                && model.AssemblyPlacements.Count == 13
+                && model.AssemblyPlacements.Count(item => item.Kind == AssemblyComponentKind.Purchased) == 6
+                && model.AssemblyPlacements.Where(item => item.Kind == AssemblyComponentKind.Purchased)
+                    .All(item => item.ComponentId == hingeId)
+                && top.Pockets.Count == 14
+                && top.Holes.Count == 56
+                && top.Pockets.Count(slot => Close(slot.LengthMm, 82) && Close(slot.WidthMm, 20)) == 6
+                && top.Pockets.Count(slot => Close(slot.LengthMm, 20) && Close(slot.WidthMm, 82)) == 8
+                && top.Pockets.All(slot => slot.DepthMode == OperationDepthMode.Through)
+                && model.Hardware.Single(item => item.PricingKey == hingeId).Quantity == 6,
+            "Opvouwbare werktafel: zeven plaatdelen, zes normale scharnieren, zes langspaneelslots, acht korte-paneelslots en 56 dogbones moeten parametrisch aanwezig zijn");
+        Require(Close(settings.DefaultUnderframeInsetLongEdgeMm, 80)
+                && Close(settings.DefaultUnderframeInsetShortEdgeMm, 80)
+                && longPanels.All(item => Close(item.LengthMm, 2240))
+                && shortPanels.All(item => Close(item.LengthMm, 508))
+                && Close(settings.IntegratedFootWidthMm, settings.FrameStileWidthMm)
+                && Close(settings.IntegratedFootReliefHeightMm, 30)
+                && longPanels.Length == 2
+                && longPanels.All(item => item.CustomContour.Count(point => Close(point.Ymm, 0)) == 6)
+                && longPanels.All(item => item.CustomContour.Count(point => Close(point.Ymm, settings.IntegratedFootReliefHeightMm)) == 4)
+                && shortPanels.Length == 4
+                && shortPanels.All(item => item.CustomContour.Count(point => Close(point.Ymm, 0)) == 4)
+                && shortPanels.All(item => item.CustomContour.Count(point => Close(point.Ymm, settings.IntegratedFootReliefHeightMm)) == 2),
+            "Opvouwbare werktafel: 80-mm bladoversteek moet een onderstel van 2240 x 1020 mm afleiden; ieder langspaneel moet drie geïntegreerde stijlvoeten hebben en ieder kort half vouwpaneel twee, met alleen tussenliggende 30-mm vloervrijloop");
+        Require(hingeContract.Primitives.Count == 6
+                && hingeContract.Primitives.Count(item => item.Shape == "box") == 2
+                && hingeContract.Primitives.Count(item => item.Shape == "cylinder") == 4
+                && hingeContract.Primitives.Select(item => item.PartId).Distinct().OrderBy(value => value)
+                    .SequenceEqual(new[] { "blad-a", "blad-b", "pen" })
+                && hingeContract.Primitives.Sum(item => item.Holes.Count) == 6
+                && hingeContract.Primitives.Where(item => item.Shape == "box").All(item => item.Holes.Count == 3)
+                && hingeContract.Primitives.Where(item => item.PartId != "pen" && item.Shape == "cylinder")
+                    .All(item => Close(item.SizeXmm, 10.8)),
+            "Opvouwbare werktafel: AXA-scharnier moet drie fysieke delen hebben, met knoopsegmenten bij de twee bladen en drie gaten per blad");
+        Require(model.AssemblyConnections.Count(item => item.JointType == AssemblyJointType.SheetHinge) == 6
+                && model.AssemblyConnections.Where(item => item.JointType == AssemblyJointType.SheetHinge)
+                    .All(item => item.ConnectorId == hingeId && item.Status == AssemblyDataStatus.Provisional && item.OpenData.Count >= 2)
+                && model.AssemblyConnections.Any(item => item.TappedPartName == "Langspaneel voor" && item.SlotPartName == "Vouwpaneel links voor")
+                && model.AssemblyConnections.Any(item => item.TappedPartName == "Vouwpaneel links voor" && item.SlotPartName == "Vouwpaneel links achter")
+                && model.AssemblyConnections.Any(item => item.TappedPartName == "Vouwpaneel links achter" && item.SlotPartName == "Langspaneel achter"),
+            "Opvouwbare werktafel: iedere scharnieras moet de twee bedoelde plaatdelen expliciet en voorlopig verbinden");
+        var hingePlan = new AssemblyInstructionPlanningService().Build(model);
+        Require(hingePlan.Available && !hingePlan.SequenceConfirmed && !hingePlan.CanReleaseForProduction
+                && hingePlan.Steps.Count == 4
+                && hingePlan.Steps[0].Title.Contains("drie gaten per blad")
+                && hingePlan.Steps[1].Title.Contains("binnenzijde")
+                && hingePlan.Steps[2].Title.Contains("vrijgegeven plaatbevestiger")
+                && hingePlan.MissingData.Count >= 2,
+            "Opvouwbare werktafel: conceptassemblage mag geen T-sleufinstructies tonen en moet de open scharnierbevestiging blokkeren");
+
+        var parts = new PortalAssembly3DService().Build(model, request);
+        var motion = new PortalMotionContractService().Build(model, request, parts);
+        var frontLongPanel = parts.Single(item => item.Name == "Langspaneel voor");
+        var rearLongPanel = parts.Single(item => item.Name == "Langspaneel achter");
+        var seatedTop = parts.Single(item => item.Name == "Uitneembaar werkblad");
+        var foldedRear = rearLongPanel.HorizontalMotionKeyframes.Single(frame => Close(frame.Value, 0));
+        var openRear = rearLongPanel.HorizontalMotionKeyframes.Single(frame => Close(frame.Value, 1));
+        var foldingPanels = parts.Where(item => item.Name.StartsWith("Vouwpaneel ", StringComparison.Ordinal)).ToArray();
+        var hingeParts = parts.Where(item => string.Equals(item.ComponentId, hingeId, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var leftFrontPanel = foldingPanels.Single(item => item.Name == "Vouwpaneel links voor");
+        var leftRearPanel = foldingPanels.Single(item => item.Name == "Vouwpaneel links achter");
+        var middlePanelGap = leftRearPanel.Zmm - leftRearPanel.SizeZmm / 2.0
+            - (leftFrontPanel.Zmm + leftFrontPanel.SizeZmm / 2.0);
+        Require(Close(frontLongPanel.SizeXmm, 2240)
+                && Close(leftFrontPanel.SizeZmm, 508)
+                && Close((seatedTop.SizeXmm - frontLongPanel.SizeXmm) / 2.0, settings.DefaultUnderframeInsetShortEdgeMm),
+            "Opvouwbare werktafel: de portalassembly moet dezelfde 80-mm bladoversteek en afgeleide paneelmaten als model en nesting gebruiken");
+        Require(motion.Horizontal != null && motion.Horizontal.DisplayKind == "fold-fraction"
+                && Close(motion.Horizontal.Minimum, 0) && Close(motion.Horizontal.Maximum, 1)
+                && motion.Vertical != null && motion.Vertical.DisplayKind == "clearance"
+                && Close(motion.Vertical.Maximum, 150)
+                && Close(seatedTop.MotionTranslateYPerMm, 1)
+                && Close(openRear.Zmm, rearLongPanel.Zmm)
+                && Close(foldedRear.Zmm - frontLongPanel.Zmm, 80),
+            "Opvouwbare werktafel: de korte-zijdevouwslider, bladslider en 80-mm conceptpakketdikte moeten uit het backendcontract volgen");
+        Require(foldingPanels.Length == 4
+                && foldingPanels.All(item => item.SizeYmm >= 882)
+                && foldingPanels.All(item => item.SizeZmm > item.SizeXmm)
+                && Close(middlePanelGap, 2)
+                && foldingPanels.All(item => item.HorizontalMotionKeyframes.Any(frame => Math.Abs(frame.RotationYDeg) > 80))
+                && foldingPanels.All(item => Math.Abs(item.HorizontalMotionKeyframes.Single(frame => Close(frame.Value, 0)).Xmm) < Math.Abs(item.Xmm))
+                && hingeParts.Length == 36
+                && hingeParts.GroupBy(item => item.AssemblyInstanceId).Count() == 6
+                && hingeParts.GroupBy(item => item.AssemblyInstanceId).All(group => group.Count() == 6)
+                && hingeParts.GroupBy(item => item.AssemblyInstanceId).All(group => group.Select(item => item.PhysicalPartId).Distinct().Count() == 3)
+                && hingeParts.Where(item => !string.IsNullOrWhiteSpace(item.RigidMotionDriverName))
+                    .All(item => parts.Any(driver => driver.Name == item.RigidMotionDriverName))
+                && parts.Count(item => item.HorizontalMotionKeyframes.Count == 21) == 33,
+            "Opvouwbare werktafel: vier korte framepanelen op geïntegreerde voeten moeten met 2-mm plaatvoegen naar binnen vouwen en zes driedelige scharnieren plus vijf plaatdelen moeten hun juiste rigide bewegingsdrivers volgen; panelen="
+            + foldingPanels.Length + ", hoogtes=" + string.Join(",", foldingPanels.Select(item => item.SizeYmm.ToString("0.###")))
+            + ", rotaties=" + string.Join(",", foldingPanels.Select(item => item.HorizontalMotionKeyframes.Count == 0 ? "geen" : item.HorizontalMotionKeyframes.Max(frame => Math.Abs(frame.RotationYDeg)).ToString("0.###")))
+            + ", bewegend=" + parts.Count(item => item.HorizontalMotionKeyframes.Count == 21));
+
+        var asymmetricRequest = Request(productId, 2400, 1180, 900, item =>
+        {
+            item.SheetMaterialId = "betonplex_18";
+            item.DeliveryForm = "bouwpakket";
+            item.ReceiptMethod = "verzenden";
+            item.FoldingWorkbenchUnderframeInsetLongEdgeMm = 60;
+            item.FoldingWorkbenchUnderframeInsetShortEdgeMm = 120;
+        });
+        var asymmetricModel = new ProductModelBuildService().Build(asymmetricRequest);
+        var asymmetricLongPanels = asymmetricModel.Sheets.Where(sheet => sheet.Name.StartsWith("Langspaneel ", StringComparison.Ordinal)).ToArray();
+        var asymmetricShortPanels = asymmetricModel.Sheets.Where(sheet => sheet.Name.StartsWith("Vouwpaneel ", StringComparison.Ordinal)).ToArray();
+        Require(asymmetricLongPanels.All(item => Close(item.LengthMm, 2160))
+                && asymmetricShortPanels.All(item => Close(item.LengthMm, 528))
+                && asymmetricModel.Sheets.Single(item => item.Name == "Uitneembaar werkblad").Pockets.Count == 14,
+            "Opvouwbare werktafel: korte-zijde-offset 120 mm moet alleen de onderstellengte sturen en lange-zijde-offset 60 mm alleen de ondersteldiepte; alle veertien bladslots moeten mee afleiden");
     }
 
     private static void VerifyDeliveryOrderFlow()
@@ -160,21 +493,17 @@ internal static class Program
                 && assembledOrder.ShippingPriceStatus == "Op aanvraag",
                 "Gemonteerd: assemblage, completeren en openstaande leveringsprijzen moeten worden vastgelegd");
 
-            var missingReceipt = Request("shipping_box", 1200, 800, 800, request =>
+            var defaultReceipt = Request("shipping_box", 1200, 800, 800, request =>
             {
                 request.SheetMaterialId = "osb_18";
                 request.ShippingBoxIncludeHandles = true;
                 request.DeliveryForm = "bouwpakket";
             });
-            try
-            {
-                service.CreateOrder(missingReceipt);
-                throw new InvalidOperationException("Order zonder ontvangstwijze is ten onrechte geaccepteerd.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Require(ex.Message.Contains("Ontvangst"), "Order zonder ontvangstwijze geeft geen bruikbare validatiefout");
-            }
+            var defaultReceiptOrder = service.CreateOrder(defaultReceipt);
+            Require(defaultReceiptOrder.ReceiptMethod == "verzenden"
+                && defaultReceiptOrder.ProductionAreas.Any(area => area.AreaId == "dispatch")
+                && defaultReceiptOrder.ShippingPriceStatus == "Op aanvraag",
+                "Lege ontvangstwijze moet de masterdata-standaard Verzenden gebruiken");
         }
         finally
         {
@@ -447,11 +776,11 @@ internal static class Program
             "EnsureProjectExportSelectionAllowed",
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         Require(selectionMethod != null, "Lineaire robotcel: exportselectiecontrole ontbreekt");
-        selectionMethod.Invoke(null, new object[] { request, release, false, true, false, false, false, false, true });
+        selectionMethod.Invoke(null, new object[] { request, release, false, true, false, false, false, false, true, true });
         var camBlocked = false;
         try
         {
-            selectionMethod.Invoke(null, new object[] { request, release, true, true, false, false, false, false, true });
+            selectionMethod.Invoke(null, new object[] { request, release, true, true, false, false, false, false, true, true });
         }
         catch (System.Reflection.TargetInvocationException ex)
         {
@@ -607,7 +936,8 @@ internal static class Program
         var envelopeMethod = typeof(WorkbenchCabinetAuditService).GetMethod("CheckAssemblyEnvelope", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         var rangeMethod = typeof(ProductionOutputService).GetMethod("BuildMotionRangeSvg", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         var htmlMethod = typeof(ProductionOutputService).GetMethod("BuildAssembly3DHtml", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-        Require(envelopeMethod != null && rangeMethod != null && htmlMethod != null, "LEX: interne envelop- of bereikbeeldexport ontbreekt");
+        var embeddedHtmlMethod = typeof(ProductionOutputService).GetMethod("BuildEmbeddedAssembly3DHtml", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Require(envelopeMethod != null && rangeMethod != null && htmlMethod != null && embeddedHtmlMethod != null, "LEX: interne envelop-, bereikbeeld- of gedeelde webviewerexport ontbreekt");
         envelopeMethod.Invoke(null, new object[] { model, request, envelopeAudit });
         Require(envelopeAudit.Passed,
             "LEX: leveranciersgeometrie van kogelpotten en Item-aanslagen moet binnen de vrijgegeven externe product-envelop vallen: "
@@ -616,6 +946,7 @@ internal static class Program
         var horizontalSvg = (string)rangeMethod.Invoke(null, new object[] { parts, motion, false });
         var serializer = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = int.MaxValue };
         var html = (string)htmlMethod.Invoke(null, new object[] { parts, motion, serializer });
+        var embeddedHtml = (string)embeddedHtmlMethod.Invoke(null, new object[] { parts, motion, serializer });
         Require(heightSvg.Contains("848 mm werkhoogte") && heightSvg.Contains("1248 mm werkhoogte"),
             "LEX: laagste en hoogste werkhoogte ontbreken in het bereikbeeld");
         Require(horizontalSvg.Contains("maximale oversteek") && horizontalSvg.Contains("560 mm"),
@@ -638,6 +969,16 @@ internal static class Program
                 && html.Contains("data:text/javascript;base64,")
                 && !html.Contains("function box(part,a,s)"),
             "LEX: het zelfstandige 3D-klantmodel gebruikt niet dezelfde WebGL-profielrenderer als de portal");
+        Require(embeddedHtml.Contains("<body class=\"embedded\">")
+                && embeddedHtml.Contains("buildThreeParts(THREE,group,adjustedParts())")
+                && embeddedHtml.Contains("openTSlotModuleShape")
+                && embeddedHtml.Contains("data:text/javascript;base64,")
+                && embeddedHtml.Contains("new OrbitControls(camera,canvas)")
+                && embeddedHtml.Contains("controls.enablePan=true")
+                && embeddedHtml.Contains("controls.enableRotate=true")
+                && embeddedHtml.Contains("controls.enableZoom=true")
+                && !embeddedHtml.Contains("canvas.addEventListener('pointermove'"),
+            "Gedeelde webviewer: productwebsites moeten de centrale portalrenderer insluiten in plaats van een eigen visualisatielaag te bouwen");
 
         var customerModelPathMethod = typeof(ProductionOutputService).GetMethod(
             "InteractiveCustomerModelPath",
@@ -667,26 +1008,37 @@ internal static class Program
         Require(catalog.Presentation.DesignTokens != null
             && catalog.Presentation.DesignTokens.Colors.ContainsKey("assemblyActive")
             && catalog.Presentation.DesignTokens.Colors.ContainsKey("plywoodFaceBase")
+            && catalog.Presentation.DesignTokens.Colors.ContainsKey("osbFlakeDark")
             && catalog.Presentation.DesignTokens.Typography.FontSizesPx.ContainsKey("body")
             && catalog.Presentation.DesignTokens.SpacingPx.ContainsKey("large")
             && catalog.Presentation.DesignTokens.ControlsPx["minimumTarget"] == 44
             && catalog.Presentation.DesignTokens.BreakpointsPx.ContainsKey("compact")
             && catalog.Presentation.Assembly.Animation.ContainsKey("hardwareMoveMs")
             && catalog.Presentation.Assembly.Camera.ContainsKey("detailWidthFill")
-            && catalog.Presentation.Assembly.Materials.ContainsKey("plywoodLayerBands"),
+            && catalog.Presentation.Assembly.Materials.ContainsKey("plywoodLayerBands")
+            && catalog.Presentation.Assembly.Materials.ContainsKey("osbFlakeCount"),
             "Portal: kleur, typografie, spacing, bediening, animatie en camerafit moeten centraal in het presentatiecontract staan");
 
         var portalHtml = PortalHtml.Page();
         Require(portalHtml.Contains("id=\"exportIncludeInteractiveCustomerModel\"")
                 && portalHtml.Contains("id=\"exportIncludeHighDefinitionCustomerModel\"")
+                && portalHtml.Contains("id=\"exportIncludeSolidWorksGeometryAudit\" class=\"exportOption\" type=\"checkbox\"")
                 && typeof(PortalQuoteRequest).GetProperty("ExportIncludeInteractiveCustomerModel") != null
-                && typeof(PortalQuoteRequest).GetProperty("ExportIncludeHighDefinitionCustomerModel") != null,
-            "Portalexport: interactief 3D en high-definition 3D + SW-bron moeten afzonderlijk selecteerbaar zijn");
+                && typeof(PortalQuoteRequest).GetProperty("ExportIncludeHighDefinitionCustomerModel") != null
+                && typeof(PortalQuoteRequest).GetProperty("ExportIncludeSolidWorksGeometryAudit") != null,
+            "Portalexport: interactief 3D, high-definition 3D en de optionele SolidWorks-geometriecontrole moeten afzonderlijk selecteerbaar zijn");
         var archiveMethod = typeof(ProductionOutputService).GetMethod("ShouldKeepSolidWorksArchive", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         Require(archiveMethod != null
                 && (bool)archiveMethod.Invoke(null, new object[] { new PortalQuoteRequest { ExportIncludeSolidWorks = false, ExportIncludeHighDefinitionCustomerModel = true } })
+                && (bool)archiveMethod.Invoke(null, new object[] { new PortalQuoteRequest { ExportIncludeSolidWorks = false, ExportIncludeHighDefinitionCustomerModel = false, ExportIncludeSolidWorksGeometryAudit = true } })
                 && !(bool)archiveMethod.Invoke(null, new object[] { new PortalQuoteRequest { ExportIncludeSolidWorks = false, ExportIncludeHighDefinitionCustomerModel = false } }),
-            "Portalexport: high-definition 3D moet de native SolidWorks-map als naslag behouden");
+            "Portalexport: high-definition 3D en geometriecontrole moeten de native SolidWorks-map als naslag behouden");
+        var auditMethod = typeof(ProductionOutputService).GetMethod("ShouldRunSolidWorksGeometryAudit", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Require(auditMethod != null
+                && !(bool)auditMethod.Invoke(null, new object[] { new PortalQuoteRequest() })
+                && !(bool)auditMethod.Invoke(null, new object[] { new PortalQuoteRequest { ExportIncludeSolidWorksGeometryAudit = false } })
+                && (bool)auditMethod.Invoke(null, new object[] { new PortalQuoteRequest { ExportIncludeSolidWorksGeometryAudit = true } }),
+            "Portalexport: de zware SolidWorks-geometriecontrole mag uitsluitend na expliciet aanvinken starten");
         Require(portalHtml.Contains("<option value=\"\" selected disabled>")
                 && !portalHtml.Contains("<option value=\" selected disabled>"),
             "Portal: een lege select-placeholder moet een geldige lege HTML-waarde hebben");
@@ -738,6 +1090,12 @@ internal static class Program
             && portalHtml.Contains("presentationNumber('animation','hardwareMoveMs')")
             && portalHtml.Contains("presentationNumber('camera','detailWidthFill')")
             && portalHtml.Contains("MaterialAppearance==='multiplex-gelaagd'")
+            && portalHtml.Contains("MaterialAppearance==='betonplex-donker'")
+            && portalHtml.Contains("MaterialAppearance==='osb-vlokken'")
+            && portalHtml.Contains("betonplexBoxMaterials")
+            && portalHtml.Contains("betonplexExtrudeMaterials")
+            && portalHtml.Contains("if(!realisticBetonplex)")
+            && portalHtml.Contains("osbBoxMaterials")
             && portalHtml.Contains("presentationNumber('materials','plywoodLayerBands')")
             && portalHtml.Contains("presentationColor('plywoodFaceBase')"),
             "Portal: de assemblageweergave moet het centrale presentatiecontract werkelijk gebruiken");
@@ -757,6 +1115,7 @@ internal static class Program
         var shippingBox = catalog.Products.Single(product => product.Product == "shipping_box");
         var cabinet = catalog.Products.Single(product => product.Product == "cabinet");
         var workbenchCabinet = catalog.Products.Single(product => product.Product == "werkbankkast");
+        var cubbyCabinet = catalog.Products.Single(product => product.Product == "vakjeskast");
         var robotCell = catalog.Products.Single(product => product.Product == "robotcel");
         Require(cabinet.CardImageStatus == "Beschikbaar"
             && cabinet.CardImageUrl == "/images/product-cabinet.png"
@@ -787,6 +1146,33 @@ internal static class Program
             && Close(workbench.InputConstraints.Single(rule => rule.InputId == "depthMm").Maximum, 1520)
             && Close(workbench.InputConstraints.Single(rule => rule.InputId == "heightMm").Maximum, 2400),
             "Portalcatalogus: de losse Werktafel moet uit expliciete maat- en groef-8-regels configureren");
+        Require(cabinet.CanConfigure && cabinet.MissingConfigurationData.Length == 0
+            && workbenchCabinet.CanConfigure && workbenchCabinet.MissingConfigurationData.Length == 0
+            && cubbyCabinet.CanConfigure && cubbyCabinet.MissingConfigurationData.Length == 0
+            && cabinet.DefaultSheetMaterialId == "betonplex_18"
+            && workbenchCabinet.DefaultSheetMaterialId == "betonplex_18"
+            && cubbyCabinet.DefaultSheetMaterialId == "betonplex_18"
+            && Close(cabinet.InputConstraints.Single(rule => rule.InputId == "widthMm").Minimum, 300)
+            && Close(cabinet.InputConstraints.Single(rule => rule.InputId == "depthMm").Minimum, 250)
+            && cabinet.InputConstraints.Select(rule => (rule.InputId, rule.Minimum, rule.Maximum))
+                .SequenceEqual(cubbyCabinet.InputConstraints.Select(rule => (rule.InputId, rule.Minimum, rule.Maximum)))
+            && Close(workbenchCabinet.InputConstraints.Single(rule => rule.InputId == "widthMm").Minimum, 600)
+            && Close(workbenchCabinet.InputConstraints.Single(rule => rule.InputId == "depthMm").Minimum, 300)
+            && Close(workbenchCabinet.InputConstraints.Single(rule => rule.InputId == "heightMm").Minimum, 500),
+            "Portalcatalogus: de volledige kastfamilie moet het basisplaatmateriaal en maatcontract app-breed erven, met alleen de strengere werkbankkastoverride");
+
+        var inheritedCabinetConfig = new PortalConfigurationFactory().BuildWorkbenchCabinet(Request("werkbankkast", 100, 100, 100, request =>
+        {
+            request.UnitCount = 1;
+            request.DefaultShelfCount = 1;
+        }));
+        Require(Close(inheritedCabinetConfig.WidthMm, 600)
+            && Close(inheritedCabinetConfig.DepthMm, 300)
+            && Close(inheritedCabinetConfig.WorktopHeightMm, 500)
+            && inheritedCabinetConfig.CarcassMaterial.Id == "betonplex_18"
+            && inheritedCabinetConfig.WorktopMaterial.Id == "betonplex_18"
+            && inheritedCabinetConfig.FrontMaterial.Id == "betonplex_18",
+            "Werkbankkastbouw: backend moet de erfbare betonplex-default gebruiken en invoer op de masterdatagrenzen klemmen");
         var machineBaseWorktop = machineBase.ConfigurationInputs.Single(input => input.RequestField == "MachineBaseWorktopMaterialId");
         var machineBaseLowerBeam = machineBase.ConfigurationInputs.Single(input => input.RequestField == "MachineBaseLowerBeamProfileId");
         foreach (var product in catalog.Products)
@@ -795,7 +1181,7 @@ internal static class Program
             var receipt = product.ConfigurationInputs.Single(input => input.RequestField == "ReceiptMethod");
             Require(delivery.DefaultValue == "bouwpakket"
                 && delivery.Options.Select(option => option.Value).SequenceEqual(new[] { "bouwpakket", "gemonteerd" })
-                && string.IsNullOrWhiteSpace(receipt.DefaultValue)
+                && receipt.DefaultValue == "verzenden"
                 && receipt.Options.Select(option => option.Value).SequenceEqual(new[] { "verzenden", "afhalen" }),
                 product.Product + ": levervorm en ontvangstwijze moeten uit het erfbare masterdatacontract komen");
         }
@@ -828,6 +1214,7 @@ internal static class Program
             && heightAdjustableWorkbench.AllowedProfileMaterialIds.SequenceEqual(new[] { "alu_system_40x40", "alu_system_80x40" })
             && heightAdjustableWorkbench.AllowedSheetMaterialIds.SequenceEqual(new[] { "hpl_10_lex", "multiplex_okoume_grandplex_40" })
             && heightAdjustableWorkbench.DefaultSheetMaterialId == "hpl_10_lex"
+            && heightAdjustableWorkbench.DefaultProfileMaterialId == "alu_system_40x40"
             && Close(heightAdjustableWorkbench.InputConstraints.Single(rule => rule.InputId == "heightMm").Minimum, 770)
             && Close(heightAdjustableWorkbench.InputConstraints.Single(rule => rule.InputId == "heightMm").Maximum, 1130)
             && !heightAdjustableWorkbench.ProductionReleased
@@ -842,7 +1229,9 @@ internal static class Program
             "Portalcatalogus: sim-riggrenzen en profieldefault moeten uit productmasterdata komen");
         Require(shippingBox.DefaultSheetMaterialId == "osb_18"
             && portalHtml.Contains("applyProductCatalogContract(meta)")
-            && !portalHtml.Contains("if(meta.CanConfigure)quote();")
+            && portalHtml.Contains("if(meta.CanConfigure)await quote();")
+            && portalHtml.Contains("meta.DefaultSheetMaterialId")
+            && portalHtml.Contains("meta.DefaultProfileMaterialId")
             && !portalHtml.Contains("bouwpakket|Bouwpakket")
             && portalHtml.Contains("threeState.preserveCameraOnNextRebuild=true")
             && portalHtml.Contains("if(!threeState.preserveCameraOnNextRebuild)threeState.forceFit=true")
@@ -852,6 +1241,25 @@ internal static class Program
             && !portalHtml.Contains("$('sheetMaterialId').value='osb_18'")
             && !portalHtml.Contains("$('profileMaterialId').value='alu_profile_40x40'"),
             "Portalcatalogus: materiaaldefaults mogen uitsluitend uit /api/catalog komen en een geldige standaardconfiguratie moet direct renderen");
+        Require(portalHtml.Contains("const state=orthoThreeState,key=assemblyRenderKey(parts)")
+            && portalHtml.Contains("buildThreeParts(THREE,state.group,parts)")
+            && portalHtml.Contains("renderOrthoViewport(THREE,state,front,Math.PI)")
+            && portalHtml.Contains("renderOrthoViewport(THREE,state,side,Math.PI/2)")
+            && !portalHtml.Contains("function drawOrthoSet")
+            && !portalHtml.Contains("drawOsbOrthoOverlay")
+            && !portalHtml.Contains("assemblyFallbackCanvas")
+            && !portalHtml.Contains("function addBoxFaces"),
+            "Portal: voor- en zijaanzicht moeten dezelfde Three.js-meshbouwer als de 360-view gebruiken; een tweede 2D-geometrieprojectie is verboden");
+        Require(portalHtml.Contains("data-assembly-legend=\"profile\"")
+            && portalHtml.Contains("data-assembly-legend=\"hardware\"")
+            && portalHtml.Contains("data-assembly-legend=\"motion\"")
+            && portalHtml.Contains("data-assembly-legend=\"sheet\"")
+            && portalHtml.Contains("function updateAssemblyLegend(parts)")
+            && portalHtml.Contains("updateAssemblyLegend(parts)")
+            && portalHtml.Contains("body.appendChild($('lexMotionControls'))")
+            && portalHtml.Contains("document.querySelector('.lexViewerTools').appendChild($('lexMotionControls'))")
+            && portalHtml.Contains("modalBody.assemblyViewer"),
+            "Portal: de 360-legenda moet de aanwezige rendercategorieën volgen en dezelfde bewegingsbediening moet ook in volledig scherm beschikbaar blijven");
     }
 
     private static void VerifyProfileSlotGeometryMasterdata()
@@ -982,7 +1390,7 @@ internal static class Program
             C("cabinet", Request("cabinet", 2400, 600, 900, r => { r.UnitCount = 4; r.DefaultShelfCount = 3; r.DefaultDrawerCount = 1; r.IncludeBackPanel = true; }), 44, 0, 315, 0, 0, 307, 44),
             C("werktafel", Request("werktafel", 1500, 750, 900, null), 1, 12, 64, 0, 0, 44, 13),
             C("machinebasis", Request("machinebasis", 2000, 800, 2000, r => { r.MachineBaseWorktopHeightMm = 900; }), 14, 36, 766, 0, 4, 686, 129),
-            C("robotcel", Request("robotcel", 1200, 800, 900, r => { r.RobotCellIntermediateBeamMaxSpacingMm = 700; }), 1, 15, 32, 4, 2, 26, 30),
+            C("robotcel", Request("robotcel", 1200, 800, 1000, r => { r.RobotCellIntermediateBeamMaxSpacingMm = 700; }), 1, 15, 32, 4, 2, 26, 30),
             C("lineaire_robotcel", Request("lineaire_robotcel", 3000, 700, 900, r => { r.LinearRobotCellWorktopSideCount = 1; r.LinearRobotCellGuardHeightAboveWorktopMm = 1200; r.LinearRobotCellIntermediateSupportMaxSpacingMm = 750; }), 7, 45, 30, 10, 0, 0, 83),
             C("materiaalwagen", Request("materiaalwagen", 1000, 650, 950, r => { r.MaterialCartShelfCount = 3; r.MaterialCartShelfMaterialId = "hpl_10_lex"; r.MaterialCartHandleSide = "right"; r.MaterialCartSteeringMode = "fixed-and-swivel"; }), 3, 22, 40, 0, 0, 0, 33),
             C("sim_rig_4080", Request("sim_rig_4080", 680, 1350, 660, r => { r.SimRigSteeringBridgePositionMm = 610; r.SimRigPedalDeckPositionMm = 250; r.SimRigPedalAngleDeg = 12; r.SimRigWheelMountPattern = "csl-dd"; }), 6, 11, 56, 0, 6, 50, 23),
@@ -1018,6 +1426,28 @@ internal static class Program
         Require(EndCapCount(model) == contract.EndCaps, contract.ProductId + ": aantal eind-/afdekkappen gewijzigd");
         Require(FastenerCount(model) == contract.Fasteners, contract.ProductId + ": aantal bevestigingen gewijzigd");
         Require(model.AssemblyPlacements.Count == contract.Placements, contract.ProductId + ": assemblytelling gewijzigd");
+    }
+
+    private static void VerifyUniversalSolidWorksSourceGeometry(PortalQuoteRequest request, WorkbenchModel model)
+    {
+        var visuals = new PortalAssembly3DService().Build(model, request);
+        var audit = SolidWorksSourceGeometryAudit.Audit(model, visuals);
+        var contractErrors = audit.Findings.Where(value => string.Equals(value.Severity, "Error", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(value.Code, "REQUIRED_POCKET_EMPTY", StringComparison.OrdinalIgnoreCase)).ToArray();
+        Require(contractErrors.Length == 0,
+            model.ProductId + ": universele SolidWorks-broncontrole faalt: "
+            + string.Join(" | ", contractErrors.Take(8).Select(value => value.Code + " " + value.PartName + " " + value.OperationName + " " + value.Message)));
+        Require(audit.ThicknessCount == model.AssemblyPlacements.Count(value => value.Kind == AssemblyComponentKind.Sheet),
+            model.ProductId + ": niet iedere plaatplaatsing kreeg een SolidWorks-diktecontrole");
+        var expectedFitCount = model.AssemblyPlacements
+            .Where(value => value.Kind == AssemblyComponentKind.Sheet)
+            .Select(value => model.Sheets.FirstOrDefault(sheet => string.Equals(sheet.Name, value.PartName, StringComparison.OrdinalIgnoreCase)))
+            .Where(value => value != null)
+            .Sum(value => value.Pockets.Count(pocket => pocket.RequiresAssemblyOccupant));
+        Require(audit.FitCount == expectedFitCount && audit.PocketFits.Count == expectedFitCount,
+            model.ProductId + ": niet iedere gemarkeerde sleuf/rabat kreeg een bezettingscontrole");
+        Require(audit.PocketFits.All(value => !string.IsNullOrWhiteSpace(value.ContractId)),
+            model.ProductId + ": een sleuf/rabatcontrole mist een stabiel contract-ID");
     }
 
     private static void VerifyDamagedSheetRecovery()
