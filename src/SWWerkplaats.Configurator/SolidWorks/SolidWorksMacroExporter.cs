@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
+using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
 
 namespace SWWerkplaats.Configurator.SolidWorks
@@ -60,9 +64,30 @@ namespace SWWerkplaats.Configurator.SolidWorks
                 sb.AppendLine("    CreateSheetPart " + Q(path) + ", " + M(sheet.LengthMm) + ", " + M(sheet.Material.ThicknessMm) + ", " + M(sheet.WidthMm) + ", " + M(notchLength) + ", " + M(notchWidth) + ", " + Q(HoleData(sheet)) + ", " + Q(SheetPartOrientation(model, sheet)) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickDepthMm : 0) + ", " + M(sheet.HasToeKickNotch ? sheet.ToeKickHeightMm : 0));
             }
 
-            AppendAssemblyCalls(sb, model, cadFolder);
+            var componentContracts = PrimitiveComponentContracts(model);
+            AppendPrimitiveComponentDefinitions(sb, componentContracts, cadFolder);
+            AppendAssemblyCalls(sb, model, cadFolder, componentContracts);
 
             sb.AppendLine("    MsgBox \"Parts en assembly aangemaakt.\"");
+            sb.AppendLine("End Sub");
+            sb.AppendLine();
+            sb.AppendLine("Sub CreateCylinderPart(filePath As String, diameter As Double, height As Double)");
+            sb.AppendLine("    Dim swModel As Object");
+            sb.AppendLine("    Dim ok As Boolean");
+            sb.AppendLine("    Dim errors As Long");
+            sb.AppendLine("    Dim warnings As Long");
+            sb.AppendLine("    Set swModel = swApp.NewPart");
+            sb.AppendLine("    If swModel Is Nothing Then Exit Sub");
+            sb.AppendLine("    ok = swModel.Extension.SelectByID2(\"Top Plane\", \"PLANE\", 0, 0, 0, False, 0, Nothing, 0)");
+            sb.AppendLine("    If Not ok Then ok = swModel.Extension.SelectByID2(\"Vlak Boven\", \"PLANE\", 0, 0, 0, False, 0, Nothing, 0)");
+            sb.AppendLine("    If Not ok Then Exit Sub");
+            sb.AppendLine("    swModel.SketchManager.InsertSketch True");
+            sb.AppendLine("    swModel.SketchManager.CreateCircleByRadius 0, 0, 0, diameter / 2");
+            sb.AppendLine("    swModel.SketchManager.InsertSketch True");
+            sb.AppendLine("    swModel.FeatureManager.FeatureExtrusion2 True, False, True, 0, 0, height, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False");
+            sb.AppendLine("    AddPartMetadata swModel, diameter, height, diameter");
+            sb.AppendLine("    swModel.Extension.SaveAs filePath, 0, 1, Nothing, errors, warnings");
+            sb.AppendLine("    swApp.CloseDoc swModel.GetTitle");
             sb.AppendLine("End Sub");
             sb.AppendLine();
             sb.AppendLine("Sub CreateBoxPart(filePath As String, x As Double, y As Double, z As Double, drillData As String, lengthAxis As String)");
@@ -708,6 +733,14 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swAsm.Extension.SaveAs filePath, 0, 1, Nothing, errors, warnings");
             sb.AppendLine("End Sub");
             sb.AppendLine();
+            sb.AppendLine("Sub SaveActiveAssembly(filePath As String)");
+            sb.AppendLine("    Dim errors As Long");
+            sb.AppendLine("    Dim warnings As Long");
+            sb.AppendLine("    If swApp.ActiveDoc Is Nothing Then Exit Sub");
+            sb.AppendLine("    swApp.ActiveDoc.EditRebuild3");
+            sb.AppendLine("    swApp.ActiveDoc.Extension.SaveAs filePath, 0, 1, Nothing, errors, warnings");
+            sb.AppendLine("End Sub");
+            sb.AppendLine();
             sb.AppendLine("Sub AddPart(partPath As String, x As Double, y As Double, z As Double)");
             sb.AppendLine("    AddPartOriented partPath, x, y, z, \"\"");
             sb.AppendLine("End Sub");
@@ -723,6 +756,8 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    Dim asmTitle As String");
             sb.AppendLine("    Dim partTitle As String");
             sb.AppendLine("    Dim errText As String");
+            sb.AppendLine("    Dim documentType As Long");
+            sb.AppendLine("    Dim matrixFields As Variant");
             sb.AppendLine("    Set swModel = swApp.ActiveDoc");
             sb.AppendLine("    asmTitle = swModel.GetTitle");
             sb.AppendLine("    Set swAsm = swModel");
@@ -732,7 +767,9 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("        Exit Sub");
             sb.AppendLine("    End If");
             sb.AppendLine();
-            sb.AppendLine("    Set swPart = swApp.OpenDoc6(partPath, 1, 1, \"\", loadErrors, loadWarnings)");
+            sb.AppendLine("    documentType = 1");
+            sb.AppendLine("    If LCase(Right(partPath, 7)) = \".sldasm\" Then documentType = 2");
+            sb.AppendLine("    Set swPart = swApp.OpenDoc6(partPath, documentType, 1, \"\", loadErrors, loadWarnings)");
             sb.AppendLine("    If swPart Is Nothing Then");
             sb.AppendLine("        MsgBox \"Kan part niet laden voor assembly:\" & vbCrLf & partPath & vbCrLf & \"OpenDoc6 errors: \" & CStr(loadErrors)");
             sb.AppendLine("        Exit Sub");
@@ -762,6 +799,10 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("        If orientation = \"SHEET_XY_TO_XZ\" Then SetSheetComponentTransform swComp, x, y, z");
             sb.AppendLine("        If orientation = \"SHEET_VERTICAL_X\" Then SetComponentTransform swComp, x, y, z, 1#, 0#, 0#, 0#, 0#, 1#, 0#, 1#, 0#");
             sb.AppendLine("        If orientation = \"SHEET_VERTICAL_Z\" Then SetComponentTransform swComp, x, y, z, 0#, 0#, -1#, 0#, 1#, 0#, 1#, 0#, 0#");
+            sb.AppendLine("        If Left(orientation, 2) = \"M:\" Then");
+            sb.AppendLine("            matrixFields = Split(Mid(orientation, 3), \";\")");
+            sb.AppendLine("            If UBound(matrixFields) = 8 Then SetComponentTransform swComp, x, y, z, Val(matrixFields(0)), Val(matrixFields(1)), Val(matrixFields(2)), Val(matrixFields(3)), Val(matrixFields(4)), Val(matrixFields(5)), Val(matrixFields(6)), Val(matrixFields(7)), Val(matrixFields(8))");
+            sb.AppendLine("        End If");
             sb.AppendLine("        On Error Resume Next");
             sb.AppendLine("        swComp.Select4 False, Nothing, False");
             sb.AppendLine("        swAsm.FixComponent");
@@ -809,11 +850,66 @@ namespace SWWerkplaats.Configurator.SolidWorks
             return sb.ToString();
         }
 
-        private static void AppendAssemblyCalls(StringBuilder sb, WorkbenchModel model, string cadFolder)
+        private static Dictionary<string, ComponentPrimitiveRenderContract> PrimitiveComponentContracts(WorkbenchModel model)
+        {
+            var result = new Dictionary<string, ComponentPrimitiveRenderContract>(StringComparer.OrdinalIgnoreCase);
+            var service = new ComponentPrimitiveRenderContractService();
+            foreach (var componentId in model.AssemblyPlacements
+                .Where(placement => placement.Kind == AssemblyComponentKind.Purchased && !string.IsNullOrWhiteSpace(placement.ComponentId))
+                .Select(placement => placement.ComponentId)
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    result[componentId] = service.BuildRequired(componentId);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Een ingekocht onderdeel zonder rendercontract blijft uit de
+                    // proefmacro; plaat- en profielgeometrie worden wel uitgevoerd.
+                }
+            }
+            return result;
+        }
+
+        private static void AppendPrimitiveComponentDefinitions(StringBuilder sb,
+            IDictionary<string, ComponentPrimitiveRenderContract> contracts, string cadFolder)
+        {
+            foreach (var contract in contracts.Values.OrderBy(item => item.ComponentId, StringComparer.OrdinalIgnoreCase))
+            {
+                foreach (var primitive in contract.Primitives)
+                {
+                    var primitivePath = PrimitivePartPath(cadFolder, contract.ComponentId, primitive.Id);
+                    if (string.Equals(primitive.Shape, "cylinder", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var diameter = 2.0 * Math.Max(primitive.RadiusTopMm, primitive.RadiusBottomMm);
+                        sb.AppendLine("    CreateCylinderPart " + Q(primitivePath) + ", " + M(diameter) + ", " + M(primitive.SizeYmm));
+                    }
+                    else
+                    {
+                        sb.AppendLine("    CreateBoxPart " + Q(primitivePath) + ", " + M(primitive.SizeXmm) + ", " + M(primitive.SizeYmm) + ", " + M(primitive.SizeZmm) + ", \"\", \"X\"");
+                    }
+                }
+
+                var assemblyPath = PrimitiveComponentAssemblyPath(cadFolder, contract.ComponentId);
+                sb.AppendLine("    CreateAssembly " + Q(assemblyPath));
+                foreach (var primitive in contract.Primitives)
+                {
+                    AddComponentOriented(sb,
+                        PrimitivePartPath(cadFolder, contract.ComponentId, primitive.Id),
+                        primitive.Xmm, primitive.Ymm, primitive.Zmm,
+                        EulerOrientationCode(primitive.RotationXDeg, primitive.RotationYDeg, primitive.RotationZDeg));
+                }
+                sb.AppendLine("    SaveActiveAssembly " + Q(assemblyPath));
+            }
+        }
+
+        private static void AppendAssemblyCalls(StringBuilder sb, WorkbenchModel model, string cadFolder,
+            IDictionary<string, ComponentPrimitiveRenderContract> componentContracts)
         {
             if (model.AssemblyPlacements.Count > 0)
             {
-                AppendGenericAssemblyCalls(sb, model, cadFolder);
+                AppendGenericAssemblyCalls(sb, model, cadFolder, componentContracts);
                 return;
             }
 
@@ -906,7 +1002,8 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swApp.ActiveDoc.Extension.SaveAs assemblyPath, 0, 1, Nothing, asmErrors, asmWarnings");
         }
 
-        private static void AppendGenericAssemblyCalls(StringBuilder sb, WorkbenchModel model, string cadFolder)
+        private static void AppendGenericAssemblyCalls(StringBuilder sb, WorkbenchModel model, string cadFolder,
+            IDictionary<string, ComponentPrimitiveRenderContract> componentContracts)
         {
             sb.AppendLine("    CreateAssembly assemblyPath");
             foreach (var placement in model.AssemblyPlacements)
@@ -916,12 +1013,24 @@ namespace SWWerkplaats.Configurator.SolidWorks
                 {
                     path = Path.Combine(cadFolder, SafeName(placement.PartName) + "_" + placement.LengthMm.ToString("0", CultureInfo.InvariantCulture) + "mm.SLDPRT");
                 }
+                else if (placement.Kind == AssemblyComponentKind.Purchased)
+                {
+                    if (string.IsNullOrWhiteSpace(placement.ComponentId) || !componentContracts.ContainsKey(placement.ComponentId))
+                    {
+                        sb.AppendLine("    ' Overgeslagen ingekocht onderdeel zonder primitief rendercontract: " + DataText(placement.PartName));
+                        continue;
+                    }
+                    path = PrimitiveComponentAssemblyPath(cadFolder, placement.ComponentId);
+                }
                 else
                 {
                     path = Path.Combine(cadFolder, SafeName(placement.PartName) + "_" + placement.LengthMm.ToString("0", CultureInfo.InvariantCulture) + "x" + placement.WidthMm.ToString("0", CultureInfo.InvariantCulture) + ".SLDPRT");
                 }
 
-                AddComponentOriented(sb, path, placement.Xmm, placement.Ymm, placement.Zmm, "");
+                AddComponentOriented(sb, path, placement.Xmm, placement.Ymm, placement.Zmm,
+                    placement.Kind == AssemblyComponentKind.Purchased
+                        ? EulerOrientationCode(placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg)
+                        : string.Empty);
             }
 
             sb.AppendLine("    Dim asmErrors As Long");
@@ -929,6 +1038,30 @@ namespace SWWerkplaats.Configurator.SolidWorks
             sb.AppendLine("    swApp.ActiveDoc.EditRebuild3");
             sb.AppendLine("    swApp.ActiveDoc.ViewZoomtofit2");
             sb.AppendLine("    swApp.ActiveDoc.Extension.SaveAs assemblyPath, 0, 1, Nothing, asmErrors, asmWarnings");
+        }
+
+        private static string PrimitivePartPath(string cadFolder, string componentId, string primitiveId)
+        {
+            return Path.Combine(cadFolder, SafeName(componentId) + "__" + SafeName(primitiveId) + ".SLDPRT");
+        }
+
+        private static string PrimitiveComponentAssemblyPath(string cadFolder, string componentId)
+        {
+            return Path.Combine(cadFolder, SafeName(componentId) + "__render.SLDASM");
+        }
+
+        private static string EulerOrientationCode(double rotationXDeg, double rotationYDeg, double rotationZDeg)
+        {
+            var matrix = SolidWorksTransformMath.RotationMatrix(rotationXDeg, rotationYDeg, rotationZDeg);
+            return "M:" + MatrixNumber(matrix[0]) + ";" + MatrixNumber(matrix[1]) + ";" + MatrixNumber(matrix[2]) + ";"
+                + MatrixNumber(matrix[3]) + ";" + MatrixNumber(matrix[4]) + ";" + MatrixNumber(matrix[5]) + ";"
+                + MatrixNumber(matrix[6]) + ";" + MatrixNumber(matrix[7]) + ";" + MatrixNumber(matrix[8]);
+        }
+
+        private static string MatrixNumber(double value)
+        {
+            if (Math.Abs(value) < 0.0000001) value = 0;
+            return value.ToString("0.########", CultureInfo.InvariantCulture);
         }
 
         private static void AddComponent(StringBuilder sb, string path, double xMm, double yMm, double zMm)

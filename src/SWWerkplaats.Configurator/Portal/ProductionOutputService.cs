@@ -247,16 +247,17 @@ namespace SWWerkplaats.Configurator.Portal
             var includeHighDefinitionCustomerModel = request.ExportIncludeHighDefinitionCustomerModel != false;
             var includeThreeDPrint = request.ExportIncludeThreeDPrint != false;
             var includeControls = request.ExportIncludeControls != false;
+            var includeSolidWorksGeometryAudit = ShouldRunSolidWorksGeometryAudit(request);
             var keepSolidWorksArchive = ShouldKeepSolidWorksArchive(request);
             var includeAnyCustomerOutput = includeCustomerPackage || includeInteractiveCustomerModel || includeHighDefinitionCustomerModel;
             var releaseContract = new ProductReleaseContractService().LoadRequired(request.Product);
             var conceptExport = !releaseContract.ProductionReleased;
             if (!includeCam && !includeSolidWorks && !includeCustomerPackage && !includeInteractiveCustomerModel
-                && !includeHighDefinitionCustomerModel && !includeThreeDPrint && !includeControls)
+                && !includeHighDefinitionCustomerModel && !includeThreeDPrint && !includeControls && !includeSolidWorksGeometryAudit)
                 throw new InvalidOperationException("Selecteer minimaal één onderdeel voor de projectexport.");
             EnsureProjectExportSelectionAllowed(request, releaseContract,
                 includeCam, includeSolidWorks, includeCustomerPackage, includeInteractiveCustomerModel,
-                includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls);
+                includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls, includeSolidWorksGeometryAudit);
 
             if (string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(request.Product, "werktafel_lex", StringComparison.OrdinalIgnoreCase)
@@ -288,6 +289,8 @@ namespace SWWerkplaats.Configurator.Portal
 
             string macroPath = null;
             string assemblyPath = null;
+            string controlModelPath = null;
+            SolidWorksAuditedAssemblyResult solidWorksGeometryAudit = null;
             string customerModelPath = null;
             string customerHtmlPath = null;
             string interactiveCustomerHtmlPath = null;
@@ -296,9 +299,10 @@ namespace SWWerkplaats.Configurator.Portal
             string customerDrawingPath = null;
             string customerDrawingPdfPath = null;
 
+            if (includeControls) macroPath = new SolidWorksMacroExporter().ExportMacro(model, outputFolder);
+
             if (includeSolidWorks || includeCustomerPackage || includeHighDefinitionCustomerModel)
             {
-                if (includeControls) macroPath = new SolidWorksMacroExporter().ExportMacro(model, outputFolder);
                 assemblyPath = RunSolidWorksWorker(request, outputFolder);
                 if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
                     throw new InvalidOperationException("SolidWorks heeft geen assembly aangemaakt.");
@@ -325,6 +329,15 @@ namespace SWWerkplaats.Configurator.Portal
                     customerAppendixPdfPath = SolidWorksCustomerPowerPointExporter.CustomerPdfPath(customerModelPath, request);
                     if (!File.Exists(customerAppendixPdfPath)) throw new InvalidOperationException("PowerPoint heeft geen statische klantbijlage aangemaakt: " + customerAppendixPdfPath);
                 }
+            }
+
+            if (includeSolidWorksGeometryAudit)
+            {
+                solidWorksGeometryAudit = RunSolidWorksAuditedAssemblyWorker(request, outputFolder);
+                controlModelPath = solidWorksGeometryAudit == null ? null : solidWorksGeometryAudit.AssemblyPath;
+                if (string.IsNullOrWhiteSpace(controlModelPath) || !File.Exists(controlModelPath))
+                    throw new InvalidOperationException("SolidWorks heeft geen geaudite SLDASM-controleassembly aangemaakt: "
+                        + (solidWorksGeometryAudit == null ? "helperresultaat ontbreekt." : solidWorksGeometryAudit.Error));
             }
 
             // Bouw CAM, controles, 3D-printdelen en statische aanzichten pas op
@@ -436,6 +449,9 @@ namespace SWWerkplaats.Configurator.Portal
                 MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksMacroInstructies.txt"), generationFolder);
                 MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksWorkerInput.json"), generationFolder);
                 MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksWorkerResult.json"), generationFolder);
+                MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksAssemblyAuditWorkerResult.json"), validationFolder);
+                if (solidWorksGeometryAudit != null && !string.IsNullOrWhiteSpace(solidWorksGeometryAudit.AuditPath))
+                    MoveFileToFolder(solidWorksGeometryAudit.AuditPath, validationFolder);
             }
             else
             {
@@ -443,6 +459,18 @@ namespace SWWerkplaats.Configurator.Portal
                 DeleteFileIfPresent(Path.Combine(outputFolder, "SolidWorksMacroInstructies.txt"));
                 DeleteFileIfPresent(Path.Combine(outputFolder, "SolidWorksWorkerInput.json"));
                 DeleteFileIfPresent(Path.Combine(outputFolder, "SolidWorksWorkerResult.json"));
+                if (includeSolidWorksGeometryAudit)
+                {
+                    Directory.CreateDirectory(validationFolder);
+                    MoveFileToFolder(Path.Combine(outputFolder, "SolidWorksAssemblyAuditWorkerResult.json"), validationFolder);
+                    if (solidWorksGeometryAudit != null && !string.IsNullOrWhiteSpace(solidWorksGeometryAudit.AuditPath))
+                        MoveFileToFolder(solidWorksGeometryAudit.AuditPath, validationFolder);
+                }
+                else
+                {
+                    DeleteFileIfPresent(Path.Combine(outputFolder, "SolidWorksAssemblyAuditWorkerResult.json"));
+                    if (solidWorksGeometryAudit != null) DeleteFileIfPresent(solidWorksGeometryAudit.AuditPath);
+                }
             }
 
             if (conceptExport && !includeControls)
@@ -454,6 +482,7 @@ namespace SWWerkplaats.Configurator.Portal
                 CloseGeneratedSolidWorksDocuments(cadFolder);
                 DeleteDirectoryIfPresent(cadFolder);
                 assemblyPath = null;
+                controlModelPath = null;
                 customerDrawingPath = null;
             }
             else
@@ -481,18 +510,18 @@ namespace SWWerkplaats.Configurator.Portal
                 + "  Interactief 3D-model met schuifregelaars: " + (includeInteractiveCustomerModel ? "geselecteerd" : "niet geselecteerd") + Environment.NewLine
                 + "  High-definition 3D-model + native SW-naslag: " + (includeHighDefinitionCustomerModel ? "geselecteerd" : "niet geselecteerd") + Environment.NewLine
                 + OutputOverviewLine("04_3D-print", includeThreeDPrint, printFolder)
-                + OutputOverviewLine("05_Projectdata", includeControls, projectDataFolder));
+                + OutputOverviewLine("05_Projectdata", includeControls || includeSolidWorksGeometryAudit, projectDataFolder));
 
             var fileCount = Directory.GetFiles(outputFolder, "*", SearchOption.AllDirectories).Length;
             var response = new PortalSolidWorksExportResponse
             {
                 Ok = true,
                 Message = (conceptExport ? "Conceptexport — niet productievrijgegeven — gegenereerd met: " : "Projectexport gegenereerd met: ")
-                    + SelectedOutputNames(includeCam, includeSolidWorks, includeCustomerPackage, includeInteractiveCustomerModel, includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls) + ".",
+                    + SelectedOutputNames(includeCam, includeSolidWorks, includeCustomerPackage, includeInteractiveCustomerModel, includeHighDefinitionCustomerModel, includeThreeDPrint, includeControls, includeSolidWorksGeometryAudit) + ".",
                 IsConceptExport = conceptExport,
                 OutputFolder = outputFolder,
                 AssemblyPath = assemblyPath,
-                ControlModelPath = assemblyPath,
+                ControlModelPath = controlModelPath ?? assemblyPath,
                 CustomerModelPath = customerModelPath,
                 CustomerHtmlPath = customerHtmlPath,
                 InteractiveCustomerHtmlPath = interactiveCustomerHtmlPath,
@@ -518,7 +547,8 @@ namespace SWWerkplaats.Configurator.Portal
             bool interactiveCustomerModel,
             bool highDefinitionCustomerModel,
             bool threeDPrint,
-            bool controls)
+            bool controls,
+            bool solidWorksGeometryAudit)
         {
             if (release == null || release.ProductionReleased) return;
             var allowed = new HashSet<string>(release.ConceptExportOutputs ?? new string[0], StringComparer.OrdinalIgnoreCase);
@@ -532,6 +562,8 @@ namespace SWWerkplaats.Configurator.Portal
                 { "3D-print", threeDPrint },
                 { "Projectdata", controls }
             };
+            if (solidWorksGeometryAudit && !allowed.Contains("SolidWorks"))
+                throw new InvalidOperationException("Product is nog niet productievrijgegeven. SolidWorks geometriecontrole is alleen toegestaan wanneer concept-SolidWorks is toegestaan.");
             var unsupported = selected.Where(item => item.Value && !allowed.Contains(item.Key)).Select(item => item.Key).ToArray();
             if (unsupported.Length > 0)
                 throw new InvalidOperationException("Product is nog niet productievrijgegeven. Alleen conceptexport toegestaan: "
@@ -746,7 +778,14 @@ namespace SWWerkplaats.Configurator.Portal
         internal static bool ShouldKeepSolidWorksArchive(PortalQuoteRequest request)
         {
             return request != null
-                && (request.ExportIncludeSolidWorks != false || request.ExportIncludeHighDefinitionCustomerModel != false);
+                && (request.ExportIncludeSolidWorks != false
+                    || request.ExportIncludeHighDefinitionCustomerModel != false
+                    || request.ExportIncludeSolidWorksGeometryAudit == true);
+        }
+
+        internal static bool ShouldRunSolidWorksGeometryAudit(PortalQuoteRequest request)
+        {
+            return request != null && request.ExportIncludeSolidWorksGeometryAudit == true;
         }
 
         private static string SelectedOutputNames(
@@ -756,7 +795,8 @@ namespace SWWerkplaats.Configurator.Portal
             bool interactiveCustomerModel,
             bool highDefinitionCustomerModel,
             bool threeDPrint,
-            bool controls)
+            bool controls,
+            bool solidWorksGeometryAudit)
         {
             var names = new List<string>();
             if (cam) names.Add("CAM");
@@ -766,6 +806,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (highDefinitionCustomerModel) names.Add("high-definition 3D-klantmodel met SW-bronbestanden");
             if (threeDPrint) names.Add("3D-print");
             if (controls) names.Add("projectdata");
+            if (solidWorksGeometryAudit) names.Add("SolidWorks geometriecontrole");
             return string.Join(", ", names.ToArray());
         }
 
@@ -818,6 +859,41 @@ namespace SWWerkplaats.Configurator.Portal
             }
 
             throw new InvalidOperationException(lastResult == null ? "Ongeldig SolidWorks-helperresultaat." : lastResult.Error);
+        }
+
+        private static SolidWorksAuditedAssemblyResult RunSolidWorksAuditedAssemblyWorker(PortalQuoteRequest request, string outputFolder)
+        {
+            var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+            var workerInput = Path.Combine(outputFolder, "SolidWorksWorkerInput.json");
+            var workerResult = Path.Combine(outputFolder, "SolidWorksAssemblyAuditWorkerResult.json");
+            if (!File.Exists(workerInput)) File.WriteAllText(workerInput, serializer.Serialize(request));
+            DeleteFileIfPresent(workerResult);
+
+            var executable = Process.GetCurrentProcess().MainModule.FileName;
+            var start = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = "--solidworks-audited-assembly-worker " + Q(workerInput) + " " + Q(workerResult),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+            };
+            using (var process = Process.Start(start))
+            {
+                if (process == null) throw new InvalidOperationException("SolidWorks-geometriecontrolehelper kon niet starten.");
+                if (!process.WaitForExit(20 * 60 * 1000))
+                {
+                    try { process.Kill(); } catch { }
+                    throw new TimeoutException("SolidWorks-geometriecontrole duurde langer dan 20 minuten.");
+                }
+                if (!File.Exists(workerResult))
+                    throw new InvalidOperationException("SolidWorks-geometriecontrole stopte zonder resultaat (exitcode " + process.ExitCode + ").");
+                var result = serializer.Deserialize<SolidWorksAuditedAssemblyResult>(File.ReadAllText(workerResult));
+                if (result == null || result.ContractVersion != 1)
+                    throw new InvalidOperationException("SolidWorks-geometriecontrole gaf een ongeldig contract terug.");
+                return result;
+            }
         }
 
         private static SolidWorksWorkerResult RunSolidWorksWorkerAttempt(
@@ -1399,12 +1475,26 @@ namespace SWWerkplaats.Configurator.Portal
 
         private static string BuildAssembly3DHtml(List<PortalAssemblyPart> parts, PortalMotionContract motion, JavaScriptSerializer serializer)
         {
+            return BuildAssembly3DHtmlDocument(parts, motion, serializer, false);
+        }
+
+        internal static string BuildEmbeddedAssembly3DHtml(List<PortalAssemblyPart> parts, PortalMotionContract motion, JavaScriptSerializer serializer)
+        {
+            return BuildAssembly3DHtmlDocument(parts, motion, serializer, true);
+        }
+
+        private static string BuildAssembly3DHtmlDocument(List<PortalAssemblyPart> parts, PortalMotionContract motion, JavaScriptSerializer serializer, bool embedded)
+        {
             var json = SafeScriptJson(serializer.Serialize(parts));
             var motionJson = SafeScriptJson(serializer.Serialize(motion));
             var presentationJson = SafeScriptJson(serializer.Serialize(PortalPresentationContract.LoadRequired()));
-            var sb = new StringBuilder(PortalAssemblyViewerSource.RendererJavaScript.Length + PortalAssemblyViewerSource.ThreeModuleDataUrl.Length + json.Length + presentationJson.Length + 16000);
+            var sb = new StringBuilder(PortalAssemblyViewerSource.RendererJavaScript.Length + PortalAssemblyViewerSource.ThreeModuleDataUrl.Length + PortalAssemblyViewerSource.OrbitControlsModuleDataUrl.Length + json.Length + presentationJson.Length + 18000);
             sb.AppendLine("<!doctype html><html lang=\"nl\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>3D klantmodel</title>");
-            sb.AppendLine("<style>:root{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#17202a;background:#eef1f4}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{display:grid;grid-template-rows:auto 1fr;background:radial-gradient(circle at 48% 16%,#fff 0,#f4f6f8 52%,#e7ebef 100%)}header{display:grid;gap:10px;padding:12px 18px;border-bottom:1px solid #d9dee4;background:rgba(255,255,255,.94);box-shadow:0 5px 22px rgba(20,24,33,.05);z-index:2}.top,.controls,.group{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.top{justify-content:space-between}.title{font-size:17px;font-weight:760}.hint{font-size:12px;color:#697581}.controls{justify-content:space-between}.group{padding:6px 9px;border-radius:11px;background:#f2f4f7}.group strong{font-size:11px;color:#667085}button{appearance:none;border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:8px;padding:7px 10px;font:650 12px 'Segoe UI',Arial;cursor:pointer}button.active{border-color:#1f4b73;background:#1f4b73;color:#fff}label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#344054}input[type=range]{width:clamp(120px,16vw,230px);padding:0;accent-color:#0071e3}.value{min-width:92px;color:#1f4b73;font-weight:760}main{position:relative;min-height:0}canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}canvas:active{cursor:grabbing}.status{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:7px 12px;border-radius:999px;background:rgba(31,41,51,.8);color:#fff;font-size:11px;pointer-events:none}.error{display:none;position:absolute;inset:24px;place-items:center;text-align:center;background:#fff;border:1px solid #ebc6c1;border-radius:14px;color:#8a1f17}.hasError .error{display:grid}.hasError canvas{visibility:hidden}@media(max-width:720px){header{padding:9px}.hint{display:none}.controls{align-items:stretch}.group{width:100%}label{width:100%}input[type=range]{flex:1}}</style></head><body>");
+            sb.Append("<style>:root{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#17202a;background:#eef1f4}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{display:grid;grid-template-rows:auto 1fr;background:radial-gradient(circle at 48% 16%,#fff 0,#f4f6f8 52%,#e7ebef 100%)}header{display:grid;gap:10px;padding:12px 18px;border-bottom:1px solid #d9dee4;background:rgba(255,255,255,.94);box-shadow:0 5px 22px rgba(20,24,33,.05);z-index:2}.top,.controls,.group{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.top{justify-content:space-between}.title{font-size:17px;font-weight:760}.hint{font-size:12px;color:#697581}.controls{justify-content:space-between}.group{padding:6px 9px;border-radius:11px;background:#f2f4f7}.group strong{font-size:11px;color:#667085}button{appearance:none;border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:8px;padding:7px 10px;font:650 12px 'Segoe UI',Arial;cursor:pointer}button.active{border-color:#1f4b73;background:#1f4b73;color:#fff}label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#344054}input[type=range]{width:clamp(120px,16vw,230px);padding:0;accent-color:#0071e3}.value{min-width:92px;color:#1f4b73;font-weight:760}main{position:relative;min-height:0}canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}canvas:active{cursor:grabbing}.status{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:7px 12px;border-radius:999px;background:rgba(31,41,51,.8);color:#fff;font-size:11px;pointer-events:none}.error{display:none;position:absolute;inset:24px;place-items:center;text-align:center;background:#fff;border:1px solid #ebc6c1;border-radius:14px;color:#8a1f17}.hasError .error{display:grid}.hasError canvas{visibility:hidden}@media(max-width:720px){header{padding:9px}.hint{display:none}.controls{align-items:stretch}.group{width:100%}label{width:100%}input[type=range]{flex:1}}");
+            if (embedded) sb.Append("body.embedded{display:block;background:#f5f7fa}body.embedded header,body.embedded .status{display:none}body.embedded main{width:100%;height:100%}");
+            sb.Append("</style></head><body");
+            if (embedded) sb.Append(" class=\"embedded\"");
+            sb.AppendLine(">");
             sb.AppendLine("<header><div class=\"top\"><div class=\"title\">3D klantmodel</div><div class=\"hint\">Dezelfde assembly en renderer als de configurator · sleep om te draaien · scrol om te zoomen</div></div><div class=\"controls\"><div class=\"group\"><strong>Aanzicht</strong><button type=\"button\" data-view=\"iso\" class=\"active\">Iso</button><button type=\"button\" data-view=\"front\">Voor</button><button type=\"button\" data-view=\"side\">Zij</button><button type=\"button\" data-view=\"underside\">Onderzijde</button></div><div class=\"group\"><strong>Kleur</strong><button type=\"button\" data-color=\"realistic\" class=\"active\">Echte kleuren</button><button type=\"button\" data-color=\"technical\">Constructiekleuren</button></div><div class=\"group\" id=\"horizontalControl\"><label>Bladpositie <input id=\"horizontal\" type=\"range\"><span id=\"horizontalValue\" class=\"value\"></span></label></div><div class=\"group\" id=\"verticalControl\"><label>Werkhoogte <input id=\"vertical\" type=\"range\"><span id=\"verticalValue\" class=\"value\"></span></label></div><div class=\"group\"><label>Zoom <input id=\"zoom\" type=\"range\" min=\"55\" max=\"190\" value=\"100\"></label></div></div></header>");
             sb.AppendLine("<main id=\"stage\"><canvas id=\"assemblyCanvas\"></canvas><div class=\"status\">Interactief offline klantmodel</div><div class=\"error\"><div><strong>Het 3D-model kon niet worden geopend.</strong><br><br>Open dit bestand in een actuele versie van Edge of Chrome.</div></div></main>");
             sb.AppendLine("<script type=\"module\">");
@@ -1412,19 +1502,21 @@ namespace SWWerkplaats.Configurator.Portal
             sb.Append("const motion=").Append(motionJson).AppendLine(";");
             sb.Append("const presentationData=").Append(presentationJson).AppendLine(";");
             sb.Append("const THREE=await import('").Append(PortalAssemblyViewerSource.ThreeModuleDataUrl).AppendLine("');");
-            sb.AppendLine("let ghostLexTop=false,assemblyColorMode='realistic',viewMode='iso',rotationDeg=215,motionHorizontal=0,motionVertical=0,fitZoom=1,dragging=false,lastX=0;");
+            sb.Append("const {OrbitControls}=await import('").Append(PortalAssemblyViewerSource.OrbitControlsModuleDataUrl).AppendLine("');");
+            sb.AppendLine("let ghostLexTop=false,assemblyColorMode='realistic',viewMode='iso',rotationDeg=215,motionHorizontal=0,motionVertical=0,fitZoom=1;");
             sb.AppendLine(PortalAssemblyViewerSource.RendererJavaScript);
             sb.AppendLine("const stage=document.getElementById('stage'),canvas=document.getElementById('assemblyCanvas'),horizontal=document.getElementById('horizontal'),vertical=document.getElementById('vertical'),zoom=document.getElementById('zoom');");
-            sb.AppendLine("const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setClearColor(0xf5f7fa,1);renderer.outputColorSpace=THREE.SRGBColorSpace;const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10000),group=new THREE.Group();scene.add(group);scene.add(new THREE.HemisphereLight(0xffffff,0x7d8996,2.35));const keyLight=new THREE.DirectionalLight(0xffffff,3.1);keyLight.position.set(3,5,4);scene.add(keyLight);");
+            sb.AppendLine("const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setClearColor(0xf5f7fa,1);renderer.outputColorSpace=THREE.SRGBColorSpace;const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10000),group=new THREE.Group(),controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.08;controls.enablePan=true;controls.enableRotate=true;controls.enableZoom=true;controls.zoomSpeed=1.15;controls.minZoom=.025;controls.maxZoom=9;scene.add(group);scene.add(new THREE.HemisphereLight(0xffffff,0x7d8996,2.35));const keyLight=new THREE.DirectionalLight(0xffffff,3.1);keyLight.position.set(3,5,4);scene.add(keyLight);controls.addEventListener('change',()=>renderer.render(scene,camera));");
             sb.AppendLine("function setupMotion(input,axis,host){if(!axis){host.style.display='none';return}input.min=axis.Minimum;input.max=axis.Maximum;input.step=axis.Step;input.value=axis.DefaultValue;input.addEventListener('input',()=>{updateMotionLabels();rebuild(false)})}setupMotion(horizontal,motion&&motion.Horizontal,document.getElementById('horizontalControl'));setupMotion(vertical,motion&&motion.Vertical,document.getElementById('verticalControl'));");
-            sb.AppendLine("function adjustedParts(){if(!motion)return baseParts;const h=Number(horizontal.value),v=Number(vertical.value);return baseParts.map(source=>{const p=JSON.parse(JSON.stringify(source)),dx=h*Number(p.MotionTranslateXPerMm||0),dy=v*Number(p.MotionTranslateYPerMm||0),dsy=v*Number(p.MotionSizeYPerMm||0);p.Xmm+=dx;p.Ymm+=dy;p.SizeYmm+=dsy;(p.Holes||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy});(p.Pockets||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy});(p.CoreHoles||[]).forEach(x=>{if(x.Xmm!=null)x.Xmm+=dx;if(x.Ymm!=null)x.Ymm+=dy});return p})}");
-            sb.AppendLine("function updateMotionLabels(){if(!motion)return;const h=Number(horizontal.value),v=Number(vertical.value),direction=h<0?'links':h>0?'rechts':'midden';document.getElementById('horizontalValue').textContent=direction+' · '+Math.abs(Math.round(h))+' '+motion.Horizontal.Unit;document.getElementById('verticalValue').textContent=Math.round(motion.Vertical.ReferenceValueMm+v)+' '+motion.Vertical.Unit}");
+            sb.AppendLine("function keyframe(frames,value){if(!frames||!frames.length)return null;const f=frames.slice().sort((a,b)=>a.Value-b.Value);if(value<=f[0].Value)return f[0];if(value>=f[f.length-1].Value)return f[f.length-1];for(let i=1;i<f.length;i++){if(value>f[i].Value)continue;const a=f[i-1],b=f[i],q=(value-a.Value)/Math.max(1e-9,b.Value-a.Value),m=k=>Number(a[k]||0)+(Number(b[k]||0)-Number(a[k]||0))*q;return{Xmm:m('Xmm'),Ymm:m('Ymm'),Zmm:m('Zmm'),RotationXDeg:m('RotationXDeg'),RotationYDeg:m('RotationYDeg'),RotationZDeg:m('RotationZDeg')}}return f[f.length-1]}");
+            sb.AppendLine("function adjustedParts(){if(!motion)return baseParts;const h=Number(horizontal.value),v=Number(vertical.value);return baseParts.map(source=>{const p=JSON.parse(JSON.stringify(source)),bx=p.Xmm,by=p.Ymm,bz=p.Zmm,k=keyframe(p.HorizontalMotionKeyframes,h);if(k){p.Xmm=k.Xmm;p.Ymm=k.Ymm;p.Zmm=k.Zmm;p.RotationXDeg=k.RotationXDeg;p.RotationYDeg=k.RotationYDeg;p.RotationZDeg=k.RotationZDeg}const dx=p.Xmm-bx+h*Number(p.MotionTranslateXPerMm||0),dy=p.Ymm-by+v*Number(p.MotionTranslateYPerMm||0),dz=p.Zmm-bz,dsy=v*Number(p.MotionSizeYPerMm||0);p.Xmm=bx+dx;p.Ymm=by+dy;p.Zmm=bz+dz;p.SizeYmm+=dsy;(p.Holes||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy;x.Zmm+=dz});(p.Pockets||[]).forEach(x=>{x.Xmm+=dx;x.Ymm+=dy;x.Zmm+=dz});(p.CoreHoles||[]).forEach(x=>{if(x.Xmm!=null)x.Xmm+=dx;if(x.Ymm!=null)x.Ymm+=dy;if(x.Zmm!=null)x.Zmm+=dz});return p})}");
+            sb.AppendLine("function updateMotionLabels(){if(!motion)return;const h=Number(horizontal.value),v=Number(vertical.value),ha=motion.Horizontal,va=motion.Vertical,direction=h<0?'links':h>0?'rechts':'midden';document.getElementById('horizontalValue').textContent=ha.DisplayKind==='fold-fraction'?(h<=0?'ingeklapt':h>=1?'uitgeklapt':Math.round(h*100)+'% open'):direction+' · '+Math.abs(Math.round(h))+' '+ha.Unit;document.getElementById('verticalValue').textContent=va.DisplayKind==='clearance'?(v<=0?'blad geplaatst':Math.round(v)+' '+va.Unit+' boven onderstel'):Math.round(va.ReferenceValueMm+v)+' '+va.Unit}");
             sb.AppendLine("function bounds(){group.updateMatrixWorld(true);const box=new THREE.Box3();group.children.filter(x=>!x.userData.excludeFromFit).forEach(x=>box.expandByObject(x));return box}");
-            sb.AppendLine("function fit(){const box=bounds();if(box.isEmpty())return;const size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),span=Math.max(size.x,size.y,size.z,1),w=Math.max(320,stage.clientWidth),h=Math.max(260,stage.clientHeight);camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;camera.up.set(0,1,0);if(viewMode==='front'||viewMode==='side')camera.position.set(center.x,center.y,center.z+span*2);else if(viewMode==='underside')camera.position.set(center.x+span*.82,center.y-span*.38,center.z+span);else camera.position.set(center.x+span*.88,center.y+span*.44,center.z+span);camera.lookAt(center);const diagonal=viewMode==='iso'||viewMode==='underside',wf=diagonal?.70:.84,hf=diagonal?.74:.82;fitZoom=Math.min(3,Math.max(.06,Math.min(w*wf/Math.max(size.x,size.z,1),h*hf/Math.max(size.y,1))));camera.zoom=fitZoom*Number(zoom.value)/100;camera.updateProjectionMatrix();render()}");
-            sb.AppendLine("function render(){group.rotation.y=rotationDeg*Math.PI/180;renderer.render(scene,camera)}function rebuild(refit){group.clear();buildThreeParts(THREE,group,adjustedParts());if(refit)fit();else render()}");
+            sb.AppendLine("function fit(){const box=bounds();if(box.isEmpty())return;const size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3()),span=Math.max(size.x,size.y,size.z,1),w=Math.max(320,stage.clientWidth),h=Math.max(260,stage.clientHeight);camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;camera.up.set(0,1,0);if(viewMode==='front'||viewMode==='side')camera.position.set(center.x,center.y,center.z+span*2);else if(viewMode==='underside')camera.position.set(center.x+span*.82,center.y-span*.38,center.z+span);else camera.position.set(center.x+span*.88,center.y+span*.44,center.z+span);controls.target.copy(center);const diagonal=viewMode==='iso'||viewMode==='underside',wf=diagonal?.70:.84,hf=diagonal?.74:.82;fitZoom=Math.min(3,Math.max(.06,Math.min(w*wf/Math.max(size.x,size.z,1),h*hf/Math.max(size.y,1))));camera.zoom=fitZoom*Number(zoom.value)/100;camera.updateProjectionMatrix();controls.update();render()}");
+            sb.AppendLine("function render(){group.rotation.y=rotationDeg*Math.PI/180;controls.update();renderer.render(scene,camera)}function rebuild(refit){group.clear();buildThreeParts(THREE,group,adjustedParts());if(refit)fit();else render()}");
             sb.AppendLine("function resize(){const w=Math.max(320,stage.clientWidth),h=Math.max(260,stage.clientHeight);renderer.setSize(w,h,false);fit()}addEventListener('resize',resize);zoom.addEventListener('input',()=>{camera.zoom=fitZoom*Number(zoom.value)/100;camera.updateProjectionMatrix();render()});");
             sb.AppendLine("document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{viewMode=button.dataset.view;rotationDeg=viewMode==='side'?90:viewMode==='front'?180:215;document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x===button));rebuild(true)}));document.querySelectorAll('[data-color]').forEach(button=>button.addEventListener('click',()=>{assemblyColorMode=button.dataset.color;document.querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('active',x===button));rebuild(false)}));");
-            sb.AppendLine("canvas.addEventListener('pointerdown',event=>{dragging=true;lastX=event.clientX;canvas.setPointerCapture(event.pointerId)});canvas.addEventListener('pointermove',event=>{if(!dragging)return;rotationDeg=(rotationDeg+(event.clientX-lastX)*.45+360)%360;lastX=event.clientX;render()});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);canvas.addEventListener('wheel',event=>{event.preventDefault();zoom.value=Math.max(Number(zoom.min),Math.min(Number(zoom.max),Number(zoom.value)+(event.deltaY<0?8:-8)));zoom.dispatchEvent(new Event('input'))},{passive:false});");
+            sb.AppendLine("canvas.addEventListener('wheel',event=>event.preventDefault(),{passive:false});");
             sb.AppendLine("try{updateMotionLabels();resize();rebuild(true)}catch(error){console.error(error);stage.classList.add('hasError')}</script></body></html>");
             return sb.ToString();
         }

@@ -17,6 +17,8 @@ namespace SWWerkplaats.Configurator
         private static void Main(string[] args)
         {
             if (TryCloseGeneratedSolidWorksDocuments(args)) return;
+            if (TryRunSolidWorksAssemblyProbe(args)) return;
+            if (TryRunSolidWorksAuditedAssemblyWorker(args)) return;
             if (TryRunSolidWorksWorker(args)) return;
             PortalWebServer portal = null;
             var portalOptions = PortalRuntimeOptions.Load(args);
@@ -108,6 +110,90 @@ namespace SWWerkplaats.Configurator
                 try { File.WriteAllText(resultPath, new JavaScriptSerializer().Serialize(new SolidWorksWorkerResult { ContractVersion = 1, Ok = false, Error = ex.ToString() })); } catch { }
                 Environment.ExitCode = 2;
             }
+            return true;
+        }
+
+        private static bool TryRunSolidWorksAssemblyProbe(string[] args)
+        {
+            if (args == null || args.Length < 3 || !string.Equals(args[0], "--solidworks-assembly-probe", StringComparison.OrdinalIgnoreCase)) return false;
+            var resultPath = args[1];
+            var probeFolder = args[2];
+            SolidWorksAssemblyProbeResult result;
+            try
+            {
+                result = new SolidWorksComPartExporter().ProbeExternalAssemblyInsertion(probeFolder);
+            }
+            catch (Exception ex)
+            {
+                result = new SolidWorksAssemblyProbeResult
+                {
+                    ContractVersion = 1,
+                    Ok = false,
+                    AssemblyInsertionAvailable = false,
+                    Status = "ProbeFailed",
+                    FailureStage = "ProbeBootstrap",
+                    HResult = ex.HResult,
+                    Error = ex.ToString(),
+                    ProbeFolder = probeFolder
+                };
+            }
+
+            try
+            {
+                var parent = Path.GetDirectoryName(resultPath);
+                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+                File.WriteAllText(resultPath, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(result));
+            }
+            catch (Exception writeError)
+            {
+                Console.Error.WriteLine(writeError.ToString());
+                Environment.ExitCode = 2;
+                return true;
+            }
+
+            Environment.ExitCode = result.Ok ? 0 : 2;
+            return true;
+        }
+
+        private static bool TryRunSolidWorksAuditedAssemblyWorker(string[] args)
+        {
+            if (args == null || args.Length < 3 || !string.Equals(args[0], "--solidworks-audited-assembly-worker", StringComparison.OrdinalIgnoreCase)) return false;
+            var resultPath = args[2];
+            SolidWorksAuditedAssemblyResult result;
+            try
+            {
+                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                var request = serializer.Deserialize<PortalQuoteRequest>(File.ReadAllText(args[1]));
+                var model = new ProductModelBuildService().Build(new PortalConfigurationFactory(), request);
+                result = new SolidWorksComPartExporter().ExportAuditedAssembly(model, Path.GetDirectoryName(resultPath), request);
+            }
+            catch (Exception ex)
+            {
+                result = new SolidWorksAuditedAssemblyResult
+                {
+                    ContractVersion = 1,
+                    Ok = false,
+                    GeometryAuditPassed = false,
+                    ReleaseEligible = false,
+                    Status = "WorkerFailed",
+                    FailureStage = "WorkerBootstrap",
+                    Error = ex.ToString()
+                };
+            }
+
+            try
+            {
+                var parent = Path.GetDirectoryName(resultPath);
+                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+                File.WriteAllText(resultPath, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(result));
+            }
+            catch (Exception writeError)
+            {
+                Console.Error.WriteLine(writeError.ToString());
+                Environment.ExitCode = 2;
+                return true;
+            }
+            Environment.ExitCode = result.Ok ? 0 : 2;
             return true;
         }
 
