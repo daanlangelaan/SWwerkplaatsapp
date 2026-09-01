@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using SWWerkplaats.Configurator.Drawing;
 using SWWerkplaats.Configurator.Drawing.Products.CubbyCabinet;
 using SWWerkplaats.Configurator.Domain;
@@ -277,12 +278,20 @@ namespace SWWerkplaats.Configurator.Engine
 
         private static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, OperationFace face, string note)
         {
-            SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, face, note);
+            var pocket = SheetOperations.AddPocket(sheet, name, x, y, length, width, depth, face, note);
+            SheetOperations.RequireAssemblyOccupant(pocket, "cubby-joinery-" + SafeContractToken(sheet.Name) + "-" + SafeContractToken(name), 0.6);
         }
 
         private static void AddThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
         {
-            SheetOperations.AddThroughCutout(sheet, name, x, y, length, width, face, note);
+            var pocket = SheetOperations.AddThroughCutout(sheet, name, x, y, length, width, face, note);
+            SheetOperations.RequireAssemblyOccupant(pocket, "cubby-comb-" + SafeContractToken(sheet.Name) + "-" + SafeContractToken(name), 0.35);
+        }
+
+        private static string SafeContractToken(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "unknown";
+            return new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
         }
 
         private static void AddMountingLine(SheetPart sheet, double x1, double y1, double x2, double y2, double diameter, double maxSpacing, string name)

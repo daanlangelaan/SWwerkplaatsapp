@@ -27,6 +27,7 @@ namespace SWWerkplaats.Configurator.Application
         public WorkbenchModel Build(PortalConfigurationFactory factory, PortalQuoteRequest request)
         {
             if (factory == null) throw new ArgumentNullException("factory");
+            new ProductRequestDimensionValidationService().Validate(request);
 
             var builder = products.Resolve(request);
             var model = builder.Build(factory, request);

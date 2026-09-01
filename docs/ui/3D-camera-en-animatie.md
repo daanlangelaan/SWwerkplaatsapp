@@ -35,6 +35,23 @@ wordt de eindtoestand direct en volledig getoond.
 - Labels worden na iedere camerawijziging opnieuw geprojecteerd.
 - Animaties eindigen deterministisch in de technisch juiste toestand.
 
+## Vrije viewerbediening
+
+De interne webconfigurator, klantviewer en iedere productwebsite gebruiken
+dezelfde gedeelde viewerbediening:
+
+- slepen met de primaire muisknop of één vinger roteert horizontaal en verticaal;
+- slepen met de secundaire muisknop of Shift + primaire muisknop verplaatst het
+  model in beeld;
+- muiswiel, trackpad of knijpgebaar zoomt in en uit;
+- twee vingers combineren zoomen en verplaatsen;
+- een aanzichtpreset herstelt camera en focuspunt zonder productgeometrie te
+  wijzigen.
+
+Een productwebsite bouwt hiervoor geen eigen pointer-, touch- of cameralaag. Zij
+sluit de gedeelde viewerbediening uit de backend in, zodat uitbreiding of herstel
+op alle websites tegelijk doorstroomt.
+
 ## Testmatrix
 
 - 390 px mobiel;
@@ -44,4 +61,3 @@ wordt de eindtoestand direct en volledig getoond.
 - normale en gereduceerde beweging;
 - ingeklapt en uitgeklapt overzicht;
 - één en meerdere herhalingen.
-

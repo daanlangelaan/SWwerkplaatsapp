@@ -42,6 +42,7 @@ namespace SWWerkplaats.Configurator.Application
             new ProductFastenerStandard { ProductId = "werkbankkast", BaseProductId = "cabinet" },
             new ProductFastenerStandard { ProductId = "vakjeskast", BaseProductId = "cabinet" },
             new ProductFastenerStandard { ProductId = "shipping_box" },
+            new ProductFastenerStandard { ProductId = "opvouwbare_werktafel" },
             new ProductFastenerStandard { ProductId = "werktafel", StructuralFastenerId = "M8_ISO4762" },
             new ProductFastenerStandard { ProductId = "machinebasis", BaseProductId = "werktafel" },
             new ProductFastenerStandard { ProductId = "robotcel", BaseProductId = "machinebasis" },

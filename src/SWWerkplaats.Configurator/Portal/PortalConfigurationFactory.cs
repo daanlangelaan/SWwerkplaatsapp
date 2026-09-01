@@ -235,9 +235,10 @@ namespace SWWerkplaats.Configurator.Portal
         public ShippingBoxConfig BuildShippingBox(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();
-            var internalWidth = Clamp(request.WidthMm, 200, 6000, ProductDefaults.ShippingBoxInternalWidthMm);
-            var internalDepth = Clamp(request.DepthMm, 200, 3000, ProductDefaults.ShippingBoxInternalDepthMm);
-            var internalHeight = Clamp(request.HeightMm, 200, 3000, ProductDefaults.ShippingBoxInternalHeightMm);
+            var master = ShippingBoxMasterDataSettings.LoadRequired();
+            var internalWidth = Clamp(request.WidthMm, master.MinimumWidthMm, master.MaximumWidthMm, ProductDefaults.ShippingBoxInternalWidthMm);
+            var internalDepth = Clamp(request.DepthMm, master.MinimumDepthMm, master.MaximumDepthMm, ProductDefaults.ShippingBoxInternalDepthMm);
+            var internalHeight = Clamp(request.HeightMm, master.MinimumHeightMm, master.MaximumHeightMm, ProductDefaults.ShippingBoxInternalHeightMm);
             var materialId = string.IsNullOrWhiteSpace(request.SheetMaterialId) ? ProductDefaults.ShippingBoxDefaultMaterialId : request.SheetMaterialId;
             var material = CloneMaterial(FindSheet(materialId));
             return new ShippingBoxConfig
@@ -254,7 +255,8 @@ namespace SWWerkplaats.Configurator.Portal
                 HandleHeightMm = 40,
                 HandleCenterHeightRatio = 0.68,
                 RabbetClearanceMm = 0.4,
-                RabbetDepthFactor = 0.5
+                RabbetDepthFactor = 0.5,
+                StockAllowanceMm = master.StockAllowanceMm
             };
         }
 
@@ -370,11 +372,12 @@ namespace SWWerkplaats.Configurator.Portal
         public CabinetConfig BuildCabinet(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();
-            var width = Clamp(request.WidthMm, 300, 3020, ProductDefaults.CabinetWidthMm);
-            var depth = Clamp(request.DepthMm, 250, 1520, ProductDefaults.CabinetDepthMm);
-            var height = Clamp(request.HeightMm, 300, 2400, ProductDefaults.CabinetHeightMm);
+            var productContract = ProductConfigurationContract(request.Product, "cabinet");
+            var width = ClampDimension(request.WidthMm, productContract, "widthMm", ProductDefaults.CabinetWidthMm);
+            var depth = ClampDimension(request.DepthMm, productContract, "depthMm", ProductDefaults.CabinetDepthMm);
+            var height = ClampDimension(request.HeightMm, productContract, "heightMm", ProductDefaults.CabinetHeightMm);
             var units = (int)Clamp(request.UnitCount, 1, 12, ProductDefaults.CabinetUnitCount);
-            var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
+            var carcass = CloneMaterial(FindSheetRequired(ResolveSheetMaterialId(request.SheetMaterialId, productContract)));
             var drawer = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId));
             var back = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
             var slidingDoor = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.SlidingDoorMaterialId) ? ProductDefaults.DefaultSlidingDoorMaterialId : request.SlidingDoorMaterialId));
@@ -402,9 +405,9 @@ namespace SWWerkplaats.Configurator.Portal
                 PlinthDepthMm = ProductDefaults.CabinetPlinthDepthMm,
                 IncludeBackPanel = request.IncludeBackPanel,
                 CarcassMaterial = carcass,
-                WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                WorktopMaterial = CloneMaterial(carcass),
                 DrawerMaterial = drawer,
-                FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                FrontMaterial = CloneMaterial(carcass),
                 SlidingDoorMaterial = slidingDoor,
                 BackMaterial = back,
                 SheetFastener = sheetFastener,
@@ -459,11 +462,12 @@ namespace SWWerkplaats.Configurator.Portal
         public WorkbenchCabinetConfig BuildWorkbenchCabinet(PortalQuoteRequest request)
         {
             request = request ?? new PortalQuoteRequest();
-            var width = Clamp(request.WidthMm, 600, 3020, ProductDefaults.WorkbenchCabinetWidthMm);
-            var depth = Clamp(request.DepthMm, 300, 1520, ProductDefaults.WorkbenchCabinetDepthMm);
-            var height = Clamp(request.HeightMm, 500, 2400, ProductDefaults.WorkbenchCabinetHeightMm);
+            var productContract = ProductConfigurationContract(request.Product, "werkbankkast");
+            var width = ClampDimension(request.WidthMm, productContract, "widthMm", ProductDefaults.WorkbenchCabinetWidthMm);
+            var depth = ClampDimension(request.DepthMm, productContract, "depthMm", ProductDefaults.WorkbenchCabinetDepthMm);
+            var height = ClampDimension(request.HeightMm, productContract, "heightMm", ProductDefaults.WorkbenchCabinetHeightMm);
             var units = (int)Clamp(request.UnitCount, 1, 12, ProductDefaults.WorkbenchCabinetUnitCount);
-            var carcass = CloneMaterial(FindSheet(request.SheetMaterialId));
+            var carcass = CloneMaterial(FindSheetRequired(ResolveSheetMaterialId(request.SheetMaterialId, productContract)));
             var rail = CloneRail(DefaultRail(catalog.DrawerRails()));
             var shelfSupport = CloneShelfSupport(catalog.ShelfSupports()[ProductDefaults.DefaultShelfSupportIndex]);
             var backMaterial = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.BackMaterialId) ? ProductDefaults.DefaultBackMaterialId : request.BackMaterialId));
@@ -525,8 +529,8 @@ namespace SWWerkplaats.Configurator.Portal
                 BackPanelFastenerEndInsetMm = backPanelSettings.FastenerEndInsetMm,
                 BackPanelFastenerMaxSpacingMm = backPanelSettings.FastenerMaxSpacingMm,
                 CarcassMaterial = carcass,
-                WorktopMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
-                FrontMaterial = CloneMaterial(FindSheet(request.SheetMaterialId)),
+                WorktopMaterial = CloneMaterial(carcass),
+                FrontMaterial = CloneMaterial(carcass),
                 DrawerMaterial = CloneMaterial(FindSheet(string.IsNullOrWhiteSpace(request.DrawerMaterialId) ? ProductDefaults.DefaultDrawerMaterialId : request.DrawerMaterialId)),
                 BackMaterial = backMaterial,
                 SheetFastener = sheetFastener,
@@ -637,10 +641,98 @@ namespace SWWerkplaats.Configurator.Portal
             return value;
         }
 
+        public FoldingWorkbenchConfig BuildFoldingWorkbench(PortalQuoteRequest request)
+        {
+            request = request ?? new PortalQuoteRequest();
+            var master = FoldingWorkbenchMasterDataSettings.LoadRequired();
+            var length = Clamp(request.WidthMm, master.MinimumLengthMm, master.MaximumLengthMm, master.DefaultLengthMm);
+            var width = Clamp(request.DepthMm, master.MinimumWidthMm, master.MaximumWidthMm, master.DefaultWidthMm);
+            var height = Clamp(request.HeightMm, master.MinimumHeightMm, master.MaximumHeightMm, master.DefaultHeightMm);
+            var material = CloneMaterial(FindSheetRequired(master.MaterialId));
+            return new FoldingWorkbenchConfig
+            {
+                ProjectName = "OPVOUWBARE_WERKTAFEL_" + length.ToString("0") + "x" + width.ToString("0") + "x" + height.ToString("0"),
+                LengthMm = length,
+                WidthMm = width,
+                HeightMm = height,
+                PanelMaterial = material,
+                StockAllowanceMm = master.StockAllowanceMm,
+                UnderframeInsetLongEdgeMm = Clamp(request.FoldingWorkbenchUnderframeInsetLongEdgeMm,
+                    master.MinimumUnderframeInsetLongEdgeMm, master.MaximumUnderframeInsetLongEdgeMm,
+                    master.DefaultUnderframeInsetLongEdgeMm),
+                UnderframeInsetShortEdgeMm = Clamp(request.FoldingWorkbenchUnderframeInsetShortEdgeMm,
+                    master.MinimumUnderframeInsetShortEdgeMm, master.MaximumUnderframeInsetShortEdgeMm,
+                    master.DefaultUnderframeInsetShortEdgeMm),
+                JointClearanceMm = master.JointClearanceMm,
+                TabWidthMm = master.TabWidthMm,
+                FrameStileWidthMm = master.FrameStileWidthMm,
+                TopRailHeightMm = master.TopRailHeightMm,
+                BottomRailHeightMm = master.BottomRailHeightMm,
+                IntegratedFootWidthMm = master.IntegratedFootWidthMm,
+                IntegratedFootReliefHeightMm = master.IntegratedFootReliefHeightMm,
+                CornerRadiusMm = master.CornerRadiusMm,
+                WorktopFloatMm = master.WorktopFloatMm,
+                FoldedClearanceMm = master.FoldedClearanceMm,
+                TabsPerLongPanel = master.TabsPerLongPanel,
+                TabsPerShortPanelHalf = master.TabsPerShortPanelHalf,
+                HingeHeightMm = master.HingeHeightMm,
+                HingeOpenWidthMm = master.HingeOpenWidthMm,
+                HingeLeafThicknessMm = master.HingeLeafThicknessMm,
+                HingeBarrelDiameterMm = master.HingeBarrelDiameterMm,
+                HingeGapMm = master.HingeGapMm,
+                HingeComponentId = master.HingeComponentId,
+                HingeArticleNumber = master.HingeArticleNumber,
+                DogboneToolDiameterMm = master.DogboneToolDiameterMm
+            };
+        }
+
+        private static ProductCatalogItem ProductConfigurationContract(string requestedProductId, string fallbackProductId)
+        {
+            var productId = string.IsNullOrWhiteSpace(requestedProductId) ? fallbackProductId : requestedProductId;
+            var product = Array.Find(new ProductCatalogApplicationService().ListProducts(), item =>
+                string.Equals(item.Product, productId, StringComparison.OrdinalIgnoreCase));
+            if (product == null)
+                throw new InvalidOperationException("Productcontract ontbreekt in productmasterdata voor " + productId + ".");
+            if (!product.CanConfigure)
+                throw new InvalidOperationException(string.Join(" ", product.MissingConfigurationData));
+            return product;
+        }
+
+        private static double ClampDimension(double value, ProductCatalogItem product, string inputId, double fallback)
+        {
+            var constraint = Array.Find(product.InputConstraints, item =>
+                string.Equals(item.InputId, inputId, StringComparison.OrdinalIgnoreCase));
+            if (constraint == null)
+                throw new InvalidOperationException("Parametergrens " + inputId + " ontbreekt in productmasterdata voor " + product.Product + ".");
+            return Clamp(value, constraint.Minimum, constraint.Maximum, fallback);
+        }
+
+        private static string ResolveSheetMaterialId(string requestedMaterialId, ProductCatalogItem product)
+        {
+            var materialId = string.IsNullOrWhiteSpace(requestedMaterialId)
+                ? product.DefaultSheetMaterialId
+                : requestedMaterialId;
+            if (string.IsNullOrWhiteSpace(materialId))
+                throw new InvalidOperationException("Standaard plaatmateriaal ontbreekt in productmasterdata voor " + product.Product + ".");
+            if (Array.FindIndex(product.AllowedSheetMaterialIds, id =>
+                    string.Equals(id, materialId, StringComparison.OrdinalIgnoreCase)) < 0)
+                throw new InvalidOperationException("Plaatmateriaal " + materialId + " is niet toegestaan voor " + product.Product + ".");
+            return materialId;
+        }
+
         private Material FindSheet(string id)
         {
             var sheets = catalog.Sheets();
             return FindMaterial(sheets, id, sheets[ProductDefaults.DefaultSheetIndex]);
+        }
+
+        private Material FindSheetRequired(string id)
+        {
+            var material = Array.Find(catalog.Sheets(), item =>
+                string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+            if (material == null)
+                throw new InvalidOperationException("Plaatmateriaal ontbreekt in de materiaalbibliotheek: " + id + ".");
+            return material;
         }
 
         private Material FindProfile(string id)

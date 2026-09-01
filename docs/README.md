@@ -11,6 +11,7 @@ Gebruik actuele contracten en beheerhandleidingen als beslisbron. Iteratieversla
 - `architecture/SolidWorks-worker.md`: subprocesscontract, time-out en retry voor SolidWorks.
 - `architecture/Operationele-opslag.md`: SQLite-contract, bestandsmirror, back-up en schaalgrens.
 - `architecture/Productwebsites-en-gedeelde-backend.md`: meerdere productwebsites, sitecontext, gebruikers en één interne waarheid.
+- `architecture/Portal-werkruimten.md`: actuele portalroutes, rolgrenzen, projectdossier, werkplaats, inkoop, voorraad en klantcontract.
 - `drawing-strategy/Tekencontract.md`: teken- en oriëntatiecontracten.
 - `drawing-strategy/Code-structuur.md`: huidige lagen van de tekenlogica.
 - `drawing-strategy/Profielvisualisatie-contract.md`: visuele laagopbouw en regressiecontract voor aluminium profielen en assemblage-instructies.
@@ -29,6 +30,7 @@ Productgebonden invoer, bronnen en proefstukstatus staan onder `producten/`. Pro
 ## Toekomst en archief
 
 - `future/`: ideeën en concepten waarover nog geen bouwbesluit is genomen.
+- `future/Portal-pilot-beslissingen.md`: opgespaarde bedrijfs-, rol-, voorraad-, document- en uitrolkeuzes voor de pilot.
 - `future/Assemblagehandleiding-systeemprofielen.md`: bevestigde standaardverbinderlogica, benodigde verbindingsgraaf en beeldgerichte LEGO/IKEA-UX voor de toekomstige handleidingmodule.
 - `archive/`: oude plannen en ervaringslogs; nuttig als context, nooit leidend boven actuele contracten en code.
 

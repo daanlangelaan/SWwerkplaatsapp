@@ -31,6 +31,7 @@ namespace SWWerkplaats.Configurator.Application
 
         public PortalQuoteResponse BuildQuote(PortalQuoteRequest request)
         {
+            OrderApplicationService.ApplyDeliveryContract(request);
             var preview = production.BuildPreview(request);
             var price = pricing.Calculate(preview.Model, preview.NestingPlan);
             var response = new PortalQuoteResponse
@@ -47,6 +48,9 @@ namespace SWWerkplaats.Configurator.Application
                 Vat = price.Vat,
                 PriceIncVat = price.IncVat,
                 LeadTime = "Indicatie: 5-10 werkdagen na controle",
+                DeliveryForm = request.DeliveryForm,
+                ReceiptMethod = request.ReceiptMethod,
+                DeliveryPriceNote = DeliveryPriceNote(request),
                 SheetPartCount = CountSheets(preview.Model),
                 ProfilePartCount = CountProfiles(preview.Model),
                 PreviewSvg = visualization.BuildProductSvg(preview.Model, request),
@@ -91,6 +95,17 @@ namespace SWWerkplaats.Configurator.Application
             return response;
         }
 
+        private static string DeliveryPriceNote(PortalQuoteRequest request)
+        {
+            var open = new System.Collections.Generic.List<string>();
+            if (string.Equals(request.DeliveryForm, "gemonteerd", StringComparison.OrdinalIgnoreCase)) open.Add("montage");
+            if (string.Equals(request.ReceiptMethod, "verzenden", StringComparison.OrdinalIgnoreCase)) open.Add("verpakking en verzending");
+            var description = open.Count == 2 ? "montage, verpakking en verzending" : string.Join(" en ", open);
+            return open.Count == 0
+                ? "Montage en verzending zijn niet van toepassing op deze keuze."
+                : "De getoonde productprijs is exclusief " + description + "; Bedrijfsbeheer stelt deze kosten vast.";
+        }
+
         private static string ProductName(PortalQuoteRequest request)
         {
             if (request != null && string.Equals(request.Product, "werktafel", StringComparison.OrdinalIgnoreCase)) return "Werktafel";
@@ -105,6 +120,7 @@ namespace SWWerkplaats.Configurator.Application
             if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)) return "Werkbank met kastonderbouw";
             if (request != null && string.Equals(request.Product, "vakjeskast", StringComparison.OrdinalIgnoreCase)) return "Vakjeskast";
             if (request != null && string.Equals(request.Product, "shipping_box", StringComparison.OrdinalIgnoreCase)) return "Shipping box / clipkist";
+            if (request != null && string.Equals(request.Product, "opvouwbare_werktafel", StringComparison.OrdinalIgnoreCase)) return "Opvouwbare werktafel";
             return "Cabinet";
         }
 

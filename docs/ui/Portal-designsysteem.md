@@ -113,10 +113,22 @@ onzichtbare labels of kleinere primaire aanraakdoelen.
 
 - Hoofdonderdelen zoals Configurator, Projecten, Werkplaats en Inkoop zijn echte
   routes. Zij zijn direct te openen, te vernieuwen en te bookmarken.
+- De eerste navigatieactie gebruikt het door de backend geleverde rollabel en
+  opent de rolstart: `Overzicht`, `Offertes & projecten`, `Productieplanning`,
+  `Inkoopplanning`, `Productieoverzicht`, `Mijn wachtrij` of `Mijn orders`. Rol-, site- en
+  organisatiekeuze zijn testcontext en geen gelijkwaardige hoofdnavigatie.
+- Vaste hoofdnavigatie gebruikt taakgerichte termen: `Product configureren`,
+  `Projecten`, `Productie`, `Inkoop` en `Voorraad`.
+- De testsimulator staat in een apart, herkenbaar `Testmodus`-menu. Rolwissels
+  worden direct toegepast. Klantorganisatie wordt alleen bij de klantrol
+  gevraagd en productsite staat als afzonderlijke geavanceerde testcontext.
 - De actieve route is zowel visueel als semantisch herkenbaar.
 - Tabs zijn alleen voor nauw verwante informatie binnen één pagina wanneer de
   gebruiker niet alles tegelijk hoeft te zien. Tabs zijn geen vervanging voor de
   hoofdroutering en verbergen geen verplichte stapvolgorde.
+- Het productieoverzicht toont alle openstaande taken en afzonderlijke
+  wachtrijlinks met aantallen. Een wachtrijroute filtert één backend-geleverd
+  werkgebied; een specialistische machinecontext toont uitsluitend die route.
 - Een lineaire voortgangsindicator wordt alleen gebruikt voor minstens drie
   stabiele hoofdstappen. Niet-lineaire project- of productiestatussen gebruiken
   een statusoverzicht of takenlijst.
@@ -251,8 +263,9 @@ afwijkende spacing, focus, foutgedrag of statusbetekenis maken.
 
 ## Test- en acceptatiecontract
 
-Iedere hoofdflow wordt minimaal getest als Beheerder, Verkoop, Werkvoorbereider,
-Inkoper, relevante Operator en Klant/testklant. Per flow gelden:
+Iedere hoofdflow wordt minimaal getest als Bedrijfsbeheer, Productiemedewerker en
+Klant/testklant. Bewaarde specialistrollen krijgen gerichte autorisatie- en
+startpaginatests. Per flow gelden:
 
 - directe route, refresh en terugnavigatie behouden context;
 - zichtbare bediening én API-autorisatie passen bij de testrol;

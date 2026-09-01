@@ -5,22 +5,22 @@ namespace SWWerkplaats.Configurator.Drawing
 {
     public static class SheetOperations
     {
-        public static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, string note)
+        public static SheetPocket AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, string note)
         {
-            AddPocket(sheet, name, x, y, length, width, depth, OperationFace.CenterPlane, note);
+            return AddPocket(sheet, name, x, y, length, width, depth, OperationFace.CenterPlane, note);
         }
 
-        public static void AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, OperationFace face, string note)
+        public static SheetPocket AddPocket(SheetPart sheet, string name, double x, double y, double length, double width, double depth, OperationFace face, string note)
         {
-            if (sheet == null || sheet.Material == null || length <= 0 || width <= 0 || depth <= 0) return;
+            if (sheet == null || sheet.Material == null || length <= 0 || width <= 0 || depth <= 0) return null;
 
             var safeX = Math.Max(0, Math.Min(sheet.LengthMm, x));
             var safeY = Math.Max(0, Math.Min(sheet.WidthMm, y));
             var safeLength = Math.Max(0, Math.Min(length, sheet.LengthMm - safeX));
             var safeWidth = Math.Max(0, Math.Min(width, sheet.WidthMm - safeY));
-            if (safeLength <= 0 || safeWidth <= 0) return;
+            if (safeLength <= 0 || safeWidth <= 0) return null;
 
-            sheet.Pockets.Add(new SheetPocket
+            var pocket = new SheetPocket
             {
                 Name = name,
                 Xmm = Math.Round(safeX, 3),
@@ -31,20 +31,22 @@ namespace SWWerkplaats.Configurator.Drawing
                 Face = face,
                 DepthMode = OperationDepthMode.PocketFromFace,
                 Note = note
-            });
+            };
+            sheet.Pockets.Add(pocket);
+            return pocket;
         }
 
-        public static void AddThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
+        public static SheetPocket AddThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
         {
-            if (sheet == null || sheet.Material == null || length <= 0 || width <= 0) return;
+            if (sheet == null || sheet.Material == null || length <= 0 || width <= 0) return null;
 
             var safeX = Math.Max(0, Math.Min(sheet.LengthMm, x));
             var safeY = Math.Max(0, Math.Min(sheet.WidthMm, y));
             var safeLength = Math.Max(0, Math.Min(length, sheet.LengthMm - safeX));
             var safeWidth = Math.Max(0, Math.Min(width, sheet.WidthMm - safeY));
-            if (safeLength <= 0 || safeWidth <= 0) return;
+            if (safeLength <= 0 || safeWidth <= 0) return null;
 
-            sheet.Pockets.Add(new SheetPocket
+            var pocket = new SheetPocket
             {
                 Name = name,
                 Xmm = Math.Round(safeX, 3),
@@ -55,18 +57,28 @@ namespace SWWerkplaats.Configurator.Drawing
                 Face = face,
                 DepthMode = OperationDepthMode.Through,
                 Note = note
-            });
+            };
+            sheet.Pockets.Add(pocket);
+            return pocket;
         }
 
-        public static void AddCapsuleThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
+        public static SheetPocket AddCapsuleThroughCutout(SheetPart sheet, string name, double x, double y, double length, double width, OperationFace face, string note)
         {
-            if (sheet == null) return;
-            var before = sheet.Pockets.Count;
-            AddThroughCutout(sheet, name, x, y, length, width, face, note);
-            if (sheet.Pockets.Count > before)
-            {
-                sheet.Pockets[sheet.Pockets.Count - 1].Shape = "capsule";
-            }
+            if (sheet == null) return null;
+            var pocket = AddThroughCutout(sheet, name, x, y, length, width, face, note);
+            if (pocket != null) pocket.Shape = "capsule";
+            return pocket;
+        }
+
+        public static SheetPocket RequireAssemblyOccupant(SheetPocket pocket, string fitContractId, double minimumOccupancyRatio)
+        {
+            if (pocket == null) throw new ArgumentNullException("pocket");
+            if (string.IsNullOrWhiteSpace(fitContractId)) throw new ArgumentException("Passingcontract-ID ontbreekt.");
+            if (minimumOccupancyRatio <= 0 || minimumOccupancyRatio > 1) throw new ArgumentOutOfRangeException("minimumOccupancyRatio");
+            pocket.AssemblyFitContractId = fitContractId.Trim();
+            pocket.RequiresAssemblyOccupant = true;
+            pocket.MinimumAssemblyOccupancyRatio = minimumOccupancyRatio;
+            return pocket;
         }
 
         public static void AddUniqueThroughHole(SheetPart sheet, double x, double y, double diameter, string name, SheetHoleSupportKind supportKind, double edgeClampMm)

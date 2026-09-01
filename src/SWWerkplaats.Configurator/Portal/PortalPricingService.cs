@@ -1050,6 +1050,7 @@ namespace SWWerkplaats.Configurator.Portal
             if (request != null && string.Equals(request.Product, "werktafel_lex_revolution", StringComparison.OrdinalIgnoreCase)) return "Workstation ontwikkelvariant";
             if (request != null && string.Equals(request.Product, "werkbankkast", StringComparison.OrdinalIgnoreCase)) return "Werkbank met kastonderbouw";
             if (request != null && string.Equals(request.Product, "shipping_box", StringComparison.OrdinalIgnoreCase)) return "Shipping box / clipkist";
+            if (request != null && string.Equals(request.Product, "opvouwbare_werktafel", StringComparison.OrdinalIgnoreCase)) return "Opvouwbare werktafel";
             return "Cabinet";
         }
 

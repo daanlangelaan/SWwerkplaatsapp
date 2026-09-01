@@ -5,6 +5,9 @@ namespace SWWerkplaats.Configurator.Portal
 {
     public sealed class PortalQuoteRequest
     {
+        public string SourceSiteId { get; set; }
+        public string OrganizationId { get; set; }
+        public string RequestedByUserId { get; set; }
         public string Product { get; set; }
         public double WidthMm { get; set; }
         public double DepthMm { get; set; }
@@ -35,6 +38,8 @@ namespace SWWerkplaats.Configurator.Portal
         public string CustomerEmail { get; set; }
         public string CustomerPhone { get; set; }
         public string Notes { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
         public bool IncludeLowerShelf { get; set; }
         public bool IncludeMiddleShelf { get; set; }
         public double LowerShelfHeightMm { get; set; }
@@ -82,6 +87,8 @@ namespace SWWerkplaats.Configurator.Portal
         public double WorkbenchCabinetDoorStopWidthMm { get; set; }
         public double WorkbenchCabinetTopDrawerHeightMm { get; set; }
         public double? WorkbenchCabinetFrontPanelCornerRadiusMm { get; set; }
+        public double FoldingWorkbenchUnderframeInsetLongEdgeMm { get; set; }
+        public double FoldingWorkbenchUnderframeInsetShortEdgeMm { get; set; }
         public bool? ExportIncludeCam { get; set; }
         public bool? ExportIncludeSolidWorks { get; set; }
         public bool? ExportIncludeCustomerPackage { get; set; }
@@ -89,6 +96,7 @@ namespace SWWerkplaats.Configurator.Portal
         public bool? ExportIncludeHighDefinitionCustomerModel { get; set; }
         public bool? ExportIncludeThreeDPrint { get; set; }
         public bool? ExportIncludeControls { get; set; }
+        public bool? ExportIncludeSolidWorksGeometryAudit { get; set; }
         public bool TestFitFirstSheet { get; set; }
         public bool RevisionAfterMilledTestSheetOne { get; set; }
         public List<string> CompletedSheetPartNames { get; set; }
@@ -114,6 +122,9 @@ namespace SWWerkplaats.Configurator.Portal
         public decimal Vat { get; set; }
         public decimal PriceIncVat { get; set; }
         public string LeadTime { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public string DeliveryPriceNote { get; set; }
         public int SheetPartCount { get; set; }
         public int ProfilePartCount { get; set; }
         public string PreviewSvg { get; set; }
@@ -135,6 +146,9 @@ namespace SWWerkplaats.Configurator.Portal
     public sealed class PortalAssemblyPart
     {
         public string Name { get; set; }
+        public string AssemblyInstanceId { get; set; }
+        public string PhysicalPartId { get; set; }
+        public string RigidMotionDriverName { get; set; }
         public string MemberId { get; set; }
         public string TraceId { get; set; }
         public ProfileStickerPlacement Sticker { get; set; }
@@ -172,6 +186,8 @@ namespace SWWerkplaats.Configurator.Portal
         public double MotionTranslateXPerMm { get; set; }
         public double MotionTranslateYPerMm { get; set; }
         public double MotionSizeYPerMm { get; set; }
+        public List<PortalAssemblyMotionKeyframe> HorizontalMotionKeyframes { get; private set; }
+        public List<PortalAssemblyMotionKeyframe> VerticalMotionKeyframes { get; private set; }
         public List<PortalAssemblyHole> Holes { get; private set; }
         public List<PortalAssemblyPocket> Pockets { get; private set; }
         public List<PortalAssemblyOutlinePoint> Outline { get; private set; }
@@ -185,7 +201,20 @@ namespace SWWerkplaats.Configurator.Portal
             Outline = new List<PortalAssemblyOutlinePoint>();
             CoreHoles = new List<ProfileCoreHolePosition>();
             ComponentRenderOpenData = new List<string>();
+            HorizontalMotionKeyframes = new List<PortalAssemblyMotionKeyframe>();
+            VerticalMotionKeyframes = new List<PortalAssemblyMotionKeyframe>();
         }
+    }
+
+    public sealed class PortalAssemblyMotionKeyframe
+    {
+        public double Value { get; set; }
+        public double Xmm { get; set; }
+        public double Ymm { get; set; }
+        public double Zmm { get; set; }
+        public double RotationXDeg { get; set; }
+        public double RotationYDeg { get; set; }
+        public double RotationZDeg { get; set; }
     }
 
     public sealed class PortalAssemblyOutlinePoint
@@ -208,6 +237,8 @@ namespace SWWerkplaats.Configurator.Portal
         public double CountersinkDiameterMm { get; set; }
         public double CountersinkDepthMm { get; set; }
         public string VisualRole { get; set; }
+        public OperationFace SourceFace { get; set; }
+        public OperationDepthMode SourceDepthMode { get; set; }
     }
 
     public sealed class PortalAssemblyPocket
@@ -224,25 +255,45 @@ namespace SWWerkplaats.Configurator.Portal
         public string Plane { get; set; }
         public bool IsThroughCutout { get; set; }
         public double MinorDiameterMm { get; set; }
+        public OperationFace SourceFace { get; set; }
+        public OperationDepthMode SourceDepthMode { get; set; }
+        public string AssemblyFitContractId { get; set; }
+        public bool RequiresAssemblyOccupant { get; set; }
+        public double MinimumAssemblyOccupancyRatio { get; set; }
     }
 
     public sealed class PortalOrderRecord
     {
+        public string ProjectId { get; set; }
+        public string SourceSiteId { get; set; }
+        public string OrganizationId { get; set; }
+        public string ProductId { get; set; }
+        public string ProjectName { get; set; }
         public string OrderId { get; set; }
         public string Status { get; set; }
         public string CreatedAt { get; set; }
         public string ProductName { get; set; }
         public string CustomerName { get; set; }
         public string CustomerEmail { get; set; }
+        public string DeliveryForm { get; set; }
+        public string ReceiptMethod { get; set; }
+        public decimal? AssemblyPriceExVat { get; set; }
+        public string AssemblyPriceStatus { get; set; }
+        public decimal? ShippingPriceExVat { get; set; }
+        public string ShippingPriceStatus { get; set; }
         public decimal PriceExVat { get; set; }
         public decimal PriceIncVat { get; set; }
         public string OutputFolder { get; set; }
         public string QueueFolder { get; set; }
-        public List<string> Files { get; private set; }
+        public List<string> Files { get; set; }
+        public List<PortalPurchaseSnapshotLine> PurchaseLines { get; set; }
+        public List<PortalProductionAreaSnapshot> ProductionAreas { get; set; }
 
         public PortalOrderRecord()
         {
             Files = new List<string>();
+            PurchaseLines = new List<PortalPurchaseSnapshotLine>();
+            ProductionAreas = new List<PortalProductionAreaSnapshot>();
         }
     }
 
@@ -299,6 +350,7 @@ namespace SWWerkplaats.Configurator.Portal
         public double DefaultValue { get; set; }
         public double Step { get; set; }
         public double ReferenceValueMm { get; set; }
+        public string DisplayKind { get; set; }
     }
 
     public sealed class PortalProfileRenderGeometry
@@ -331,6 +383,25 @@ namespace SWWerkplaats.Configurator.Portal
         public bool Ok { get; set; }
         public string AssemblyPath { get; set; }
         public string Error { get; set; }
+    }
+
+    public sealed class SolidWorksAssemblyProbeResult
+    {
+        public int ContractVersion { get; set; }
+        public bool Ok { get; set; }
+        public bool AssemblyInsertionAvailable { get; set; }
+        public bool LikelyWindowsApplicationControlBlock { get; set; }
+        public string Status { get; set; }
+        public string FailureStage { get; set; }
+        public int? HResult { get; set; }
+        public string Error { get; set; }
+        public string ProbeFolder { get; set; }
+        public string FirstPartPath { get; set; }
+        public string SecondPartPath { get; set; }
+        public string AssemblyPath { get; set; }
+        public int InsertedComponentCount { get; set; }
+        public int ReopenedComponentCount { get; set; }
+        public long DurationMs { get; set; }
     }
 
     public sealed class PortalOrderStatusRequest

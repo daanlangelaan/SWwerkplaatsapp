@@ -57,6 +57,23 @@ Liangyue publiceert voor `LY103-12` geen bruikbaar maatblad. Daarom is de global
 
 Schaalreferentie: <https://wierfab.en.made-in-china.com/product/eTNrDlpMsQUz/China-Metal-Crate-Clips-Spring-Snap-Clips-Retaining-Crate.html>
 
+## Gedeeld 3D- en macrocontract
+
+De voorlopige clipvorm staat één keer als `ProvisionalRenderEnvelope` bij component
+`liangyue_ly103_12_candidate` in de productmasterdata. Zowel de centrale webviewer
+als de SolidWorks-proefmacro lezen ditzelfde primitieve componentcontract. Een
+productwebsite of losse UI mag daarom geen eigen clipgeometrie bevatten.
+
+Het huidige contract benadert de twee cliparmen, de veerbrug en de twee omgezette
+randen met vijf plaatprimitieven. Dit is uitsluitend een visuele en geometrische
+proefweergave. De open meetpunten uit de masterdata blijven zichtbaar in het
+backendcontract en sluiten CAM- en productievrijgave uit.
+
+Plaatmateriaal gebruikt eveneens een beheerde renderweergave. `osb_18` levert
+`osb-vlokken`; de viewer tekent daar een generieke, deterministische OSB-structuur
+voor. De textuur is presentatie en bevat geen sterkte-, persrichting- of
+vezelclassificatie.
+
 ## Vrijgavevoorwaarden
 
 Voor productievrijgave zijn minimaal nodig:

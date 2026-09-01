@@ -10,6 +10,7 @@ namespace SWWerkplaats.Configurator.Portal
     {
         public PortalMotionContract Build(WorkbenchModel model, PortalQuoteRequest request, IList<PortalAssemblyPart> parts)
         {
+            if (IsFoldingWorkbench(request)) return BuildFoldingWorkbench(model, request, parts);
             if (IsHeightAdjustableWorkbench(request)) return BuildHeightAdjustableWorkbench(model, request, parts);
             if (!IsLex(request)) return null;
             if (model == null) throw new ArgumentNullException("model");
@@ -71,6 +72,46 @@ namespace SWWerkplaats.Configurator.Portal
             };
         }
 
+        private static PortalMotionContract BuildFoldingWorkbench(WorkbenchModel model, PortalQuoteRequest request, IList<PortalAssemblyPart> parts)
+        {
+            if (model == null) throw new ArgumentNullException("model");
+            var config = new PortalConfigurationFactory().BuildFoldingWorkbench(request);
+            var top = (parts ?? new List<PortalAssemblyPart>()).FirstOrDefault(item => item != null
+                && string.Equals(item.Name, "Uitneembaar werkblad", StringComparison.OrdinalIgnoreCase));
+            if (top == null) throw new InvalidOperationException("Uitneembaar werkblad ontbreekt voor het vouwbewegingscontract.");
+
+            return new PortalMotionContract
+            {
+                Horizontal = new PortalMotionAxis
+                {
+                    Id = "underframe-fold",
+                    Label = "Onderstel uitvouwen",
+                    Unit = "%",
+                    Minimum = 0,
+                    Maximum = 1,
+                    DefaultValue = 1,
+                    Step = 0.01,
+                    ReferenceValueMm = 0,
+                    DisplayKind = "fold-fraction"
+                },
+                Vertical = new PortalMotionAxis
+                {
+                    Id = "worktop-drop",
+                    Label = "Blad laten zakken",
+                    Unit = "mm",
+                    Minimum = 0,
+                    Maximum = config.WorktopFloatMm,
+                    DefaultValue = config.WorktopFloatMm,
+                    Step = Math.Max(1, config.WorktopFloatMm / 60.0),
+                    ReferenceValueMm = 0,
+                    DisplayKind = "clearance"
+                },
+                WorktopWidthMm = top.SizeXmm,
+                FixedSupportOuterWidthMm = config.LengthMm - 2.0 * config.UnderframeInsetShortEdgeMm,
+                MaximumOverhangMm = config.UnderframeInsetShortEdgeMm
+            };
+        }
+
         private static PortalMotionContract BuildHeightAdjustableWorkbench(WorkbenchModel model, PortalQuoteRequest request, IList<PortalAssemblyPart> parts)
         {
             if (model == null) throw new ArgumentNullException("model");
@@ -107,7 +148,13 @@ namespace SWWerkplaats.Configurator.Portal
 
         public static void ApplyPartMotionMetadata(IEnumerable<PortalAssemblyPart> parts)
         {
-            foreach (var part in parts ?? Enumerable.Empty<PortalAssemblyPart>())
+            var all = (parts ?? Enumerable.Empty<PortalAssemblyPart>()).Where(item => item != null).ToArray();
+            if (all.Any(item => string.Equals(item.Name, "Uitneembaar werkblad", StringComparison.OrdinalIgnoreCase)))
+            {
+                ApplyFoldingWorkbenchMotion(all);
+                return;
+            }
+            foreach (var part in all)
             {
                 if (part == null) continue;
                 var name = (part.Name ?? string.Empty).ToLowerInvariant();
@@ -126,6 +173,105 @@ namespace SWWerkplaats.Configurator.Portal
                     // Het operator-vooraanzicht spiegelt model-X. Een negatieve modelsprong
                     // laat een negatieve sliderwaarde daarom zichtbaar naar links bewegen.
                     part.MotionTranslateXPerMm = -1;
+            }
+        }
+
+        private static void ApplyFoldingWorkbenchMotion(IEnumerable<PortalAssemblyPart> parts)
+        {
+            var master = FoldingWorkbenchMasterDataSettings.LoadRequired();
+            var frontLongPanel = parts.Single(item => string.Equals(item.Name, "Langspaneel voor", StringComparison.OrdinalIgnoreCase));
+            var rearLongPanel = parts.Single(item => string.Equals(item.Name, "Langspaneel achter", StringComparison.OrdinalIgnoreCase));
+            var top = parts.Single(item => string.Equals(item.Name, "Uitneembaar werkblad", StringComparison.OrdinalIgnoreCase));
+            var span = rearLongPanel.Zmm - frontLongPanel.Zmm;
+            var thickness = top.SizeYmm;
+            var closedGap = Math.Min(span - 1.0, 4.0 * thickness + master.FoldedClearanceMm);
+            var maximumAngle = Math.Acos(closedGap / span);
+            var half = span / 2.0;
+            var frontZ = frontLongPanel.Zmm;
+
+            foreach (var part in parts)
+            {
+                var name = (part.Name ?? string.Empty).ToLowerInvariant();
+                if (name == "uitneembaar werkblad")
+                {
+                    part.MotionTranslateYPerMm = 1;
+                    continue;
+                }
+                if (name.StartsWith("scharnier")) continue;
+
+                var isLeft = name.Contains(" links ") || name.StartsWith("vouwpaneel links") || name.StartsWith("scharnier links");
+                var isRight = name.Contains(" rechts ") || name.StartsWith("vouwpaneel rechts") || name.StartsWith("scharnier rechts");
+                if (!isLeft && !isRight && name != "langspaneel achter") continue;
+                // Beide korte zijden vouwen naar binnen, zodat de vier paneelhelften
+                // binnen de tafellengte als een vlak pakket tussen de langspanelen vallen.
+                var direction = isLeft ? 1.0 : -1.0;
+                var baseX = part.Xmm;
+
+                for (var index = 0; index <= 20; index++)
+                {
+                    var value = index / 20.0;
+                    var angle = (1.0 - value) * maximumAngle;
+                    var sin = Math.Sin(angle);
+                    var cos = Math.Cos(angle);
+                    var rearZ = frontZ + span * cos;
+                    var frame = new PortalAssemblyMotionKeyframe
+                    {
+                        Value = value,
+                        Xmm = part.Xmm,
+                        Ymm = part.Ymm,
+                        Zmm = part.Zmm,
+                        RotationXDeg = part.RotationXDeg,
+                        RotationYDeg = part.RotationYDeg,
+                        RotationZDeg = part.RotationZDeg
+                    };
+
+                    if (name == "langspaneel achter") frame.Zmm = rearZ;
+                    else if (name.StartsWith("vouwpaneel") && name.EndsWith(" voor"))
+                    {
+                        frame.Xmm = baseX + direction * half * sin / 2.0;
+                        frame.Zmm = frontZ + half * cos / 2.0;
+                        frame.RotationYDeg = direction * angle * 180.0 / Math.PI;
+                    }
+                    else if (name.StartsWith("vouwpaneel") && name.EndsWith(" achter"))
+                    {
+                        frame.Xmm = baseX + direction * half * sin / 2.0;
+                        frame.Zmm = frontZ + 3.0 * half * cos / 2.0;
+                        frame.RotationYDeg = -direction * angle * 180.0 / Math.PI;
+                    }
+                    else continue;
+
+                    part.HorizontalMotionKeyframes.Add(frame);
+                }
+            }
+
+            ApplyRigidComponentMotion(parts);
+        }
+
+        private static void ApplyRigidComponentMotion(IEnumerable<PortalAssemblyPart> parts)
+        {
+            var all = parts.ToArray();
+            foreach (var part in all.Where(value => !string.IsNullOrWhiteSpace(value.RigidMotionDriverName)))
+            {
+                var driver = all.Single(value => string.Equals(value.Name, part.RigidMotionDriverName, StringComparison.OrdinalIgnoreCase));
+                if (driver.HorizontalMotionKeyframes.Count == 0) continue;
+                var baseOffsetX = part.Xmm - driver.Xmm;
+                var baseOffsetZ = part.Zmm - driver.Zmm;
+                foreach (var driverFrame in driver.HorizontalMotionKeyframes)
+                {
+                    var delta = (driverFrame.RotationYDeg - driver.RotationYDeg) * Math.PI / 180.0;
+                    var cos = Math.Cos(delta);
+                    var sin = Math.Sin(delta);
+                    part.HorizontalMotionKeyframes.Add(new PortalAssemblyMotionKeyframe
+                    {
+                        Value = driverFrame.Value,
+                        Xmm = driverFrame.Xmm + baseOffsetX * cos + baseOffsetZ * sin,
+                        Ymm = driverFrame.Ymm + (part.Ymm - driver.Ymm),
+                        Zmm = driverFrame.Zmm - baseOffsetX * sin + baseOffsetZ * cos,
+                        RotationXDeg = part.RotationXDeg + (driverFrame.RotationXDeg - driver.RotationXDeg),
+                        RotationYDeg = part.RotationYDeg + (driverFrame.RotationYDeg - driver.RotationYDeg),
+                        RotationZDeg = part.RotationZDeg + (driverFrame.RotationZDeg - driver.RotationZDeg)
+                    });
+                }
             }
         }
 
@@ -162,6 +308,11 @@ namespace SWWerkplaats.Configurator.Portal
         private static bool IsHeightAdjustableWorkbench(PortalQuoteRequest request)
         {
             return request != null && string.Equals(request.Product, "hoogteverstelbare_werktafel", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsFoldingWorkbench(PortalQuoteRequest request)
+        {
+            return request != null && string.Equals(request.Product, "opvouwbare_werktafel", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

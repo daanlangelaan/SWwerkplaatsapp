@@ -62,6 +62,8 @@
     <Compile Include="Application\AssemblyHardwareRenderContractService.cs" />
     <Compile Include="Application\ComponentPrimitiveRenderContractService.cs" />
     <Compile Include="Application\FastenerToolAccessCalculator.cs" />
+    <Compile Include="Application\FoldingWorkbenchMasterDataSettings.cs" />
+    <Compile Include="Application\FoldingWorkbenchProductBuilder.cs" />
     <Compile Include="Application\CamMasterSettings.cs" />
     <Compile Include="Application\CubbyCabinetProductBuilder.cs" />
     <Compile Include="Application\DrawingContractValidationService.cs" />
@@ -80,6 +82,7 @@
     <Compile Include="Application\LinearRobotCellProductBuilder.cs" />
     <Compile Include="Application\SimRigProductBuilder.cs" />
     <Compile Include="Application\ShippingBoxProductBuilder.cs" />
+    <Compile Include="Application\ShippingBoxMasterDataSettings.cs" />
     <Compile Include="Application\LexRevolutionProductBuilder.cs" />
     <Compile Include="Application\MasterDataRuntimeCatalog.cs" />
     <Compile Include="Application\MachineBaseMasterDataSettings.cs" />
@@ -96,6 +99,7 @@
     <Compile Include="Application\StructuralCalculationService.cs" />
     <Compile Include="Application\WorktopBracketPlacementService.cs" />
     <Compile Include="Application\ProductModelBuildService.cs" />
+    <Compile Include="Application\ProductRequestDimensionValidationService.cs" />
     <Compile Include="Application\ProfileTraceabilityService.cs" />
     <Compile Include="Application\ProfileConnectionTapOperationService.cs" />
     <Compile Include="Application\ProfileConnectionGeometryService.cs" />
@@ -118,6 +122,10 @@
     <Compile Include="Application\ProfileProjectConfigurationService.cs" />
     <Compile Include="Application\ProductRegistry.cs" />
     <Compile Include="Application\PortalRuntimeOptions.cs" />
+    <Compile Include="Application\PortalRolePolicy.cs" />
+    <Compile Include="Application\PortalSiteCatalog.cs" />
+    <Compile Include="Application\PortalWorkspaceRepository.cs" />
+    <Compile Include="Application\PortalWorkspaceApplicationService.cs" />
     <Compile Include="Application\QuoteApplicationService.cs" />
     <Compile Include="Application\WorkflowApplicationService.cs" />
     <Compile Include="Program.cs" />
@@ -131,6 +139,7 @@
     <Compile Include="Domain\DrawingContracts.cs" />
     <Compile Include="Domain\DrillOperation.cs" />
     <Compile Include="Domain\FastenerDefinition.cs" />
+    <Compile Include="Domain\FoldingWorkbenchConfig.cs" />
     <Compile Include="Domain\HardwareItem.cs" />
     <Compile Include="Domain\LibraryCatalog.cs" />
     <Compile Include="Domain\LexWorkbenchConfig.cs" />
@@ -174,6 +183,7 @@
     <Compile Include="Drawing\SheetOperations.cs" />
     <Compile Include="Drawing\SheetPatterns.cs" />
     <Compile Include="Engine\WorkbenchEngine.cs" />
+    <Compile Include="Engine\FoldingWorkbenchEngine.cs" />
     <Compile Include="Engine\MachineBaseEngine.cs" />
     <Compile Include="Engine\MaterialCartEngine.cs" />
     <Compile Include="Engine\RobotCellEngine.cs" />
@@ -210,6 +220,8 @@
     <Compile Include="Portal\PortalHtml.cs" />
     <Compile Include="Portal\PortalLibraryHtml.cs" />
     <Compile Include="Portal\PortalModels.cs" />
+    <Compile Include="Portal\PortalWorkspaceModels.cs" />
+    <Compile Include="Portal\PortalWorkspaceHtml.cs" />
     <Compile Include="Portal\PortalMotionContractService.cs" />
     <Compile Include="Portal\PortalPresentationContract.cs" />
     <Compile Include="Portal\PortalPricingService.cs" />
@@ -219,6 +231,7 @@
     <Compile Include="Portal\WorkbenchCabinetAuditService.cs" />
     <Compile Include="SolidWorks\ISolidWorksExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksComPartExporter.cs" />
+    <Compile Include="SolidWorks\SolidWorksAssemblyAudit.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerHtmlExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerDrawingExporter.cs" />
     <Compile Include="SolidWorks\SolidWorksCustomerPowerPointExporter.cs" />
@@ -230,6 +243,10 @@
     <Compile Include="UI\MainForm.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Portal\portal-workspace.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>PortalAssets\portal-workspace.html</Link>
+    </Content>
     <Content Include="Portal\vendor\three\three.module.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>PortalAssets\vendor\three\three.module.js</Link>

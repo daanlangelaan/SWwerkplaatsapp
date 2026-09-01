@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
+using System.Web.Script.Serialization;
 using SolidWorks.Interop.sldworks;
 using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Domain;
@@ -31,6 +33,249 @@ namespace SWWerkplaats.Configurator.SolidWorks
         public void ExportParts(WorkbenchModel model, string outputFolder)
         {
             ExportPartsAndAssembly(model, outputFolder);
+        }
+
+        public SolidWorksAssemblyProbeResult ProbeExternalAssemblyInsertion(string outputFolder)
+        {
+            if (string.IsNullOrWhiteSpace(outputFolder)) throw new ArgumentException("Outputmap voor de SolidWorks-assemblyproef ontbreekt.");
+
+            var stopwatch = Stopwatch.StartNew();
+            var probeFolder = Path.GetFullPath(outputFolder);
+            Directory.CreateDirectory(probeFolder);
+            var result = new SolidWorksAssemblyProbeResult
+            {
+                ContractVersion = 1,
+                Ok = false,
+                AssemblyInsertionAvailable = false,
+                Status = "Running",
+                FailureStage = "Start",
+                ProbeFolder = probeFolder,
+                FirstPartPath = Path.Combine(probeFolder, "WAC_PROBE_A.SLDPRT"),
+                SecondPartPath = Path.Combine(probeFolder, "WAC_PROBE_B.SLDPRT"),
+                AssemblyPath = Path.Combine(probeFolder, "WAC_PROBE.SLDASM")
+            };
+
+            SldWorks solidWorks = null;
+            try
+            {
+                result.FailureStage = "ConnectSolidWorks";
+                solidWorks = GetOrCreateSolidWorks();
+                solidWorks.Visible = true;
+
+                result.FailureStage = "CreateFirstPart";
+                CreateProbePart(solidWorks, result.FirstPartPath, 40, 30, 20);
+                result.FailureStage = "CreateSecondPart";
+                CreateProbePart(solidWorks, result.SecondPartPath, 25, 35, 15);
+
+                result.FailureStage = "CreateAssembly";
+                var assemblyModel = (ModelDoc2)solidWorks.NewAssembly();
+                if (assemblyModel == null) throw new InvalidOperationException("SolidWorks kon voor de WAC-proef geen nieuwe assembly maken. Controleer de default assembly template.");
+                var assemblyTitle = assemblyModel.GetTitle();
+                try
+                {
+                    var errors = 0;
+                    var warnings = 0;
+                    assemblyModel.Extension.SaveAs(result.AssemblyPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
+                    if (errors != 0) throw new InvalidOperationException("SolidWorks kon de lege WAC-proefassembly niet opslaan (code " + errors + ").");
+
+                    var assembly = (AssemblyDoc)assemblyModel;
+                    result.FailureStage = "InsertFirstLocalPart";
+                    var first = assembly.AddComponent5(result.FirstPartPath, 0, "", false, "", MmToM(-50), 0, 0);
+                    if (first == null) throw new InvalidOperationException("SolidWorks gaf geen component terug bij het invoegen van het eerste lokale proefpart.");
+                    result.InsertedComponentCount = 1;
+                    ReleaseCom(first);
+
+                    result.FailureStage = "InsertSecondLocalPart";
+                    var second = assembly.AddComponent5(result.SecondPartPath, 0, "", false, "", MmToM(50), 0, 0);
+                    if (second == null) throw new InvalidOperationException("SolidWorks gaf geen component terug bij het invoegen van het tweede lokale proefpart.");
+                    result.InsertedComponentCount = 2;
+                    ReleaseCom(second);
+
+                    result.FailureStage = "SavePopulatedAssembly";
+                    assemblyModel.EditRebuild3();
+                    errors = 0;
+                    warnings = 0;
+                    if (!assemblyModel.Save3(SaveAsOptionsSilent, ref errors, ref warnings) || errors != 0)
+                        throw new InvalidOperationException("SolidWorks kon de gevulde WAC-proefassembly niet opslaan (code " + errors + ").");
+                }
+                finally
+                {
+                    try { solidWorks.CloseDoc(assemblyTitle); } catch { }
+                    ReleaseCom(assemblyModel);
+                    ForceComCleanup();
+                }
+
+                result.FailureStage = "ReopenAssembly";
+                var openErrors = 0;
+                var openWarnings = 0;
+                var reopened = solidWorks.OpenDoc6(result.AssemblyPath, 2, 1, "", ref openErrors, ref openWarnings);
+                if (reopened == null || openErrors != 0)
+                    throw new InvalidOperationException("SolidWorks kon de WAC-proefassembly niet opnieuw openen (code " + openErrors + ").");
+                var reopenedTitle = reopened.GetTitle();
+                try
+                {
+                    result.FailureStage = "AuditReopenedAssembly";
+                    var reopenedAssembly = (AssemblyDoc)reopened;
+                    var components = reopenedAssembly.GetComponents(false) as object[];
+                    result.ReopenedComponentCount = components == null ? 0 : components.Length;
+                    if (result.ReopenedComponentCount != 2)
+                        throw new InvalidOperationException("De opnieuw geopende WAC-proefassembly bevat " + result.ReopenedComponentCount + " componenten; verwacht 2.");
+                    if (components != null)
+                    {
+                        foreach (var component in components) ReleaseCom(component);
+                    }
+                }
+                finally
+                {
+                    try { solidWorks.CloseDoc(reopenedTitle); } catch { }
+                    ReleaseCom(reopened);
+                    ForceComCleanup();
+                }
+
+                result.Ok = true;
+                result.AssemblyInsertionAvailable = true;
+                result.Status = "Passed";
+                result.FailureStage = null;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.HResult = ex.HResult;
+                result.Error = ex.ToString();
+                result.LikelyWindowsApplicationControlBlock = IsLikelyApplicationControlBlock(ex);
+                result.Status = result.LikelyWindowsApplicationControlBlock ? "BlockedByPolicy" : "Failed";
+                return result;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                result.DurationMs = stopwatch.ElapsedMilliseconds;
+            }
+        }
+
+        public SolidWorksAuditedAssemblyResult ExportAuditedAssembly(WorkbenchModel model, string outputFolder, PortalQuoteRequest request = null)
+        {
+            if (model == null) throw new ArgumentNullException("model");
+            if (string.IsNullOrWhiteSpace(outputFolder)) throw new ArgumentException("Outputmap voor de geaudite SolidWorks-assembly ontbreekt.");
+
+            const double transformToleranceMm = 0.05;
+            const double rotationTolerance = 0.000001;
+            var cadFolder = Path.Combine(Path.GetFullPath(outputFolder), "02_SolidWorks", "ParallelleAssemblyAudit");
+            var partsFolder = Path.Combine(cadFolder, "Onderdelen");
+            Directory.CreateDirectory(partsFolder);
+            var result = new SolidWorksAuditedAssemblyResult
+            {
+                ContractVersion = 1,
+                Status = "Running",
+                FailureStage = "BuildSourceManifest",
+                AssemblyPath = Path.Combine(cadFolder, SafeName(model.ProjectName) + "_AUDIT.SLDASM"),
+                AuditPath = Path.Combine(cadFolder, SafeName(model.ProjectName) + "_AUDIT.json"),
+                TransformToleranceMm = transformToleranceMm
+            };
+            var visualParts = new PortalAssembly3DService().Build(model, request);
+            result.ExpectedComponentCount = visualParts.Count;
+            var sourceAudit = SolidWorksSourceGeometryAudit.Audit(model, visualParts);
+            result.SourceGeometryAuditPassed = sourceAudit.Passed;
+            result.CheckedHoleCount = sourceAudit.HoleCount;
+            result.CheckedPocketCount = sourceAudit.PocketCount;
+            result.CheckedThicknessCount = sourceAudit.ThicknessCount;
+            result.CheckedFitCount = sourceAudit.FitCount;
+            result.GeometryFindings.AddRange(sourceAudit.Findings);
+            result.PocketFits.AddRange(sourceAudit.PocketFits);
+            foreach (var openItem in visualParts
+                .SelectMany(item => item.ComponentRenderOpenData ?? new List<string>())
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+                result.OpenData.Add(openItem);
+
+            SldWorks solidWorks = null;
+            try
+            {
+                result.FailureStage = "ConnectSolidWorks";
+                solidWorks = GetOrCreateSolidWorks();
+                solidWorks.Visible = true;
+
+                var geometryParts = new Dictionary<string, string>(StringComparer.Ordinal);
+                var geometryMassProperties = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                for (var index = 0; index < visualParts.Count; index++)
+                {
+                    var visual = visualParts[index];
+                    var auditId = AuditComponentId(index, visual);
+                    var geometryKey = AuditGeometryKey(visual);
+                    string partPath;
+                    if (!geometryParts.TryGetValue(geometryKey, out partPath))
+                    {
+                        partPath = Path.Combine(partsFolder, auditId + ".SLDPRT");
+                        result.FailureStage = "CreateLocalPart:" + auditId;
+                        geometryMassProperties[geometryKey] = CreateLocalAuditPart(solidWorks, visual, partPath);
+                        geometryParts[geometryKey] = partPath;
+                    }
+                    var rotation = SolidWorksTransformMath.RotationMatrix(visual.RotationXDeg, visual.RotationYDeg, visual.RotationZDeg);
+                    result.Components.Add(new SolidWorksAssemblyAuditItem
+                    {
+                        AuditId = auditId,
+                        SourceName = visual.Name,
+                        AssemblyInstanceId = visual.AssemblyInstanceId,
+                        TraceId = visual.TraceId,
+                        MemberId = visual.MemberId,
+                        ComponentId = visual.ComponentId,
+                        SourceStatus = visual.ComponentRenderStatus,
+                        PartPath = partPath,
+                        CreatedBodyMassProperties = geometryMassProperties[geometryKey],
+                        ExpectedTransform = SolidWorksTransformMath.Transform(visual.Xmm, visual.Ymm, visual.Zmm, visual.RotationXDeg, visual.RotationYDeg, visual.RotationZDeg),
+                        ExpectedWorldBoundsMm = SolidWorksTransformMath.ExpectedBoundsMm(visual.Xmm, visual.Ymm, visual.Zmm, visual.SizeXmm, visual.SizeYmm, visual.SizeZmm, rotation)
+                    });
+                }
+
+                result.FailureStage = "CreateAssembly";
+                CreateAuditedAssembly(solidWorks, result);
+                result.FailureStage = "RoundtripAudit";
+                AuditSavedAssembly(solidWorks, result, transformToleranceMm, rotationTolerance);
+                result.BodyRoundtripAuditPassed = result.Components.Count == result.ExpectedComponentCount
+                    && result.Components.All(item => item.BodySignaturePassed);
+                result.InterferenceAuditPassed = result.Interferences.All(item => item.Passed);
+                result.InterferenceCount = result.Interferences.Count;
+                result.GeometryAuditPassed = result.SourceGeometryAuditPassed
+                    && result.BodyRoundtripAuditPassed
+                    && result.InterferenceAuditPassed
+                    && result.ReopenedComponentCount == result.ExpectedComponentCount
+                    && result.Components.Count == result.ExpectedComponentCount
+                    && result.Components.All(item => item.Passed);
+                result.ReleaseEligible = result.GeometryAuditPassed
+                    && result.OpenData.Count == 0
+                    && result.Components.All(item => string.IsNullOrWhiteSpace(item.SourceStatus)
+                        || item.SourceStatus.IndexOf("Provisional", StringComparison.OrdinalIgnoreCase) < 0);
+                result.Ok = result.GeometryAuditPassed;
+                result.Status = result.GeometryAuditPassed
+                    ? (result.ReleaseEligible ? "Passed" : "GeometryPassedReleaseBlocked")
+                    : "AuditFailed";
+                result.FailureStage = null;
+            }
+            catch (Exception ex)
+            {
+                result.Ok = false;
+                result.GeometryAuditPassed = false;
+                result.ReleaseEligible = false;
+                result.Status = "Failed";
+                result.Error = ex.ToString();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(result.AuditPath));
+                    File.WriteAllText(result.AuditPath, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(result));
+                }
+                catch (Exception auditWriteError)
+                {
+                    if (string.IsNullOrWhiteSpace(result.Error)) result.Error = auditWriteError.ToString();
+                    result.Ok = false;
+                    result.GeometryAuditPassed = false;
+                    result.ReleaseEligible = false;
+                    result.Status = "AuditReportWriteFailed";
+                }
+            }
+            return result;
         }
 
         public int CloseGeneratedDocumentsUnder(string folder)
@@ -148,10 +393,11 @@ namespace SWWerkplaats.Configurator.SolidWorks
                 CreateLexLevelingFootParts(solidWorks, visualParts, model, cadFolder);
             }
 
-            // Een externe assembly wordt op sommige werkplekken door Windows Application
-            // Control geblokkeerd zodra SolidWorks het tweede lokale part wil invoegen.
-            // Een multibody controlepart gebruikt dezelfde wereldcoordinaten, maar blijft
-            // volledig binnen een SolidWorks-document en is daardoor betrouwbaarder.
+            // Behoud procescontract v1: klantmodel en tekening blijven voorlopig uit dit
+            // multibody controlepart komen. Een historische blokkade bij het tweede lokale
+            // assemblypart wordt niet meer verondersteld; ProbeExternalAssemblyInsertion
+            // bewijst dat per werkplek. De geaudite SLDASM draait afzonderlijk totdat zijn
+            // SolidWorks-roundtrip volledig is geslaagd.
             var controlPath = Path.Combine(cadFolder, SafeName(model.ProjectName) + "_CONTROLE.SLDPRT");
             CreateMultibodyControlPart(solidWorks, visualParts, model, request, controlPath);
             return controlPath;
@@ -466,7 +712,9 @@ namespace SWWerkplaats.Configurator.SolidWorks
                     IsThroughCutout = hole.IsThroughCutout,
                     Countersunk = hole.Countersunk,
                     CountersinkDiameterMm = hole.CountersinkDiameterMm,
-                    CountersinkDepthMm = hole.CountersinkDepthMm
+                    CountersinkDepthMm = hole.CountersinkDepthMm,
+                    SourceFace = hole.SourceFace,
+                    SourceDepthMode = hole.SourceDepthMode
                 });
             }
             foreach (var pocket in source.Pockets)
@@ -483,7 +731,12 @@ namespace SWWerkplaats.Configurator.SolidWorks
                     SizeZmm = pocket.SizeZmm,
                     Plane = pocket.Plane,
                     IsThroughCutout = pocket.IsThroughCutout,
-                    MinorDiameterMm = pocket.MinorDiameterMm
+                    MinorDiameterMm = pocket.MinorDiameterMm,
+                    SourceFace = pocket.SourceFace,
+                    SourceDepthMode = pocket.SourceDepthMode,
+                    AssemblyFitContractId = pocket.AssemblyFitContractId,
+                    RequiresAssemblyOccupant = pocket.RequiresAssemblyOccupant,
+                    MinimumAssemblyOccupancyRatio = pocket.MinimumAssemblyOccupancyRatio
                 });
             }
             return translated;
@@ -864,33 +1117,88 @@ namespace SWWerkplaats.Configurator.SolidWorks
             var running = TryGetRunningSolidWorks();
             if (running != null) return running;
 
-            if (File.Exists(ThreeExperienceLauncherPath))
+            using (var startGate = new Mutex(false, "SWWerkplaats.Configurator.SolidWorks.Start"))
             {
-                StartThreeExperienceSolidWorks();
-                var deadline = DateTime.UtcNow.AddMinutes(5);
-                while (DateTime.UtcNow < deadline)
+                var gateTaken = false;
+                try
                 {
-                    Thread.Sleep(2000);
+                    try { gateTaken = startGate.WaitOne(TimeSpan.FromMinutes(2)); }
+                    catch (AbandonedMutexException) { gateTaken = true; }
+                    if (!gateTaken)
+                        throw new InvalidOperationException("Een andere worker is SolidWorks al aan het starten; de startvergrendeling kwam niet binnen 2 minuten vrij.");
+
+                    // Een tweede worker kan SolidWorks hebben gekoppeld terwijl deze worker
+                    // op de startvergrendeling wachtte. Controleer daarom altijd opnieuw.
                     running = TryGetRunningSolidWorks();
                     if (running != null) return running;
+
+                    var existingProcessIds = SolidWorksProcessIds();
+                    if (existingProcessIds.Length > 0)
+                    {
+                        running = WaitForRunningSolidWorks(TimeSpan.FromMinutes(2));
+                        if (running != null) return running;
+                        throw new InvalidOperationException(
+                            "Er draait al een lokale SOLIDWORKS-sessie (PID " + string.Join(", ", existingProcessIds.Select(id => id.ToString()).ToArray())
+                            + "), maar die registreerde binnen 2 minuten geen bruikbare COM/ROT-koppeling. "
+                            + "De worker start bewust geen tweede SolidWorks. Activeer of herstel de bestaande sessie en probeer opnieuw.");
+                    }
+
+                    if (File.Exists(ThreeExperienceLauncherPath))
+                    {
+                        StartThreeExperienceSolidWorks();
+                        running = WaitForRunningSolidWorks(TimeSpan.FromMinutes(5));
+                        if (running != null) return running;
+
+                        throw new InvalidOperationException(
+                            "SOLIDWORKS Design is via de 3DEXPERIENCE-launcher gestart, maar registreerde binnen 5 minuten geen COM-sessie. "
+                            + "Controleer of een 3DEXPERIENCE-inlog- of licentievenster wacht en probeer daarna opnieuw; de worker start geen tweede instantie.");
+                    }
+
+                    try
+                    {
+                        var type = Type.GetTypeFromProgID("SldWorks.Application");
+                        if (type != null) return (SldWorks)Activator.CreateInstance(type);
+                    }
+                    catch (Exception error)
+                    {
+                        throw new InvalidOperationException("Geen actieve of startbare SOLIDWORKS COM-sessie gevonden.", error);
+                    }
                 }
-
-                throw new InvalidOperationException(
-                    "SOLIDWORKS Design is via de 3DEXPERIENCE-launcher gestart, maar registreerde binnen 5 minuten geen COM-sessie. "
-                    + "Controleer of een 3DEXPERIENCE-inlogvenster wacht op aanmelding, rond de login af en probeer daarna opnieuw.");
-            }
-
-            try
-            {
-                var type = Type.GetTypeFromProgID("SldWorks.Application");
-                if (type != null) return (SldWorks)Activator.CreateInstance(type);
-            }
-            catch (Exception error)
-            {
-                throw new InvalidOperationException("Geen actieve of startbare SOLIDWORKS COM-sessie gevonden.", error);
+                finally
+                {
+                    if (gateTaken)
+                    {
+                        try { startGate.ReleaseMutex(); } catch { }
+                    }
+                }
             }
 
             throw new InvalidOperationException("Geen actieve of startbare SOLIDWORKS COM-sessie gevonden.");
+        }
+
+        private static SldWorks WaitForRunningSolidWorks(TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow.Add(timeout);
+            while (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(2000);
+                var running = TryGetRunningSolidWorks();
+                if (running != null) return running;
+            }
+            return null;
+        }
+
+        private static int[] SolidWorksProcessIds()
+        {
+            var processes = Process.GetProcessesByName("SLDWORKS");
+            try
+            {
+                return processes.Select(process => process.Id).OrderBy(id => id).ToArray();
+            }
+            finally
+            {
+                foreach (var process in processes) process.Dispose();
+            }
         }
 
         private static SldWorks TryGetRunningSolidWorks()
@@ -951,8 +1259,12 @@ namespace SWWerkplaats.Configurator.SolidWorks
             {
                 // Een achtergebleven ROT/COM-verwijzing kan nog castbaar zijn nadat
                 // SLDWORKS is gestopt. Deze echte serveraanroep filtert zo'n dode
-                // sessie uit voordat de partgeneratie begint.
-                return !string.IsNullOrWhiteSpace(solidWorks.RevisionNumber());
+                // sessie uit voordat de partgeneratie begint. RevisionNumber alleen
+                // is onvoldoende: 3DEXPERIENCE registreert COM al terwijl add-ins nog
+                // laden. Tijdens die fase kan de eerste modelbewerking RPC verbreken.
+                return !string.IsNullOrWhiteSpace(solidWorks.RevisionNumber())
+                    && solidWorks.StartupProcessCompleted
+                    && !solidWorks.CommandInProgress;
             }
             catch
             {
@@ -1066,6 +1378,552 @@ namespace SWWerkplaats.Configurator.SolidWorks
             saveWarnings = 0;
             assemblyModel.Extension.SaveAs(assemblyPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref saveErrors, ref saveWarnings);
             if (saveErrors != 0) throw new InvalidOperationException("SolidWorks kon de controle-assembly niet opslaan (code " + saveErrors + ").");
+        }
+
+        private static string AuditComponentId(int index, PortalAssemblyPart visual)
+        {
+            var identity = !string.IsNullOrWhiteSpace(visual.TraceId)
+                ? visual.TraceId
+                : (!string.IsNullOrWhiteSpace(visual.MemberId)
+                    ? visual.MemberId
+                    : (!string.IsNullOrWhiteSpace(visual.ComponentId) ? visual.ComponentId : visual.Name));
+            identity = SafeFeatureName(SafeName(identity ?? "component"));
+            if (identity.Length > 70) identity = identity.Substring(0, 70);
+            return "A" + (index + 1).ToString("0000") + "_" + identity;
+        }
+
+        private static string AuditGeometryKey(PortalAssemblyPart source)
+        {
+            var tokens = new List<string>
+            {
+                source.Shape ?? "box",
+                R(source.SizeXmm), R(source.SizeYmm), R(source.SizeZmm),
+                R(source.BodyDiameterMm), R(source.FlangeDiameterMm), R(source.FlangeThicknessMm),
+                R(source.FlangeRecessDepthMm), R(source.InsertionLengthMm), R(source.BallDiameterMm),
+                R(source.WorkingHeightMm), R(source.RadiusTopMm), R(source.RadiusBottomMm),
+                source.RadialSegments.ToString(), R(source.CornerRadiusMm)
+            };
+            foreach (var hole in source.Holes)
+                tokens.Add("H|" + (hole.Plane ?? "") + "|" + R(hole.Xmm - source.Xmm) + "|" + R(hole.Ymm - source.Ymm)
+                    + "|" + R(hole.Zmm - source.Zmm) + "|" + R(hole.DiameterMm) + "|" + R(hole.DepthMm)
+                    + "|" + hole.IsThroughCutout + "|" + hole.Countersunk + "|" + R(hole.CountersinkDiameterMm) + "|" + R(hole.CountersinkDepthMm));
+            foreach (var pocket in source.Pockets)
+                tokens.Add("P|" + (pocket.Shape ?? "") + "|" + (pocket.Plane ?? "") + "|" + R(pocket.Xmm - source.Xmm)
+                    + "|" + R(pocket.Ymm - source.Ymm) + "|" + R(pocket.Zmm - source.Zmm) + "|" + R(pocket.SizeXmm)
+                    + "|" + R(pocket.SizeYmm) + "|" + R(pocket.SizeZmm) + "|" + R(pocket.MinorDiameterMm) + "|" + pocket.IsThroughCutout);
+            return string.Join(";", tokens.ToArray());
+        }
+
+        private static double[] CreateLocalAuditPart(SldWorks solidWorks, PortalAssemblyPart source, string partPath)
+        {
+            if (source == null) throw new ArgumentNullException("source");
+            var hasRotation = Math.Abs(source.RotationXDeg) > 0.000001
+                || Math.Abs(source.RotationYDeg) > 0.000001
+                || Math.Abs(source.RotationZDeg) > 0.000001;
+            if (hasRotation && (source.Holes.Count > 0 || source.Pockets.Count > 0))
+                throw new InvalidOperationException(
+                    "Geaudite lokale partbouw ondersteunt nog geen geroteerde cuts voor " + source.Name
+                    + ". De assembly wordt geblokkeerd in plaats van gat-/sleufgeometrie dubbel te roteren.");
+
+            var local = new PortalAssemblyPart
+            {
+                Name = source.Name,
+                Kind = source.Kind,
+                Shape = source.Shape,
+                Xmm = 0,
+                Ymm = 0,
+                Zmm = 0,
+                SizeXmm = source.SizeXmm,
+                SizeYmm = source.SizeYmm,
+                SizeZmm = source.SizeZmm,
+                BodyDiameterMm = source.BodyDiameterMm,
+                FlangeDiameterMm = source.FlangeDiameterMm,
+                FlangeThicknessMm = source.FlangeThicknessMm,
+                FlangeRecessDepthMm = source.FlangeRecessDepthMm,
+                InsertionLengthMm = source.InsertionLengthMm,
+                BallDiameterMm = source.BallDiameterMm,
+                WorkingHeightMm = source.WorkingHeightMm,
+                RadiusTopMm = source.RadiusTopMm,
+                RadiusBottomMm = source.RadiusBottomMm,
+                RadialSegments = source.RadialSegments,
+                CornerRadiusMm = source.CornerRadiusMm
+            };
+            foreach (var sourceHole in source.Holes)
+            {
+                local.Holes.Add(new PortalAssemblyHole
+                {
+                    Name = sourceHole.Name,
+                    Xmm = sourceHole.Xmm - source.Xmm,
+                    Ymm = sourceHole.Ymm - source.Ymm,
+                    Zmm = sourceHole.Zmm - source.Zmm,
+                    DiameterMm = sourceHole.DiameterMm,
+                    DepthMm = sourceHole.DepthMm,
+                    Plane = sourceHole.Plane,
+                    IsThroughCutout = sourceHole.IsThroughCutout,
+                    Countersunk = sourceHole.Countersunk,
+                    CountersinkDiameterMm = sourceHole.CountersinkDiameterMm,
+                    CountersinkDepthMm = sourceHole.CountersinkDepthMm,
+                    VisualRole = sourceHole.VisualRole,
+                    SourceFace = sourceHole.SourceFace,
+                    SourceDepthMode = sourceHole.SourceDepthMode
+                });
+            }
+            foreach (var sourcePocket in source.Pockets)
+            {
+                local.Pockets.Add(new PortalAssemblyPocket
+                {
+                    Name = sourcePocket.Name,
+                    Shape = sourcePocket.Shape,
+                    VisualRole = sourcePocket.VisualRole,
+                    Xmm = sourcePocket.Xmm - source.Xmm,
+                    Ymm = sourcePocket.Ymm - source.Ymm,
+                    Zmm = sourcePocket.Zmm - source.Zmm,
+                    SizeXmm = sourcePocket.SizeXmm,
+                    SizeYmm = sourcePocket.SizeYmm,
+                    SizeZmm = sourcePocket.SizeZmm,
+                    Plane = sourcePocket.Plane,
+                    IsThroughCutout = sourcePocket.IsThroughCutout,
+                    MinorDiameterMm = sourcePocket.MinorDiameterMm,
+                    SourceFace = sourcePocket.SourceFace,
+                    SourceDepthMode = sourcePocket.SourceDepthMode,
+                    AssemblyFitContractId = sourcePocket.AssemblyFitContractId,
+                    RequiresAssemblyOccupant = sourcePocket.RequiresAssemblyOccupant,
+                    MinimumAssemblyOccupancyRatio = sourcePocket.MinimumAssemblyOccupancyRatio
+                });
+            }
+
+            var model = (ModelDoc2)solidWorks.NewPart();
+            if (model == null) throw new InvalidOperationException("SolidWorks kon geen lokaal auditpart maken voor " + source.Name + ".");
+            var title = model.GetTitle();
+            Modeler modeler = null;
+            Body2 body = null;
+            Feature feature = null;
+            double[] massProperties = null;
+            try
+            {
+                modeler = (Modeler)solidWorks.GetModeler();
+                body = CreateVisualBody(modeler, local);
+                massProperties = ToDoubleArray(body == null ? null : body.GetMassProperties(1.0));
+                if (massProperties == null || massProperties.Length < 12)
+                    throw new InvalidOperationException("SolidWorks kon geen vormsignatuur bepalen voor " + source.Name + ".");
+                feature = ((PartDoc)model).CreateFeatureFromBody3(body, false, 1) as Feature;
+                if (feature == null) throw new InvalidOperationException("SolidWorks kon geen lokale auditfeature maken voor " + source.Name + ".");
+                feature.Name = "AUDIT_BODY";
+                model.EditRebuild3();
+                var errors = 0;
+                var warnings = 0;
+                model.Extension.SaveAs(partPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
+                if (errors != 0 || !File.Exists(partPath))
+                    throw new InvalidOperationException("SolidWorks kon het lokale auditpart niet opslaan (code " + errors + "): " + partPath);
+            }
+            finally
+            {
+                ReleaseCom(feature);
+                ReleaseCom(body);
+                ReleaseCom(modeler);
+                try { solidWorks.CloseDoc(title); } catch { }
+                ReleaseCom(model);
+                ForceComCleanup();
+            }
+            return massProperties;
+        }
+
+        private static void CreateAuditedAssembly(SldWorks solidWorks, SolidWorksAuditedAssemblyResult result)
+        {
+            var model = (ModelDoc2)solidWorks.NewAssembly();
+            if (model == null) throw new InvalidOperationException("SolidWorks kon geen nieuwe geaudite assembly maken. Controleer de default assembly template.");
+            var title = model.GetTitle();
+            try
+            {
+                var errors = 0;
+                var warnings = 0;
+                model.Extension.SaveAs(result.AssemblyPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
+                if (errors != 0) throw new InvalidOperationException("SolidWorks kon de lege geaudite assembly niet opslaan (code " + errors + ").");
+                var assembly = (AssemblyDoc)model;
+                var names = result.Components.Select(item => item.PartPath).ToArray();
+                var transforms = new double[result.Components.Count * 16];
+                var coordinateSystems = new string[result.Components.Count];
+                for (var index = 0; index < result.Components.Count; index++)
+                {
+                    Array.Copy(result.Components[index].ExpectedTransform, 0, transforms, index * 16, 16);
+                    coordinateSystems[index] = "";
+                }
+
+                result.FailureStage = "InsertComponentsBatch";
+                var inserted = assembly.AddComponents3(names, transforms, coordinateSystems) as object[];
+                if (inserted == null || inserted.Length != result.Components.Count)
+                    throw new InvalidOperationException(
+                        "SolidWorks voegde " + (inserted == null ? 0 : inserted.Length)
+                        + " auditcomponenten toe; verwacht " + result.Components.Count + ".");
+
+                var unmatched = new List<SolidWorksAssemblyAuditItem>(result.Components);
+                for (var index = 0; index < inserted.Length; index++)
+                {
+                    var component = inserted[index] as Component2;
+                    if (component == null) throw new InvalidOperationException("SolidWorks gaf geen component terug op auditindex " + index + ".");
+                    try
+                    {
+                        var componentPath = component.GetPathName();
+                        var transform = component.Transform2;
+                        double[] observedTransform;
+                        try
+                        {
+                            observedTransform = ToDoubleArray(transform == null ? null : transform.ArrayData);
+                        }
+                        finally
+                        {
+                            ReleaseCom(transform);
+                        }
+                        var pathMatches = unmatched.Where(item =>
+                            string.Equals(item.PartPath, componentPath, StringComparison.OrdinalIgnoreCase)).ToList();
+                        var candidates = pathMatches.Count > 0 ? pathMatches : unmatched;
+                        var match = candidates.OrderBy(item => TransformMatchScore(item.ExpectedTransform, observedTransform)).FirstOrDefault();
+                        if (match == null)
+                            throw new InvalidOperationException("SolidWorks-component op auditindex " + index + " kon niet aan de bronplaatsing worden gekoppeld.");
+                        component.Name2 = match.AuditId;
+                        unmatched.Remove(match);
+                    }
+                    finally
+                    {
+                        ReleaseCom(component);
+                    }
+                }
+                if (unmatched.Count != 0)
+                    throw new InvalidOperationException("Niet alle auditplaatsingen kregen een SolidWorks-component; resterend " + unmatched.Count + ".");
+                result.FailureStage = "SaveAssembly";
+                errors = 0;
+                warnings = 0;
+                if (!model.Save3(SaveAsOptionsSilent, ref errors, ref warnings) || errors != 0)
+                    throw new InvalidOperationException("SolidWorks kon de geaudite assembly niet opslaan (code " + errors + ").");
+            }
+            finally
+            {
+                try { solidWorks.CloseDoc(title); } catch { }
+                ReleaseCom(model);
+                ForceComCleanup();
+            }
+        }
+
+        private static void AuditSavedAssembly(SldWorks solidWorks, SolidWorksAuditedAssemblyResult result, double transformToleranceMm, double rotationTolerance)
+        {
+            CloseOpenAuditAssembly(solidWorks, result.AssemblyPath);
+            var roundtripPath = Path.Combine(
+                Path.GetDirectoryName(result.AssemblyPath),
+                Path.GetFileNameWithoutExtension(result.AssemblyPath) + "_ROUNDTRIP_" + Guid.NewGuid().ToString("N") + ".SLDASM");
+            File.Copy(result.AssemblyPath, roundtripPath, true);
+            var errors = 0;
+            var warnings = 0;
+            var model = solidWorks.OpenDoc6(roundtripPath, 2, 1, "", ref errors, ref warnings);
+            if (model == null)
+            {
+                try { File.Delete(roundtripPath); } catch { }
+                throw new InvalidOperationException("SolidWorks kon de geaudite assembly niet voor roundtripcontrole openen (code " + errors + ").");
+            }
+            if (errors != 0 || warnings != 0)
+            {
+                result.GeometryFindings.Add(new SolidWorksGeometryAuditFinding
+                {
+                    Severity = "Warning",
+                    Code = "SOLIDWORKS_ROUNDTRIP_OPEN_WARNING",
+                    Message = "SolidWorks opende de opgeslagen assembly met foutcode " + errors + " en waarschuwingcode " + warnings + "."
+                });
+            }
+            var title = model.GetTitle();
+            try
+            {
+                var components = ((AssemblyDoc)model).GetComponents(false) as object[];
+                result.ReopenedComponentCount = components == null ? 0 : components.Length;
+                var unmatched = new List<SolidWorksAssemblyAuditItem>(result.Components);
+                foreach (var rawComponent in components ?? new object[0])
+                {
+                    var component = rawComponent as Component2;
+                    if (component == null) continue;
+                    try
+                    {
+                        var transform = component.Transform2;
+                        double[] observedTransform;
+                        try
+                        {
+                            observedTransform = ToDoubleArray(transform == null ? null : transform.ArrayData);
+                        }
+                        finally
+                        {
+                            ReleaseCom(transform);
+                        }
+                        var componentPath = component.GetPathName();
+                        var pathMatches = unmatched.Where(candidate =>
+                            string.Equals(candidate.PartPath, componentPath, StringComparison.OrdinalIgnoreCase)).ToList();
+                        var candidates = pathMatches.Count > 0 ? pathMatches : unmatched;
+                        var item = candidates.OrderBy(candidate => TransformMatchScore(candidate.ExpectedTransform, observedTransform)).FirstOrDefault();
+                        if (item == null) continue;
+                        unmatched.Remove(item);
+                        item.SolidWorksComponentName = component.Name2;
+                        item.Error = null;
+                        item.ObservedTransform = observedTransform;
+                        item.ObservedWorldBoundsMm = ToDoubleArray(component.GetBox(false, false));
+                        if (item.ObservedWorldBoundsMm != null)
+                        {
+                            for (var i = 0; i < item.ObservedWorldBoundsMm.Length; i++) item.ObservedWorldBoundsMm[i] *= 1000.0;
+                        }
+                        item.MaximumRotationDelta = MaximumDelta(item.ExpectedTransform, item.ObservedTransform, 0, 9, 1.0);
+                        item.MaximumTranslationDeltaMm = MaximumDelta(item.ExpectedTransform, item.ObservedTransform, 9, 12, 1000.0);
+                        item.MaximumBoundsDeltaMm = MaximumDelta(item.ExpectedWorldBoundsMm, item.ObservedWorldBoundsMm, 0, 6, 1.0);
+                        Body2 componentBody = null;
+                        try
+                        {
+                            componentBody = component.GetBody() as Body2;
+                            item.ReopenedBodyMassProperties = ToDoubleArray(componentBody == null ? null : componentBody.GetMassProperties(1.0));
+                        }
+                        finally
+                        {
+                            ReleaseCom(componentBody);
+                        }
+                        item.BodySignaturePassed = BodySignatureMatches(item.CreatedBodyMassProperties, item.ReopenedBodyMassProperties, out var bodySignatureDelta);
+                        item.MaximumBodySignatureDelta = bodySignatureDelta;
+                        item.Passed = item.ObservedTransform != null
+                            && item.ObservedWorldBoundsMm != null
+                            && item.MaximumRotationDelta <= rotationTolerance
+                            && item.MaximumTranslationDeltaMm <= transformToleranceMm
+                            && item.MaximumBoundsDeltaMm <= transformToleranceMm
+                            && item.BodySignaturePassed;
+                        if (!item.Passed)
+                            item.Error = "Roundtripdelta buiten tolerantie: translatie " + item.MaximumTranslationDeltaMm.ToString("0.######")
+                                + " mm, rotatie " + item.MaximumRotationDelta.ToString("0.########")
+                                + ", bounds " + item.MaximumBoundsDeltaMm.ToString("0.######")
+                                + " mm, vormsignatuur " + item.MaximumBodySignatureDelta.ToString("0.########") + ".";
+                        result.MaximumTransformDeltaMm = Math.Max(result.MaximumTransformDeltaMm, item.MaximumTranslationDeltaMm);
+                        result.MaximumRotationDelta = Math.Max(result.MaximumRotationDelta, item.MaximumRotationDelta);
+                    }
+                    finally
+                    {
+                        ReleaseCom(component);
+                    }
+                }
+                foreach (var missing in unmatched)
+                {
+                    missing.Passed = false;
+                    missing.Error = "Component ontbreekt na opnieuw openen van de assembly.";
+                }
+                AuditSolidWorksInterferences((AssemblyDoc)model, result);
+            }
+            finally
+            {
+                try { solidWorks.CloseDoc(title); } catch { }
+                ReleaseCom(model);
+                ForceComCleanup();
+                try { File.Delete(roundtripPath); } catch { }
+            }
+        }
+
+        private static void CloseOpenAuditAssembly(SldWorks solidWorks, string assemblyPath)
+        {
+            var expectedPath = Path.GetFullPath(assemblyPath);
+            var expectedTitle = Path.GetFileName(expectedPath);
+            var documents = solidWorks.GetDocuments() as object[];
+            if (documents == null) return;
+            var titles = new List<string>();
+            foreach (var value in documents)
+            {
+                var document = value as ModelDoc2;
+                if (document == null) continue;
+                try
+                {
+                    var openPath = document.GetPathName();
+                    var openTitle = document.GetTitle();
+                    if ((!string.IsNullOrWhiteSpace(openPath) && string.Equals(Path.GetFullPath(openPath), expectedPath, StringComparison.OrdinalIgnoreCase))
+                        || string.Equals(openTitle, expectedTitle, StringComparison.OrdinalIgnoreCase))
+                        titles.Add(openTitle);
+                }
+                finally
+                {
+                    ReleaseCom(document);
+                }
+            }
+            foreach (var title in titles.Distinct(StringComparer.OrdinalIgnoreCase))
+                solidWorks.CloseDoc(title);
+            if (titles.Count == 0) return;
+            ForceComCleanup();
+            Thread.Sleep(250);
+        }
+
+        private static bool BodySignatureMatches(double[] expected, double[] observed, out double maximumNormalizedDelta)
+        {
+            maximumNormalizedDelta = double.PositiveInfinity;
+            if (expected == null || observed == null || expected.Length < 12 || observed.Length < 12) return false;
+            maximumNormalizedDelta = 0;
+            for (var index = 0; index < 12; index++)
+            {
+                var absoluteTolerance = index < 3 ? 0.00005 : (index == 3 ? 1e-12 : 1e-10);
+                var scale = Math.Max(absoluteTolerance, Math.Abs(expected[index]) * 0.000001);
+                var normalized = Math.Abs(expected[index] - observed[index]) / scale;
+                maximumNormalizedDelta = Math.Max(maximumNormalizedDelta, normalized);
+            }
+            return maximumNormalizedDelta <= 1.0;
+        }
+
+        private static void AuditSolidWorksInterferences(AssemblyDoc assembly, SolidWorksAuditedAssemblyResult result)
+        {
+            if (assembly == null) throw new ArgumentNullException("assembly");
+            InterferenceDetectionMgr manager = null;
+            try
+            {
+                manager = assembly.InterferenceDetectionManager;
+                if (manager == null) throw new InvalidOperationException("SolidWorks leverde geen interferentiecontrolemodule.");
+                manager.TreatCoincidenceAsInterference = false;
+                manager.TreatSubAssembliesAsComponents = true;
+                manager.IncludeMultibodyPartInterferences = true;
+                manager.IgnoreHiddenBodies = false;
+                manager.ShowIgnoredInterferences = true;
+                var count = manager.GetInterferenceCount();
+                var raw = count <= 0 ? null : manager.GetInterferences() as object[];
+                var auditedComponents = result.Components
+                    .Where(value => !string.IsNullOrWhiteSpace(value.SolidWorksComponentName))
+                    .GroupBy(value => value.SolidWorksComponentName, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(value => value.Key, value => value.First(), StringComparer.OrdinalIgnoreCase);
+                foreach (var value in raw ?? new object[0])
+                {
+                    var interference = value as Interference;
+                    if (interference == null) continue;
+                    try
+                    {
+                        var names = new List<string>();
+                        var rawComponents = interference.Components as object[];
+                        foreach (var rawComponent in rawComponents ?? new object[0])
+                        {
+                            var component = rawComponent as Component2;
+                            if (component == null) continue;
+                            try { names.Add(component.Name2); }
+                            finally { ReleaseCom(component); }
+                        }
+                        var volumeMm3 = Math.Max(0, interference.Volume * 1000000000.0);
+                        var related = names.Where(auditedComponents.ContainsKey).Select(name => auditedComponents[name]).ToList();
+                        var sameAssemblyInstance = related.Count >= 2
+                            && !string.IsNullOrWhiteSpace(related[0].AssemblyInstanceId)
+                            && related.All(item => string.Equals(item.AssemblyInstanceId, related[0].AssemblyInstanceId, StringComparison.OrdinalIgnoreCase));
+                        var provisionalEnvelope = related.Any(item => string.Equals(item.SourceStatus, "ProvisionalRenderEnvelope", StringComparison.OrdinalIgnoreCase));
+                        var isBlocking = volumeMm3 > 0.001 && !sameAssemblyInstance && !provisionalEnvelope;
+                        var disposition = volumeMm3 <= 0.001 ? "Tolerance"
+                            : (sameAssemblyInstance ? "InternalComponentUnion"
+                                : (provisionalEnvelope ? "OpenDataRenderEnvelope" : "BlockingInterference"));
+                        result.Interferences.Add(new SolidWorksInterferenceAuditItem
+                        {
+                            ComponentNames = names.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
+                            VolumeMm3 = Math.Round(volumeMm3, 6),
+                            IsPossibleInterference = interference.IsPossibleInterference,
+                            IsFastener = interference.IsFastener,
+                            Disposition = disposition,
+                            Passed = !isBlocking,
+                            Error = isBlocking ? "SolidWorks vindt een onverwachte volume-interferentie van " + volumeMm3.ToString("0.######", CultureInfo.InvariantCulture) + " mm3." : null
+                        });
+                    }
+                    finally
+                    {
+                        ReleaseCom(interference);
+                    }
+                }
+                if (result.Interferences.Count != count)
+                {
+                    result.GeometryFindings.Add(new SolidWorksGeometryAuditFinding
+                    {
+                        Severity = "Error",
+                        Code = "INTERFERENCE_RESULT_COUNT_MISMATCH",
+                        Message = "SolidWorks meldde " + count + " interferenties maar leverde " + result.Interferences.Count + " leesbare resultaten."
+                    });
+                    result.Interferences.Add(new SolidWorksInterferenceAuditItem
+                    {
+                        ComponentNames = new string[0],
+                        Passed = false,
+                        Error = "Interferentieresultaat van SolidWorks is onvolledig."
+                    });
+                }
+            }
+            finally
+            {
+                if (manager != null) try { manager.Done(); } catch { }
+                ReleaseCom(manager);
+            }
+        }
+
+        private static double[] ToDoubleArray(object value)
+        {
+            var array = value as Array;
+            if (array == null) return null;
+            var result = new double[array.Length];
+            for (var i = 0; i < array.Length; i++) result[i] = Convert.ToDouble(array.GetValue(i));
+            return result;
+        }
+
+        private static double MaximumDelta(double[] expected, double[] observed, int start, int end, double scale)
+        {
+            if (expected == null || observed == null || expected.Length < end || observed.Length < end) return double.MaxValue;
+            var maximum = 0.0;
+            for (var index = start; index < end; index++)
+                maximum = Math.Max(maximum, Math.Abs(expected[index] - observed[index]) * scale);
+            return maximum;
+        }
+
+        private static double TransformMatchScore(double[] expected, double[] observed)
+        {
+            if (expected == null || observed == null || expected.Length < 12 || observed.Length < 12)
+                return double.MaxValue;
+            var score = 0.0;
+            for (var index = 0; index < 12; index++)
+            {
+                var delta = expected[index] - observed[index];
+                score += delta * delta;
+            }
+            return score;
+        }
+
+        private static void CreateProbePart(SldWorks solidWorks, string partPath, double sizeXmm, double sizeYmm, double sizeZmm)
+        {
+            var model = (ModelDoc2)solidWorks.NewPart();
+            if (model == null) throw new InvalidOperationException("SolidWorks kon geen nieuw part maken voor de WAC-proef.");
+            var title = model.GetTitle();
+            Modeler modeler = null;
+            Body2 body = null;
+            Feature feature = null;
+            try
+            {
+                modeler = (Modeler)solidWorks.GetModeler();
+                body = CreateBoxBody(modeler, 0, 0, 0, sizeXmm, sizeYmm, sizeZmm);
+                if (body == null) throw new InvalidOperationException("SolidWorks kon geen body maken voor " + partPath + ".");
+                feature = ((PartDoc)model).CreateFeatureFromBody3(body, false, 1) as Feature;
+                if (feature == null) throw new InvalidOperationException("SolidWorks kon geen feature maken voor " + partPath + ".");
+                feature.Name = "WAC_PROBE_BODY";
+                model.EditRebuild3();
+                var errors = 0;
+                var warnings = 0;
+                model.Extension.SaveAs(partPath, SaveAsCurrentVersion, SaveAsOptionsSilent, null, ref errors, ref warnings);
+                if (errors != 0 || !File.Exists(partPath))
+                    throw new InvalidOperationException("SolidWorks kon het lokale WAC-proefpart niet opslaan (code " + errors + "): " + partPath);
+            }
+            finally
+            {
+                ReleaseCom(feature);
+                ReleaseCom(body);
+                ReleaseCom(modeler);
+                try { solidWorks.CloseDoc(title); } catch { }
+                ReleaseCom(model);
+                ForceComCleanup();
+            }
+        }
+
+        private static bool IsLikelyApplicationControlBlock(Exception error)
+        {
+            for (var current = error; current != null; current = current.InnerException)
+            {
+                if (current.HResult == unchecked((int)0x800704EC)) return true;
+                var message = current.Message ?? "";
+                if (message.IndexOf("application control", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("code integrity", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("group policy", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("system policy", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("blocked by policy", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("geblokkeerd door beleid", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            return false;
         }
 
         private static AssemblyPlacement FindPlacement(WorkbenchModel model, AssemblyComponentKind kind, string partName)

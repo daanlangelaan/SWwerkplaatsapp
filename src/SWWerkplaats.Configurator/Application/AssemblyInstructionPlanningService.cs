@@ -47,7 +47,18 @@ namespace SWWerkplaats.Configurator.Application
                         ? AssemblyDataStatus.Provisional
                         : AssemblyDataStatus.Confirmed;
 
-                if (first.JointType == AssemblyJointType.HingeSlidingNut)
+                if (first.JointType == AssemblyJointType.SheetHinge)
+                {
+                    Add(plan, model, connections, stepNumber++, AssemblyInstructionPhase.Prepare, groupId, groupLabel,
+                        "Controleer drie gaten per blad tegen het ingemeten AXA-sample", "sheet-hinge-hole-pattern", first.TappedPartName, first.SlotPartName, null, "3 + 3 gaten", status);
+                    Add(plan, model, connections, stepNumber++, AssemblyInstructionPhase.Position, groupId, groupLabel,
+                        "Plaats ieder AXA-scharnier aan de binnenzijde tussen de twee aangegeven platen", "sheet-hinge-inside", first.TappedPartName, first.SlotPartName, null, null, status);
+                    Add(plan, model, connections, stepNumber++, AssemblyInstructionPhase.Tighten, groupId, groupLabel,
+                        "Bevestig elk scharnierblad uitsluitend met de vrijgegeven plaatbevestiger", "sheet-hinge-fastener", first.TappedPartName, first.SlotPartName, null, null, status);
+                    Add(plan, model, connections, stepNumber++, AssemblyInstructionPhase.Inspect, groupId, groupLabel,
+                        "Controleer vrije inwaartse vouwslag en plaatcontact", "sheet-hinge-fold-check", first.TappedPartName, first.SlotPartName, null, null, status);
+                }
+                else if (first.JointType == AssemblyJointType.HingeSlidingNut)
                 {
                     Add(plan, model, connections, stepNumber++, AssemblyInstructionPhase.Preassemble, groupId, groupLabel,
                         "Schuif schuifmoeren in de T-sleuf", "hinge-sliding-nut", first.TappedPartName, first.SlotPartName, null, null, status);
