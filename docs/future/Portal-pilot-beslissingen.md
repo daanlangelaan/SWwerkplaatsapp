@@ -59,7 +59,7 @@ niet als browserdefaults.
 - toegestane levervormen: bouwpakket en gemonteerd;
 - standaard levervorm: bouwpakket;
 - montageprijs: op aanvraag, handmatig vast te stellen door Bedrijfsbeheer;
-- ontvangst: verzenden of afhalen; afhalen is toegestaan;
+- ontvangst: verzenden of afhalen; verzenden is de standaard en afhalen blijft toegestaan;
 - automatische verpakking/verzendkosten volgen pas met gevalideerde klant-,
   maat-, gewicht- en vervoerdersdata en worden tot die tijd niet geschat.
 

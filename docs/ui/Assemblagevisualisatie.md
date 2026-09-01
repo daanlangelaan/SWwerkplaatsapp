@@ -39,6 +39,11 @@ Voor iedere gebruikte verbinding levert de backend:
 De UI rendert deze objecten rechtstreeks. Zij telt geen gaten, kiest geen
 sleufbaan en maakt geen boutmaat uit profielafmetingen.
 
+De vrije 360-view en de orthografische voor-, zij- en onderaanzichten gebruiken
+dezelfde Three.js-meshbouwer. Een aanzicht verandert uitsluitend camera en fit;
+het bouwt geen tweede 2D-silhouet, componentvorm of materiaalweergave. Maattekst,
+kaders en labels mogen als presentatie-overlay boven die gedeelde scene staan.
+
 De concrete backendcontracten zijn:
 
 - `PortalAssemblyPart.ProfileRender` voor langsas, sleufassen, sleufmond,

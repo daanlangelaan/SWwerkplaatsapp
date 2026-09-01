@@ -44,6 +44,7 @@ namespace SWWerkplaats.Configurator.Application
                 Role("cncoperator", "Plaat-CNC-operator", "/app/workshop/sheet-cnc", "Mijn wachtrij", "sheet-cnc", false, PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.sheet-cnc"),
                 Role("printoperator", "3D-printoperator", "/app/workshop/3d-print", "Mijn wachtrij", "3d-print", false, PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.3d-print"),
                 Role("assemblage", "Assemblagemedewerker", "/app/workshop/assembly", "Mijn wachtrij", "assembly", false, PortalCapabilities.DashboardRead, PortalCapabilities.JobsReadAll, "jobs.update.assembly"),
+                Role("websiteconfigurator", "Publieke configurator", "/", "Product configureren", null, false, PortalCapabilities.Configure),
                 Role("klant", "Klant", "/app/customer", "Mijn orders", null, true, PortalCapabilities.CustomerProjectRead)
             };
         }

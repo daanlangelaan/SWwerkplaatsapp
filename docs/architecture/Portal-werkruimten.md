@@ -77,9 +77,10 @@ een afzonderlijk, getest workflowbesluit.
 ## Levervorm en logistiek
 
 Het productcontract levert voor iedere productfamilie twee onafhankelijke
-keuzes: `bouwpakket` of `gemonteerd`, en `verzenden` of `afhalen`. Bouwpakket is
-de masterdata-default; de ontvangstwijze heeft bewust geen default en moet door
-de gebruiker worden gekozen. Montage bij gemonteerd en verpakking/verzending
+keuzes: `bouwpakket` of `gemonteerd`, en `verzenden` of `afhalen`. Bouwpakket en
+verzenden zijn de masterdata-defaults. Bij het openen van een configureerbaar
+product vult de portal alle backenddefaults in en start direct de conceptberekening,
+zodat het standaardmodel zonder voorafgaande selectie zichtbaar wordt. Montage bij gemonteerd en verpakking/verzending
 bij verzenden staan eerst op `Op aanvraag`. Alleen Bedrijfsbeheer kan in de pilot
 de bedragen excl. btw vaststellen. De getoonde productprijs blijft herkenbaar
 gescheiden zolang niet alle leveringskosten bekend zijn.

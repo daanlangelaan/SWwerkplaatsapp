@@ -37,7 +37,8 @@ namespace SWWerkplaats.Configurator.Portal
 
             AddProfileConnectionAccessHoles(parts, model);
             ApplyPresentationMetadata(parts);
-            if (lexConfig != null || (request != null && string.Equals(request.Product, "hoogteverstelbare_werktafel", StringComparison.OrdinalIgnoreCase)))
+            if (lexConfig != null || (request != null && (string.Equals(request.Product, "hoogteverstelbare_werktafel", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(request.Product, "opvouwbare_werktafel", StringComparison.OrdinalIgnoreCase))))
                 PortalMotionContractService.ApplyPartMotionMetadata(parts);
             return parts;
         }
@@ -59,7 +60,7 @@ namespace SWWerkplaats.Configurator.Portal
                     || name.Contains("zwarte eindkap") || name.Contains("zwarte spleet") || name.Contains("liangyue ly103-12 clip")) part.AppearanceRole = "black-hardware";
                 else if ((part.Kind ?? string.Empty).StartsWith("hardware-cabinet", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "cabinet-hardware";
                 else if (string.Equals(part.Shape, "acrylic-panel", StringComparison.OrdinalIgnoreCase)) part.AppearanceRole = "transparent-panel";
-                else if (name.Contains("kogelpotblad")) part.AppearanceRole = "primary-surface";
+                else if (name.Contains("kogelpotblad") || name.Contains("werkblad")) part.AppearanceRole = "primary-surface";
                 else if (name.Contains("schwenkriegel") && name.Contains("rode kap")) part.AppearanceRole = "swing-latch-cap";
                 else if (name.Contains("schwenkriegel")) part.AppearanceRole = "swing-latch-body";
                 else if (name.Contains("afdekkap")) part.AppearanceRole = "end-cap";
@@ -133,8 +134,10 @@ namespace SWWerkplaats.Configurator.Portal
             var coreHolePositions = new ProfileCoreHolePositionService();
             var profileRenderContracts = new ProfileRenderContractService();
             var componentRenderContracts = new ComponentPrimitiveRenderContractService();
+            var placementIndex = 0;
             foreach (var placement in model.AssemblyPlacements)
             {
+                var assemblyInstanceId = "placement-" + (++placementIndex).ToString("D5");
                 // Legacy decoratieve markers zijn vervangen door gaten uit het
                 // bevestigde AssemblyConnection-contract.
                 if ((placement.Shape ?? string.Empty).StartsWith("black-hole-", StringComparison.OrdinalIgnoreCase)) continue;
@@ -167,35 +170,44 @@ namespace SWWerkplaats.Configurator.Portal
 
                 if (string.Equals(placement.Shape, "leveling-foot-adapter", StringComparison.OrdinalIgnoreCase))
                 {
+                    var firstPartIndex = parts.Count;
                     AddLexLevelingFootCornerAdapter(parts, placement);
+                    SetAssemblyInstanceId(parts, firstPartIndex, assemblyInstanceId);
                     continue;
                 }
 
                 if (placement.Kind == AssemblyComponentKind.Purchased && !string.IsNullOrWhiteSpace(placement.ComponentId))
                 {
-                    AddComponentPrimitives(parts, placement, componentRenderContracts.BuildRequired(placement.ComponentId));
+                    AddComponentPrimitives(parts, placement, componentRenderContracts.BuildRequired(placement.ComponentId), assemblyInstanceId);
                     continue;
                 }
 
                 if (sheet != null && placement.Orientation == AssemblyOrientation.SheetVerticalZ && HasSlidingDoorFrontEdgeCutout(sheet))
                 {
+                    var firstPartIndex = parts.Count;
                     AddSlidingDoorPassThroughVerticalZPanel(parts, placement, sheet, thickness);
+                    SetAssemblyInstanceId(parts, firstPartIndex, assemblyInstanceId);
                     continue;
                 }
                 if (sheet != null && sheet.HasToeKickNotch && placement.Orientation == AssemblyOrientation.SheetVerticalZ)
                 {
+                    var firstPartIndex = parts.Count;
                     AddNotchedVerticalZPanel(parts, placement, sheet, thickness);
+                    SetAssemblyInstanceId(parts, firstPartIndex, assemblyInstanceId);
                     continue;
                 }
                 if (sheet != null && sheet.HasCornerNotches && placement.Orientation == AssemblyOrientation.SheetHorizontal)
                 {
+                    var firstPartIndex = parts.Count;
                     AddCornerNotchedHorizontalSheet(parts, placement, sheet, thickness);
+                    SetAssemblyInstanceId(parts, firstPartIndex, assemblyInstanceId);
                     continue;
                 }
 
                 var part = new PortalAssemblyPart
                 {
                     Name = placement.PartName,
+                    AssemblyInstanceId = assemblyInstanceId,
                     MemberId = placement.MemberId,
                     TraceId = placement.TraceId,
                     Sticker = placement.Sticker,
@@ -316,15 +328,33 @@ namespace SWWerkplaats.Configurator.Portal
             }
         }
 
-        private static void AddComponentPrimitives(List<PortalAssemblyPart> parts, AssemblyPlacement placement, ComponentPrimitiveRenderContract contract)
+        private static void AddComponentPrimitives(List<PortalAssemblyPart> parts, AssemblyPlacement placement, ComponentPrimitiveRenderContract contract, string assemblyInstanceId)
         {
             foreach (var primitive in contract.Primitives)
             {
-                var center = RotateLocal(primitive.Xmm, primitive.Ymm, primitive.Zmm,
+                var pose = placement.ComponentPartPoses.FirstOrDefault(value =>
+                    string.Equals(value.PartId, primitive.PartId, StringComparison.OrdinalIgnoreCase));
+                var poseRotationX = pose == null ? 0 : pose.RotationXDeg;
+                var poseRotationY = pose == null ? 0 : pose.RotationYDeg;
+                var poseRotationZ = pose == null ? 0 : pose.RotationZDeg;
+                var posedCenter = RotateLocal(primitive.Xmm, primitive.Ymm, primitive.Zmm,
+                    poseRotationX, poseRotationY, poseRotationZ);
+                if (pose != null)
+                {
+                    posedCenter[0] += pose.Xmm;
+                    posedCenter[1] += pose.Ymm;
+                    posedCenter[2] += pose.Zmm;
+                }
+                var center = RotateLocal(posedCenter[0], posedCenter[1], posedCenter[2],
                     placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg);
+                var attachment = placement.ComponentPartAttachments.FirstOrDefault(value =>
+                    string.Equals(value.PartId, primitive.PartId, StringComparison.OrdinalIgnoreCase));
                 var part = new PortalAssemblyPart
                 {
                     Name = placement.PartName + " / " + primitive.Id,
+                    AssemblyInstanceId = assemblyInstanceId,
+                    PhysicalPartId = assemblyInstanceId + ":" + primitive.PartId,
+                    RigidMotionDriverName = attachment == null ? string.Empty : attachment.PartName,
                     MemberId = placement.MemberId + ":" + primitive.Id,
                     TraceId = placement.TraceId,
                     Kind = string.IsNullOrWhiteSpace(placement.VisualKind) ? "hardware" : placement.VisualKind,
@@ -339,9 +369,9 @@ namespace SWWerkplaats.Configurator.Portal
                     SizeXmm = primitive.InheritPlacementDimensions ? placement.LengthMm : primitive.SizeXmm,
                     SizeYmm = primitive.InheritPlacementDimensions ? placement.HeightMm : primitive.SizeYmm,
                     SizeZmm = primitive.InheritPlacementDimensions ? placement.WidthMm : primitive.SizeZmm,
-                    RotationXDeg = placement.RotationXDeg + primitive.RotationXDeg,
-                    RotationYDeg = placement.RotationYDeg + primitive.RotationYDeg,
-                    RotationZDeg = placement.RotationZDeg + primitive.RotationZDeg,
+                    RotationXDeg = placement.RotationXDeg + poseRotationX + primitive.RotationXDeg,
+                    RotationYDeg = placement.RotationYDeg + poseRotationY + primitive.RotationYDeg,
+                    RotationZDeg = placement.RotationZDeg + poseRotationZ + primitive.RotationZDeg,
                     RadiusTopMm = primitive.InheritPlacementDimensions && primitive.Shape == "cylinder" && primitive.RadiusTopMm <= 0
                         ? placement.LengthMm / 2.0 : primitive.RadiusTopMm,
                     RadiusBottomMm = primitive.InheritPlacementDimensions && primitive.Shape == "cylinder" && primitive.RadiusBottomMm <= 0
@@ -351,7 +381,15 @@ namespace SWWerkplaats.Configurator.Portal
                 part.ComponentRenderOpenData.AddRange(contract.OpenData);
                 foreach (var source in primitive.Holes)
                 {
-                    var hole = RotateLocal(source.Xmm, source.Ymm, source.Zmm,
+                    var posedHole = RotateLocal(source.Xmm, source.Ymm, source.Zmm,
+                        poseRotationX, poseRotationY, poseRotationZ);
+                    if (pose != null)
+                    {
+                        posedHole[0] += pose.Xmm;
+                        posedHole[1] += pose.Ymm;
+                        posedHole[2] += pose.Zmm;
+                    }
+                    var hole = RotateLocal(posedHole[0], posedHole[1], posedHole[2],
                         placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg);
                     part.Holes.Add(new PortalAssemblyHole
                     {
@@ -361,7 +399,10 @@ namespace SWWerkplaats.Configurator.Portal
                         Zmm = placement.Zmm + hole[2],
                         DiameterMm = source.DiameterMm,
                         DepthMm = source.DepthMm,
-                        Plane = RotatePlane(source.Plane, placement.RotationXDeg, placement.RotationYDeg, placement.RotationZDeg),
+                        Plane = RotatePlane(source.Plane,
+                            placement.RotationXDeg + poseRotationX,
+                            placement.RotationYDeg + poseRotationY,
+                            placement.RotationZDeg + poseRotationZ),
                         Countersunk = source.CountersinkDiameterMm > source.DiameterMm && source.CountersinkDepthMm > 0,
                         CountersinkDiameterMm = source.CountersinkDiameterMm,
                         CountersinkDepthMm = source.CountersinkDepthMm,
@@ -370,6 +411,12 @@ namespace SWWerkplaats.Configurator.Portal
                 }
                 parts.Add(part);
             }
+        }
+
+        private static void SetAssemblyInstanceId(List<PortalAssemblyPart> parts, int firstPartIndex, string assemblyInstanceId)
+        {
+            for (var index = firstPartIndex; index < parts.Count; index++)
+                parts[index].AssemblyInstanceId = assemblyInstanceId;
         }
 
         private static double[] RotateLocal(double x, double y, double z, double rotationXDeg, double rotationYDeg, double rotationZDeg)
@@ -785,7 +832,9 @@ namespace SWWerkplaats.Configurator.Portal
                     IsThroughCutout = hole.DepthMode == OperationDepthMode.Through,
                     Countersunk = hole.Countersunk,
                     CountersinkDiameterMm = hole.CountersinkDiameterMm,
-                    CountersinkDepthMm = hole.CountersinkDepthMm
+                    CountersinkDepthMm = hole.CountersinkDepthMm,
+                    SourceFace = hole.Face,
+                    SourceDepthMode = hole.DepthMode
                 };
 
                 if (placement.Orientation == AssemblyOrientation.SheetHorizontal)
@@ -842,7 +891,9 @@ namespace SWWerkplaats.Configurator.Portal
                     IsThroughCutout = visibleHole.IsThroughCutout,
                     Countersunk = visibleHole.Countersunk,
                     CountersinkDiameterMm = visibleHole.CountersinkDiameterMm,
-                    CountersinkDepthMm = visibleHole.CountersinkDepthMm
+                    CountersinkDepthMm = visibleHole.CountersinkDepthMm,
+                    SourceFace = visibleHole.SourceFace,
+                    SourceDepthMode = visibleHole.SourceDepthMode
                 };
 
                 if (IsInsidePartBounds(part, oppositeZ)) part.Holes.Add(oppositeZ);
@@ -864,7 +915,9 @@ namespace SWWerkplaats.Configurator.Portal
                 IsThroughCutout = visibleHole.IsThroughCutout,
                 Countersunk = visibleHole.Countersunk,
                 CountersinkDiameterMm = visibleHole.CountersinkDiameterMm,
-                CountersinkDepthMm = visibleHole.CountersinkDepthMm
+                CountersinkDepthMm = visibleHole.CountersinkDepthMm,
+                SourceFace = visibleHole.SourceFace,
+                SourceDepthMode = visibleHole.SourceDepthMode
             };
 
             if (IsInsidePartBounds(part, opposite)) part.Holes.Add(opposite);
@@ -896,7 +949,12 @@ namespace SWWerkplaats.Configurator.Portal
                 {
                     Name = pocket.Name,
                     Shape = string.IsNullOrWhiteSpace(pocket.Shape) ? "rectangle" : pocket.Shape,
-                    IsThroughCutout = pocket.DepthMode == OperationDepthMode.Through
+                    IsThroughCutout = pocket.DepthMode == OperationDepthMode.Through,
+                    SourceFace = pocket.Face,
+                    SourceDepthMode = pocket.DepthMode,
+                    AssemblyFitContractId = pocket.AssemblyFitContractId,
+                    RequiresAssemblyOccupant = pocket.RequiresAssemblyOccupant,
+                    MinimumAssemblyOccupancyRatio = pocket.MinimumAssemblyOccupancyRatio
                 };
 
                 if (placement.Orientation == AssemblyOrientation.SheetHorizontal)

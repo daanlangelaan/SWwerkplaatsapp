@@ -339,6 +339,17 @@ namespace SWWerkplaats.Configurator.Portal
                 return;
             }
 
+            if (request.Method == "POST" && path == "/api/viewer")
+            {
+                var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);
+                PrepareQuoteRequest(quoteRequest, actor);
+                var preview = new ProductionOutputService().BuildPreview(quoteRequest);
+                var parts = new PortalAssembly3DService().Build(preview.Model, quoteRequest);
+                var motion = new PortalMotionContractService().Build(preview.Model, quoteRequest, parts);
+                WriteHtml(stream, 200, ProductionOutputService.BuildEmbeddedAssembly3DHtml(parts, motion, serializer));
+                return;
+            }
+
             if (request.Method == "POST" && path == "/api/solidworks/export")
             {
                 var quoteRequest = serializer.Deserialize<PortalQuoteRequest>(request.Body);

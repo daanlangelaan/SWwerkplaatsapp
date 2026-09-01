@@ -4,7 +4,7 @@ namespace SWWerkplaats.Configurator.Domain
 {
     public enum AssemblyDataStatus { Confirmed, Provisional, Unresolved }
     public enum ProfileEnd { A, B }
-    public enum AssemblyJointType { StandardConnector, HingeSlidingNut }
+    public enum AssemblyJointType { StandardConnector, HingeSlidingNut, SheetHinge }
 
     public sealed class AssemblyConnection
     {

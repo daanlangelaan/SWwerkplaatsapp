@@ -12,6 +12,7 @@ namespace SWWerkplaats.Configurator.Portal
     {
         private static readonly Lazy<string> Renderer = new Lazy<string>(BuildRendererJavaScript);
         private static readonly Lazy<string> ThreeModule = new Lazy<string>(BuildThreeModuleDataUrl);
+        private static readonly Lazy<string> OrbitControlsModule = new Lazy<string>(BuildOrbitControlsModuleDataUrl);
 
         public static string RendererJavaScript
         {
@@ -23,6 +24,11 @@ namespace SWWerkplaats.Configurator.Portal
             get { return ThreeModule.Value; }
         }
 
+        public static string OrbitControlsModuleDataUrl
+        {
+            get { return OrbitControlsModule.Value; }
+        }
+
         private static string BuildRendererJavaScript()
         {
             var page = PortalHtml.Page();
@@ -30,7 +36,7 @@ namespace SWWerkplaats.Configurator.Portal
             AppendSlice(sb, page, "    function presentationObject(value,pascal,camel)", "    function applyPresentationContract(value)");
             AppendSlice(sb, page, "    function instructionAxis(p)", "    function instructionSize(p,axis)");
             AppendSlice(sb, page, "    function instructionCoreLocal(profile,core)", "    function instructionOverviewJoints(parts,step)");
-            AppendSlice(sb, page, "    function isLayeredPlywoodPart(p)", "    function drawGround(ctx,w,h,dpr)");
+            AppendSlice(sb, page, "    function isLayeredPlywoodPart(p)", "    function assemblyRenderKey(parts)");
             AppendSlice(sb, page, "    function buildThreeParts(THREE,group,parts)", "    function fitThreeCamera(THREE,camera,controls)");
             return sb.ToString();
         }
@@ -54,6 +60,19 @@ namespace SWWerkplaats.Configurator.Portal
                 throw new FileNotFoundException("De gedeelde Three.js-viewerasset ontbreekt.", path);
 
             return "data:text/javascript;base64," + Convert.ToBase64String(File.ReadAllBytes(path));
+        }
+
+        private static string BuildOrbitControlsModuleDataUrl()
+        {
+            var applicationFolder = Path.GetDirectoryName(typeof(PortalAssemblyViewerSource).Assembly.Location)
+                ?? AppDomain.CurrentDomain.BaseDirectory;
+            var path = Path.Combine(applicationFolder, "PortalAssets", "vendor", "three", "OrbitControls.js");
+            if (!File.Exists(path))
+                throw new FileNotFoundException("De gedeelde OrbitControls-viewerasset ontbreekt.", path);
+
+            var source = File.ReadAllText(path)
+                .Replace("from './three.module.js'", "from '" + ThreeModuleDataUrl + "'");
+            return "data:text/javascript;base64," + Convert.ToBase64String(Encoding.UTF8.GetBytes(source));
         }
     }
 }

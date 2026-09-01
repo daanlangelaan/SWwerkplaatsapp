@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Web.Script.Serialization;
 using Microsoft.Data.Sqlite;
 using SWWerkplaats.Configurator.Application;
 using SWWerkplaats.Configurator.Portal;
@@ -57,6 +58,31 @@ internal static class Program
             Require(context.Body.Contains("\"RoleId\":\"productiemedewerker\"") && context.Body.Contains("\"RoleId\":\"klant\"") && !context.Body.Contains("\"RoleId\":\"verkoop\"") && !context.Body.Contains("\"RoleId\":\"cncoperator\"") && context.Body.Contains("\"AreaId\":\"dispatch\""), "Driedelige pilotrolverdeling of gescheiden productiewachtrijen klopt niet");
             var catalog = Get(port, "/api/catalog", admin);
             Require(catalog.Status == 200 && catalog.Body.Contains("\"Product\":\"shipping_box\"") && !catalog.Body.Contains("\"Product\":\"werktafel\""), "HTTP-sitefilter lekt producten");
+            var catalogContract = new CatalogApplicationService().GetCatalog();
+            var shippingBox = catalogContract.Products.Single(product => product.Product == "shipping_box");
+            var viewerRequest = new PortalQuoteRequest
+            {
+                Product = shippingBox.Product,
+                WidthMm = shippingBox.DefaultWidthMm,
+                DepthMm = shippingBox.DefaultDepthMm,
+                HeightMm = shippingBox.DefaultHeightMm,
+                Quantity = shippingBox.DefaultQuantity
+            };
+            foreach (var input in shippingBox.ConfigurationInputs)
+            {
+                if (string.Equals(input.Section, "levering", StringComparison.OrdinalIgnoreCase)) continue;
+                var property = typeof(PortalQuoteRequest).GetProperty(input.RequestField);
+                var value = input.DefaultValue;
+                if (string.IsNullOrWhiteSpace(value) && input.Options.Any()) value = input.Options.First().Value;
+                if (property != null && property.PropertyType == typeof(string)) property.SetValue(viewerRequest, value, null);
+                if (property != null && property.PropertyType == typeof(bool?)) property.SetValue(viewerRequest, string.Equals(value, "Ja", StringComparison.OrdinalIgnoreCase), null);
+            }
+            var viewer = Post(port, "/api/viewer", admin, new JavaScriptSerializer().Serialize(viewerRequest));
+            Require(viewer.Status == 200
+                    && viewer.Body.Contains("<body class=\"embedded\">")
+                    && viewer.Body.Contains("buildThreeParts(THREE,group,adjustedParts())")
+                    && viewer.Body.Contains("openTSlotModuleShape"),
+                "Publieke viewerroute moet zonder leveringskeuze de gedeelde webconfigurator-renderer voor startwaarden leveren");
             var shell = Get(port, "/app/workshop", admin);
             Require(shell.Status == 200 && !shell.Body.Contains("/*DESIGN_TOKENS*/") && shell.Body.Contains("Bekijk portal als") && shell.Body.Contains("role-choices") && !shell.Body.Contains("<select id=\"role\"") && !shell.Body.Contains("Pas testcontext toe"), "Directe rolkeuzes of designtokens ontbreken");
             var operatorDashboard = Get(port, "/api/workspace/dashboard", assemblyOperator);
@@ -79,6 +105,27 @@ internal static class Program
         var request = (HttpWebRequest)WebRequest.Create("http://localhost:" + port + path);
         request.Method = "GET";
         foreach (var header in headers) request.Headers[header.Key] = header.Value;
+        try
+        {
+            using (var response = (HttpWebResponse)request.GetResponse()) return Read(response);
+        }
+        catch (WebException ex)
+        {
+            var response = ex.Response as HttpWebResponse;
+            if (response == null) throw;
+            using (response) return Read(response);
+        }
+    }
+
+    private static HttpResult Post(int port, string path, IDictionary<string, string> headers, string body)
+    {
+        var request = (HttpWebRequest)WebRequest.Create("http://localhost:" + port + path);
+        request.Method = "POST";
+        request.ContentType = "application/json";
+        foreach (var header in headers) request.Headers[header.Key] = header.Value;
+        var bytes = Encoding.UTF8.GetBytes(body ?? "{}");
+        request.ContentLength = bytes.Length;
+        using (var stream = request.GetRequestStream()) stream.Write(bytes, 0, bytes.Length);
         try
         {
             using (var response = (HttpWebResponse)request.GetResponse()) return Read(response);

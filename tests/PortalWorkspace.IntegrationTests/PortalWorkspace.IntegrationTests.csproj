@@ -10,5 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SWWerkplaats.Configurator\SWWerkplaats.Configurator.csproj" />
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 </Project>

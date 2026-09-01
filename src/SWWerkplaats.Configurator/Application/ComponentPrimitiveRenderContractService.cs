@@ -25,6 +25,7 @@ namespace SWWerkplaats.Configurator.Application
     public sealed class ComponentPrimitiveRenderPart
     {
         public string Id { get; set; }
+        public string PartId { get; set; }
         public string Shape { get; set; }
         public string AppearanceRole { get; set; }
         public double Xmm { get; set; }
@@ -148,6 +149,8 @@ namespace SWWerkplaats.Configurator.Application
                 RadialSegments = (int)Number(row, "segments"),
                 InheritPlacementDimensions = inheritPlacementDimensions
             };
+            primitive.PartId = OptionalText(row, "partId");
+            if (primitive.PartId.Length == 0) primitive.PartId = primitive.Id;
             if (primitive.Shape != "box" && primitive.Shape != "cylinder")
                 throw new InvalidOperationException("Rendercomponent " + componentId + " gebruikt een niet-ondersteunde primitive: " + primitive.Shape + ".");
             if (primitive.Shape == "cylinder")
@@ -188,6 +191,14 @@ namespace SWWerkplaats.Configurator.Application
             var value = row.TryGetValue(key, out raw) && raw != null ? Convert.ToString(raw, CultureInfo.InvariantCulture).Trim() : string.Empty;
             if (value.Length == 0) throw new InvalidOperationException("Rendercomponent " + componentId + " mist veld " + key + ".");
             return value;
+        }
+
+        private static string OptionalText(Dictionary<string, object> row, string key)
+        {
+            object raw;
+            return row.TryGetValue(key, out raw) && raw != null
+                ? Convert.ToString(raw, CultureInfo.InvariantCulture).Trim()
+                : string.Empty;
         }
 
         private static double Positive(Dictionary<string, object> row, string key, string componentId)

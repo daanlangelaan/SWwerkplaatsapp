@@ -174,6 +174,33 @@ Een sitespecifieke afwijking wordt via een getypeerd contract of compositiepunt
 toegevoegd. Er ontstaan geen `shipping-box-portal.js`, `workstation-pricing.js`
 of vergelijkbare forks met eigen bedrijfslogica.
 
+## Klantcopygrens
+
+Een publieke productwebsite spreekt uitsluitend over het product, het gebruik,
+de keuzes van de klant, de prijsstatus en een begrijpelijke vervolgstap. De
+interne architectuur is nooit klantcopy.
+
+Niet zichtbaar voor klanten zijn onder andere:
+
+- backend, API, database, masterdata, runtime, renderer of contractnamen;
+- formuleringen zoals "centrale technische omgeving", "gedeelde
+  webconfigurator", "rechtstreeks ingesloten" of "één technische waarheid";
+- interne vrijgave-, blokkade-, productie- of diagnosemeldingen;
+- implementatie-uitleg over waar waarden, prijzen of 3D-beelden vandaan komen.
+
+Wel zichtbaar zijn de gevolgen die voor de klant relevant zijn, bijvoorbeeld
+beschikbare maatvoering, "prijs ter indicatie", "we controleren je aanvraag" en
+een concrete herstelactie zoals opnieuw proberen of contact opnemen. Fouten uit
+backendservices worden niet onbewerkt doorgezet naar publieke pagina's; de
+publieke site vertaalt ze naar veilige, klantgerichte status- en foutteksten.
+Deze grens geldt ook voor toegankelijkheidslabels, tooltips, lege toestanden,
+laadteksten, metadata, FAQ's en footers.
+
+Iedere productwebsite krijgt een geautomatiseerde klantcopycontrole die de
+gerenderde pagina en alle publiek zichtbare status- en foutteksten controleert
+op interne architectuurtaal. Nieuwe sites mogen niet worden gepubliceerd zolang
+die controle faalt.
+
 ## Opslag- en schaalgrens
 
 In de huidige lokale fase kan één backendproces meerdere sites en gelijktijdige
@@ -204,6 +231,8 @@ De grote revisie test minimaal:
 - een uitgeschakelde site weigert nieuwe publieke aanvragen zonder bestaande
   interne projecten onbereikbaar te maken;
 - rol- en site-simulatie gebruiken dezelfde backendgrenzen als de latere login.
+- gerenderde klantpagina's, foutmeldingen, toegankelijkheidslabels, FAQ's en
+  footers bevatten geen interne architectuur-, diagnose- of vrijgavetaal.
 
 ## Migratievolgorde
 
@@ -230,3 +259,5 @@ De grote revisie test minimaal:
 - Geen globale mutable site- of gebruikerscontext in het backendproces.
 - Geen tweede klantaccount eisen wanneer dezelfde organisatie via een andere
   productwebsite bestelt.
+- Geen interne architectuuruitleg, backendmelding of technische diagnose als
+  marketingtekst, hulptekst, laadstatus, foutmelding, FAQ of footer tonen.

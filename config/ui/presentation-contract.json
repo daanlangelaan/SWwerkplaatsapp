@@ -27,7 +27,16 @@
       "plywoodFaceBase": "#d8bd94",
       "plywoodFaceGrain": "#966b43",
       "plywoodEdgeLight": "#d9b27b",
-      "plywoodEdgeDark": "#8b5a36"
+      "plywoodEdgeDark": "#8b5a36",
+      "betonplexFaceBase": "#242321",
+      "betonplexFaceGrain": "#3a3731",
+      "betonplexEdgeLight": "#d4b078",
+      "betonplexEdgeDark": "#8a5b35",
+      "osbFaceBase": "#c99b61",
+      "osbFlakeLight": "#e6c08a",
+      "osbFlakeMid": "#a97743",
+      "osbFlakeDark": "#6f4a2d",
+      "osbEdge": "#9a6c3f"
     },
     "typography": {
       "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
@@ -132,7 +141,10 @@
       "plywoodLayerBands": 11,
       "plywoodTextureWidthPx": 512,
       "plywoodTextureHeightPx": 128,
-      "plywoodGrainLines": 18
+      "plywoodGrainLines": 18,
+      "osbTextureWidthPx": 512,
+      "osbTextureHeightPx": 256,
+      "osbFlakeCount": 180
     }
   }
 }
